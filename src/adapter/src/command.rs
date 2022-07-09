@@ -123,6 +123,7 @@ pub struct StartupResponse {
 pub enum StartupMessage {
     /// The database specified in the initial session does not exist.
     UnknownSessionDatabase(String),
+    Notice(&'static str),
 }
 
 impl StartupMessage {
@@ -140,6 +141,7 @@ impl StartupMessage {
                  List available databases with SHOW DATABASES."
                     .into(),
             ),
+            StartupMessage::Notice(_) => None,
         }
     }
 }
@@ -150,6 +152,7 @@ impl fmt::Display for StartupMessage {
             StartupMessage::UnknownSessionDatabase(name) => {
                 write!(f, "session database {} does not exist", name.quoted())
             }
+            StartupMessage::Notice(s) => write!(f, "{}", s),
         }
     }
 }

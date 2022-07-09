@@ -22,10 +22,10 @@
 
 #![warn(clippy::as_conversions)]
 
-mod codec;
-mod message;
 mod protocol;
 mod server;
 
+pub mod codec;
+pub mod message;
 pub use protocol::match_handshake;
 pub use server::{Config, Server, TlsConfig, TlsMode};

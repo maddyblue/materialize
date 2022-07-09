@@ -81,7 +81,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub(crate) fn new(cmd_tx: mpsc::UnboundedSender<Command>) -> Client {
+    pub fn new(cmd_tx: mpsc::UnboundedSender<Command>) -> Client {
         Client {
             cmd_tx,
             id_alloc: Arc::new(IdAllocator::new(1, 1 << 16)),

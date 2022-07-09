@@ -3804,6 +3804,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "mz-psql-demo"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "mz-adapter",
+ "mz-ore",
+ "mz-pgwire",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "mz-repr"
 version = "0.0.0"
 dependencies = [

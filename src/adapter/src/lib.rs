@@ -33,7 +33,6 @@ macro_rules! coord_bail {
 }
 
 mod client;
-mod command;
 mod coord;
 mod error;
 mod explain_new;
@@ -42,6 +41,7 @@ mod tail;
 mod util;
 
 pub mod catalog;
+pub mod command;
 pub mod session;
 
 pub use crate::client::{Client, ConnClient, Handle, SessionClient};

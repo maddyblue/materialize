@@ -41,7 +41,7 @@ use mz_secrets_kubernetes::{KubernetesSecretsController, KubernetesSecretsContro
 use mz_storage::client::connections::ConnectionContext;
 use tracing::error;
 
-use crate::tcp_connection::ConnectionHandler;
+pub use crate::tcp_connection::ConnectionHandler;
 
 pub mod http;
 pub mod tcp_connection;

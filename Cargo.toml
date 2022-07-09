@@ -38,6 +38,7 @@ members = [
     "src/postgres-util",
     "src/prof",
     "src/proto",
+    "src/psql-demo",
     "src/repr-test-util",
     "src/repr",
     "src/s3-datagen",
