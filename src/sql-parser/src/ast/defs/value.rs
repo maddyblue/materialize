@@ -26,6 +26,8 @@ use serde::{Deserialize, Serialize};
 use crate::ast::display::{self, AstDisplay, AstFormatter};
 use crate::ast::Ident;
 
+use crate::ast::display::ToDoc;
+
 #[derive(Debug)]
 pub struct ValueError(pub(crate) String);
 
@@ -129,6 +131,7 @@ impl AstDisplay for Value {
     }
 }
 impl_display!(Value);
+impl_to_doc!(Value);
 
 impl From<Ident> for Value {
     fn from(ident: Ident) -> Self {

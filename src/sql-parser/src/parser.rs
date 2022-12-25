@@ -419,21 +419,18 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                Ok(Expr::Op {
+                Ok(Expr::UnaryOp {
                     op: Op::bare(op),
                     expr1: Box::new(self.parse_subexpr(Precedence::PrefixPlusMinus)?),
-                    expr2: None,
                 })
             }
-            Token::Op(op) if op == "+" => Ok(Expr::Op {
+            Token::Op(op) if op == "+" => Ok(Expr::UnaryOp {
                 op: Op::bare(op),
                 expr1: Box::new(self.parse_subexpr(Precedence::PrefixPlusMinus)?),
-                expr2: None,
             }),
-            Token::Op(op) if op == "~" => Ok(Expr::Op {
+            Token::Op(op) if op == "~" => Ok(Expr::UnaryOp {
                 op: Op::bare(op),
                 expr1: Box::new(self.parse_subexpr(Precedence::Other)?),
-                expr2: None,
             }),
             Token::Number(_) | Token::String(_) | Token::HexString(_) => {
                 self.prev_token();
@@ -1000,10 +997,10 @@ impl<'a> Parser<'a> {
 
                 Ok(expr)
             } else {
-                Ok(Expr::Op {
+                Ok(Expr::BinaryOp {
                     op,
                     expr1: Box::new(expr),
-                    expr2: Some(Box::new(self.parse_subexpr(precedence)?)),
+                    expr2: Box::new(self.parse_subexpr(precedence)?),
                 })
             }
         } else if let Token::Keyword(kw) = tok {

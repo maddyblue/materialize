@@ -24,15 +24,18 @@ use std::mem;
 use crate::ast::display::{self, AstDisplay, AstFormatter};
 use crate::ast::{AstInfo, Ident, OrderByExpr, Query, UnresolvedObjectName, Value};
 
+use crate::ast::display::ToDoc;
+use astdisplay::*;
+
 /// An SQL expression of any type.
 ///
 /// The parser does not distinguish between expressions of different types
 /// (e.g. boolean vs string), so the caller must handle expressions of
 /// inappropriate type, like `WHERE 1` or `SELECT 1=1`, as necessary.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum Expr<T: AstInfo> {
     /// Identifier e.g. table name or column name
-    Identifier(Vec<Ident>),
+    Identifier(#[todoc(separator = ".", no_name)] Vec<Ident>),
     /// Qualified wildcard, e.g. `alias.*` or `schema.table.*`.
     QualifiedWildcard(Vec<Ident>),
     /// A field access, like `(expr).foo`.
@@ -48,26 +51,31 @@ pub enum Expr<T: AstInfo> {
     /// compatibility.
     WildcardAccess(Box<Expr<T>>),
     /// A positional parameter, e.g., `$1` or `$42`
+    #[todoc(prefix = "$")]
     Parameter(usize),
     /// Boolean negation
     Not {
+        #[todoc(nest = "NOT")]
         expr: Box<Expr<T>>,
     },
     /// Boolean and
     And {
         left: Box<Expr<T>>,
+        #[todoc(nest = "AND")]
         right: Box<Expr<T>>,
     },
     /// Boolean or
     Or {
         left: Box<Expr<T>>,
+        #[todoc(nest = "OR")]
         right: Box<Expr<T>>,
     },
     /// `IS {NULL, TRUE, FALSE, UNKNOWN}` expression
     IsExpr {
         expr: Box<Expr<T>>,
-        construct: IsExprConstruct,
+        #[todoc(rename = "IS NOT", else = "IS")]
         negated: bool,
+        construct: IsExprConstruct,
     },
     /// `[ NOT ] IN (val1, val2, ...)`
     InList {
@@ -84,26 +92,37 @@ pub enum Expr<T: AstInfo> {
     /// `<expr> [ NOT ] {LIKE, ILIKE} <pattern> [ ESCAPE <escape> ]`
     Like {
         expr: Box<Expr<T>>,
+        #[todoc(rename = "NOT")]
+        negated: bool,
+        #[todoc(rename = "ILIKE", else = "LIKE")]
+        case_insensitive: bool,
         pattern: Box<Expr<T>>,
         escape: Option<Box<Expr<T>>>,
-        case_insensitive: bool,
-        negated: bool,
     },
     /// `<expr> [ NOT ] BETWEEN <low> AND <high>`
     Between {
         expr: Box<Expr<T>>,
+        #[todoc(rename = "NOT BETWEEN", else = "BETWEEN")]
         negated: bool,
         low: Box<Expr<T>>,
+        #[todoc(nest = "AND")]
         high: Box<Expr<T>>,
     },
-    /// Unary or binary operator
-    Op {
+    /// Unary operator
+    UnaryOp {
         op: Op,
         expr1: Box<Expr<T>>,
-        expr2: Option<Box<Expr<T>>>,
+    },
+    /// Binary operator
+    BinaryOp {
+        expr1: Box<Expr<T>>,
+        op: Op,
+        expr2: Box<Expr<T>>,
     },
     /// CAST an expression to a different data type e.g. `CAST(foo AS VARCHAR(123))`
+    #[todoc(separator = "::")]
     Cast {
+        #[todoc(prefix = "(", suffix = ")")]
         expr: Box<Expr<T>>,
         data_type: T::DataType,
     },
@@ -181,10 +200,10 @@ pub enum Expr<T: AstInfo> {
         right: Box<Expr<T>>,
     },
     /// `ARRAY[<expr>*]`
-    Array(Vec<Expr<T>>),
+    Array(#[todoc(prefix = "ARRAY[", suffix = "]", no_name)] Vec<Expr<T>>),
     ArraySubquery(Box<Query<T>>),
     /// `LIST[<expr>*]`
-    List(Vec<Expr<T>>),
+    List(#[todoc(prefix = "LIST[", suffix = "]", no_name)] Vec<Expr<T>>),
     ListSubquery(Box<Query<T>>),
     /// `<expr>([<expr>(:<expr>)?])+`
     Subscript {
@@ -305,18 +324,17 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
                 f.write_str(" AND ");
                 f.write_node(&high);
             }
-            Expr::Op { op, expr1, expr2 } => {
-                if let Some(expr2) = expr2 {
-                    f.write_node(&expr1);
-                    f.write_str(" ");
-                    f.write_str(op);
-                    f.write_str(" ");
-                    f.write_node(&expr2);
-                } else {
-                    f.write_str(op);
-                    f.write_str(" ");
-                    f.write_node(&expr1);
-                }
+            Expr::UnaryOp { op, expr1 } => {
+                f.write_str(op);
+                f.write_str(" ");
+                f.write_node(&expr1);
+            }
+            Expr::BinaryOp { op, expr1, expr2 } => {
+                f.write_node(&expr1);
+                f.write_str(" ");
+                f.write_str(op);
+                f.write_str(" ");
+                f.write_node(&expr2);
             }
             Expr::Cast { expr, data_type } => {
                 // We are potentially rewriting an expression like
@@ -329,7 +347,7 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
                 //    (<expr> OP <expr>)::<type>
                 // unless the inner expression is of a type that we know is
                 // safe to follow with a `::` to without wrapping.
-                let needs_wrap = !matches!(
+                let _needs_wrap = !matches!(
                     **expr,
                     Expr::Nested(_)
                         | Expr::Value(_)
@@ -340,6 +358,8 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
                         | Expr::HomogenizingFunction { .. }
                         | Expr::NullIf { .. }
                 );
+                // ToDoc hack:
+                let needs_wrap = true;
                 if needs_wrap {
                     f.write_str('(');
                 }
@@ -535,10 +555,10 @@ impl<T: AstInfo> Expr<T> {
     }
 
     pub fn binop(self, op: Op, right: Expr<T>) -> Expr<T> {
-        Expr::Op {
+        Expr::BinaryOp {
             op,
             expr1: Box::new(self),
-            expr2: Some(Box::new(right)),
+            expr2: Box::new(right),
         }
     }
 
@@ -626,6 +646,7 @@ impl AstDisplay for Op {
     }
 }
 impl_display!(Op);
+impl_to_doc!(Op);
 
 impl Op {
     /// Constructs a new unqualified operator reference.
@@ -640,7 +661,7 @@ impl Op {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum HomogenizingFunction {
     Coalesce,
     Greatest,
@@ -680,6 +701,7 @@ impl<T: AstInfo> AstDisplay for SubscriptPosition<T> {
     }
 }
 impl_display_t!(SubscriptPosition);
+impl_to_doc_t!(SubscriptPosition);
 
 /// A window specification (i.e. `OVER (PARTITION BY .. ORDER BY .. etc.)`)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -820,6 +842,7 @@ impl<T: AstInfo> AstDisplay for Function<T> {
     }
 }
 impl_display_t!(Function);
+impl_to_doc_t!(Function);
 
 /// Arguments for a function call.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -857,8 +880,9 @@ impl<T: AstInfo> AstDisplay for FunctionArgs<T> {
     }
 }
 impl_display_t!(FunctionArgs);
+impl_to_doc_t!(FunctionArgs);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ToDoc)]
 pub enum IsExprConstruct {
     Null,
     True,

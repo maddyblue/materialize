@@ -83,6 +83,14 @@ fn datadriven() {
         let input = tc.input.trim();
         match parser::parse_expr(input) {
             Ok(s) => {
+                for doc in pdoc(&s) {
+                    println!();
+                    dbg!(&s);
+                    println!("EXPR: {s}");
+                    println!("DOC: {doc}");
+                    let n = parser::parse_expr(&doc).unwrap();
+                    assert_eq!(n, s, "doc: {doc}, orig: {s}");
+                }
                 if tc.args.get("roundtrip").is_some() {
                     format!("{}\n", s)
                 } else {
@@ -104,6 +112,18 @@ fn datadriven() {
             }
         })
     });
+}
+
+fn pdoc<T: mz_sql_parser::ast::display::ToDoc>(t: &T) -> Vec<String> {
+    let doc = t.to_doc();
+    [0, 10000]
+        .into_iter()
+        .map(|i| {
+            let mut cur = Vec::new();
+            doc.render(i, &mut cur).unwrap();
+            String::from_utf8(cur).unwrap()
+        })
+        .collect()
 }
 
 #[test]

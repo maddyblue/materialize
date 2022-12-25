@@ -3090,8 +3090,9 @@ fn plan_expr_inner<'a>(
         Expr::Row { exprs } => plan_row(ecx, exprs),
 
         // Generalized functions, operators, and casts.
-        Expr::Op { op, expr1, expr2 } => {
-            Ok(plan_op(ecx, normalize::op(op)?, expr1, expr2.as_deref())?.into())
+        Expr::UnaryOp { op, expr1 } => Ok(plan_op(ecx, normalize::op(op)?, expr1, None)?.into()),
+        Expr::BinaryOp { op, expr1, expr2 } => {
+            Ok(plan_op(ecx, normalize::op(op)?, expr1, Some(expr2))?.into())
         }
         Expr::Cast { expr, data_type } => plan_cast(ecx, expr, data_type),
         Expr::Function(func) => Ok(plan_function(ecx, func)?.into()),

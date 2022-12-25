@@ -34,6 +34,8 @@ use crate::catalog::{CatalogItemType, CatalogTypeDetails, SessionCatalog};
 use crate::normalize;
 use crate::plan::PlanError;
 
+use crate::ast::display::ToDoc;
+
 /// A fully-qualified human readable name of an item in the catalog.
 ///
 /// Catalog names compare case sensitively. Use
@@ -413,6 +415,7 @@ impl std::fmt::Display for ResolvedObjectName {
         f.write_str(self.to_ast_string().as_str())
     }
 }
+mz_sql_parser::impl_to_doc!(ResolvedObjectName);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum ResolvedSchemaName {
@@ -590,6 +593,8 @@ impl fmt::Display for ResolvedDataType {
         f.write_str(self.to_ast_string().as_str())
     }
 }
+
+mz_sql_parser::impl_to_doc!(ResolvedDataType);
 
 impl AstInfo for Aug {
     type NestedStatement = Statement<Raw>;

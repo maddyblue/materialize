@@ -2269,6 +2269,7 @@ impl<T: AstInfo> AstDisplay for WithOptionValue<T> {
     }
 }
 impl_display_t!(WithOptionValue);
+impl_to_doc_t!(WithOptionValue);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TransactionMode {
@@ -2766,3 +2767,4 @@ impl<T: AstInfo> AstDisplay for ShowStatement<T> {
     }
 }
 impl_display_t!(ShowStatement);
+impl_to_doc_t!(ShowStatement);

@@ -108,6 +108,49 @@ where
     }
 }
 
+pub trait ToDoc {
+    fn to_doc(&self) -> pretty::RcDoc<()>;
+}
+
+impl<T: ToDoc> ToDoc for &Box<T> {
+    fn to_doc(&self) -> pretty::RcDoc<()> {
+        (*self).to_doc()
+    }
+}
+
+impl<T: ToDoc> ToDoc for Box<T> {
+    fn to_doc(&self) -> pretty::RcDoc<()> {
+        (**self).to_doc()
+    }
+}
+
+impl ToDoc for usize {
+    fn to_doc(&self) -> pretty::RcDoc<()> {
+        pretty::RcDoc::text(self.to_string())
+    }
+}
+
+#[macro_export]
+macro_rules! impl_to_doc {
+    ($name:ident) => {
+        impl ToDoc for $name {
+            fn to_doc(&self) -> pretty::RcDoc<()> {
+                pretty::RcDoc::text(self.to_ast_string())
+            }
+        }
+    };
+}
+
+macro_rules! impl_to_doc_t {
+    ($name:ident) => {
+        impl<T: AstInfo> crate::ast::display::ToDoc for $name<T> {
+            fn to_doc(&self) -> pretty::RcDoc<()> {
+                pretty::RcDoc::text(self.to_ast_string())
+            }
+        }
+    };
+}
+
 // AstDisplay is an alternative to fmt::Display to be used for formatting ASTs. It permits
 // configuration global to a printing of a given AST.
 pub trait AstDisplay {

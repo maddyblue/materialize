@@ -502,10 +502,10 @@ impl Desugarer {
         // $l1 < $r1 OR ($l1 = $r1 AND ($l2 < $r2 OR ($l2 = $r2 AND ... ($ln <= $rn))))
         //
         // and analogously for the inverse operations !=, >, and >=.
-        if let Expr::Op {
+        if let Expr::BinaryOp {
             op,
             expr1: left,
-            expr2: Some(right),
+            expr2: right,
         } = expr
         {
             if let (Expr::Row { exprs: left }, Expr::Row { exprs: right }) =

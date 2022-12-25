@@ -122,6 +122,6 @@ EXPLAIN OPTIMIZER TRACE WITH (est_cost) AS TEXT FOR SELECT 1 + 1
 ----
 EXPLAIN OPTIMIZER TRACE WITH(est_cost) AS TEXT FOR SELECT 1 + 1
 =>
-Explain(ExplainStatement { stage: Trace, config_flags: [Ident("est_cost")], format: Text, explainee: Query(Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Expr { expr: Op { op: Op { namespace: [], op: "+" }, expr1: Value(Number("1")), expr2: Some(Value(Number("1"))) }, alias: None }], from: [], selection: None, group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None }) })
+Explain(ExplainStatement { stage: Trace, config_flags: [Ident("est_cost")], format: Text, explainee: Query(Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Expr { expr: BinaryOp { expr1: Value(Number("1")), op: Op { namespace: [], op: "+" }, expr2: Value(Number("1")) }, alias: None }], from: [], selection: None, group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None }) })
 
 # TODO (#13299): Add negative tests for new explain API.

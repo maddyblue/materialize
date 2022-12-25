@@ -103,6 +103,12 @@ checksum = "bf7d0a018de4f6aa429b9d33d69edf69072b1c5b1cb8d3e4a5f7ef898fc3eb76"
 
 [[package]]
 name = "arrayvec"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
+
+[[package]]
+name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
@@ -200,6 +206,15 @@ dependencies = [
  "predicates-core",
  "predicates-tree",
  "wait-timeout",
+]
+
+[[package]]
+name = "astdisplay"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -671,7 +686,7 @@ dependencies = [
 [[package]]
 name = "axum"
 version = "0.6.1"
-source = "git+https://github.com/tokio-rs/axum.git#71e83291e18056556a242d9e504911c0bfb1a917"
+source = "git+https://github.com/tokio-rs/axum.git#978ae6335862b264b4368e01a52177d98c42b2d9"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -707,7 +722,7 @@ dependencies = [
 [[package]]
 name = "axum-core"
 version = "0.3.0"
-source = "git+https://github.com/tokio-rs/axum.git#71e83291e18056556a242d9e504911c0bfb1a917"
+source = "git+https://github.com/tokio-rs/axum.git#978ae6335862b264b4368e01a52177d98c42b2d9"
 dependencies = [
  "async-trait",
  "bytes",
@@ -4490,6 +4505,7 @@ dependencies = [
  "mz-storage-client",
  "once_cell",
  "paste",
+ "pretty",
  "prost",
  "protobuf-native",
  "rdkafka",
@@ -4512,6 +4528,7 @@ name = "mz-sql-parser"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "astdisplay",
  "datadriven",
  "enum-kinds",
  "itertools",
@@ -4519,6 +4536,7 @@ dependencies = [
  "mz-walkabout",
  "phf",
  "phf_codegen",
+ "pretty",
  "serde",
  "tracing",
  "uncased",
@@ -5669,6 +5687,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83f3aa1e3ca87d3b124db7461265ac176b40c277f37e503eaa29c9c75c037846"
+dependencies = [
+ "arrayvec 0.5.2",
+ "log",
+ "typed-arena",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "pretty-hex"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6205,7 +6235,7 @@ version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0593ce4677e3800ddafb3de917e8397b1348e06e688128ade722d88fbe11ebf"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.7.2",
  "num-traits",
  "serde",
 ]
@@ -7617,6 +7647,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "typed-arena"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0685c84d5d54d1c26f7d3eb96cd41550adb97baed141a761cf335d3d33bcd0ae"
+
+[[package]]
 name = "typemap_rev"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7678,6 +7714,12 @@ checksum = "854cbdc4f7bc6ae19c820d44abdc3277ac3e1b2b93db20a636825d9322fb60e6"
 dependencies = [
  "tinyvec",
 ]
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fdbf052a0783de01e944a6ce7a8cb939e295b1e7be835a1112c3b9a7f047a5a"
 
 [[package]]
 name = "unicode-width"
@@ -7773,7 +7815,7 @@ name = "vte"
 version = "0.10.1"
 source = "git+https://github.com/alacritty/vte#45670c47cebd7af050def2f80a307bdeec7caba3"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.7.2",
  "utf8parse",
  "vte_generate_state_changes",
 ]

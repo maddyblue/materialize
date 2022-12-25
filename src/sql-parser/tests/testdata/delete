@@ -40,4 +40,4 @@ DELETE FROM foo WHERE name = 5
 ----
 DELETE FROM foo WHERE name = 5
 =>
-Delete(DeleteStatement { table_name: Name(UnresolvedObjectName([Ident("foo")])), alias: None, using: [], selection: Some(Op { op: Op { namespace: [], op: "=" }, expr1: Identifier([Ident("name")]), expr2: Some(Value(Number("5"))) }) })
+Delete(DeleteStatement { table_name: Name(UnresolvedObjectName([Ident("foo")])), alias: None, using: [], selection: Some(BinaryOp { expr1: Identifier([Ident("name")]), op: Op { namespace: [], op: "=" }, expr2: Value(Number("5")) }) })

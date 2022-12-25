@@ -22,6 +22,8 @@ use crate::ast::{
     Ident, Statement, UnresolvedDatabaseName, UnresolvedObjectName, UnresolvedSchemaName,
 };
 
+use crate::ast::display::ToDoc;
+
 /// This represents the metadata that lives next to an AST, as we take it through
 /// various stages in the planning process.
 ///
@@ -41,7 +43,7 @@ pub trait AstInfo: Clone {
     /// The type used for nested statements.
     type NestedStatement: AstDisplay + Clone + Hash + Debug + Eq;
     /// The type used for table references.
-    type ObjectName: AstDisplay + Clone + Hash + Debug + Eq;
+    type ObjectName: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type used for schema names.
     type SchemaName: AstDisplay + Clone + Hash + Debug + Eq;
     /// The type used for database names.
@@ -49,7 +51,7 @@ pub trait AstInfo: Clone {
     /// The type used for cluster names.
     type ClusterName: AstDisplay + Clone + Hash + Debug + Eq;
     /// The type used for data types.
-    type DataType: AstDisplay + Clone + Hash + Debug + Eq;
+    type DataType: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type stored next to CTEs for their assigned ID.
     type CteId: Clone + Hash + Debug + Eq;
 }
@@ -102,6 +104,7 @@ impl AstDisplay for RawObjectName {
     }
 }
 impl_display!(RawObjectName);
+impl_to_doc!(RawObjectName);
 
 impl<T> FoldNode<Raw, T> for RawObjectName
 where
@@ -202,6 +205,7 @@ impl AstDisplay for RawDataType {
     }
 }
 impl_display!(RawDataType);
+impl_to_doc!(RawDataType);
 
 impl<T> FoldNode<Raw, T> for RawDataType
 where
