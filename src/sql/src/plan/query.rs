@@ -58,12 +58,12 @@ use mz_repr::{
 use mz_sql_parser::ast::display::AstDisplay;
 use mz_sql_parser::ast::visit_mut::{self, VisitMut};
 use mz_sql_parser::ast::{
-    AsOf, Assignment, AstInfo, CteBlock, DeleteStatement, Distinct, Expr, Function, FunctionArgs,
-    HomogenizingFunction, Ident, InsertSource, IsExprConstruct, Join, JoinConstraint, JoinOperator,
-    Limit, OrderByExpr, Query, Select, SelectItem, SelectOption, SelectOptionName, SetExpr,
-    SetOperator, ShowStatement, SubscriptPosition, TableAlias, TableFactor, TableFunction,
-    TableWithJoins, UnresolvedObjectName, UpdateStatement, Value, Values, WindowFrame,
-    WindowFrameBound, WindowFrameUnits, WindowSpec,
+    AsOf, Assignment, AstInfo, CaseCondition, Cast, CteBlock, DeleteStatement, Distinct, Expr,
+    Function, FunctionArgs, HomogenizingFunction, Ident, InsertSource, IsExprConstruct, Join,
+    JoinConstraint, JoinOperator, Limit, OrderByExpr, Query, Select, SelectItem, SelectOption,
+    SelectOptionName, SetExpr, SetOperator, ShowStatement, SubscriptPosition, TableAlias,
+    TableFactor, TableFunction, TableWithJoins, UnresolvedObjectName, UpdateStatement, Value,
+    Values, WindowFrame, WindowFrameBound, WindowFrameUnits, WindowSpec,
 };
 
 use crate::catalog::{CatalogItemType, CatalogType, SessionCatalog};
@@ -2675,7 +2675,7 @@ fn invent_column_name(
             Expr::NullIf { .. } => Some(("nullif".into(), NameQuality::High)),
             Expr::Array { .. } => Some(("array".into(), NameQuality::High)),
             Expr::List { .. } => Some(("list".into(), NameQuality::High)),
-            Expr::Cast { expr, data_type } => match invent(ecx, expr, table_func_names) {
+            Expr::Cast(Cast { expr, data_type }) => match invent(ecx, expr, table_func_names) {
                 Some((name, NameQuality::High)) => Some((name, NameQuality::High)),
                 _ => Some((data_type.unqualified_item_name().into(), NameQuality::Low)),
             },
@@ -3094,7 +3094,7 @@ fn plan_expr_inner<'a>(
         Expr::BinaryOp { op, expr1, expr2 } => {
             Ok(plan_op(ecx, normalize::op(op)?, expr1, Some(expr2))?.into())
         }
-        Expr::Cast { expr, data_type } => plan_cast(ecx, expr, data_type),
+        Expr::Cast(Cast { expr, data_type }) => plan_cast(ecx, expr, data_type),
         Expr::Function(func) => Ok(plan_function(ecx, func)?.into()),
 
         // Special functions and operators.
@@ -3109,17 +3109,18 @@ fn plan_expr_inner<'a>(
         Expr::Case {
             operand,
             conditions,
-            results,
             else_result,
-        } => Ok(plan_case(ecx, operand, conditions, results, else_result)?.into()),
+        } => Ok(plan_case(ecx, operand, conditions, else_result)?.into()),
         Expr::HomogenizingFunction { function, exprs } => {
             plan_homogenizing_function(ecx, function, exprs)
         }
         Expr::NullIf { l_expr, r_expr } => Ok(plan_case(
             ecx,
             &None,
-            &[l_expr.clone().equals(*r_expr.clone())],
-            &[Expr::null()],
+            &[CaseCondition {
+                when: l_expr.clone().equals(*r_expr.clone()),
+                then: Expr::null(),
+            }],
             &Some(Box::new(*l_expr.clone())),
         )?
         .into()),
@@ -4420,13 +4421,12 @@ fn plan_is_expr<'a>(
 fn plan_case<'a>(
     ecx: &ExprContext,
     operand: &'a Option<Box<Expr<Aug>>>,
-    conditions: &'a [Expr<Aug>],
-    results: &'a [Expr<Aug>],
+    conditions: &'a [CaseCondition<Aug>],
     else_result: &'a Option<Box<Expr<Aug>>>,
 ) -> Result<HirScalarExpr, PlanError> {
     let mut cond_exprs = Vec::new();
     let mut result_exprs = Vec::new();
-    for (c, r) in conditions.iter().zip(results) {
+    for CaseCondition { when: c, then: r } in conditions.iter() {
         let c = match operand {
             Some(operand) => operand.clone().equals(c.clone()),
             None => c.clone(),

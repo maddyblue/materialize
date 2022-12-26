@@ -83,13 +83,20 @@ fn datadriven() {
         let input = tc.input.trim();
         match parser::parse_expr(input) {
             Ok(s) => {
-                for doc in pdoc(&s) {
+                let s2 = parser::parse_expr(&s.to_ast_string_stable()).unwrap();
+                for doc in pdoc(&s2) {
+                    // Some functions (EXTRACT) don't print on to_ast_string today.
+                    if matches!(s, Expr::Function { .. }) {
+                        break;
+                    }
                     println!();
-                    dbg!(&s);
-                    println!("EXPR: {s}");
-                    println!("DOC: {doc}");
+                    dbg!(&s2, &s);
+                    println!("INPUT: {input}");
+                    println!("EXPR2: {s2}");
+                    println!("EXPR1: {s}");
+                    println!("  DOC: {doc}");
                     let n = parser::parse_expr(&doc).unwrap();
-                    assert_eq!(n, s, "doc: {doc}, orig: {s}");
+                    assert_eq!(n, s2, "doc: {doc}, orig: {s2}");
                 }
                 if tc.args.get("roundtrip").is_some() {
                     format!("{}\n", s)
@@ -116,7 +123,7 @@ fn datadriven() {
 
 fn pdoc<T: mz_sql_parser::ast::display::ToDoc>(t: &T) -> Vec<String> {
     let doc = t.to_doc();
-    [0, 10000]
+    [10000, 0]
         .into_iter()
         .map(|i| {
             let mut cur = Vec::new();

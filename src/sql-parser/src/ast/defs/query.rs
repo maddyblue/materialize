@@ -33,7 +33,7 @@ use astdisplay::*;
 /// The most complete variant of a `SELECT` query expression, optionally
 /// including `WITH`, `UNION` / other set operations, and `ORDER BY`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
-
+#[todoc(no_name)]
 pub struct Query<T: AstInfo> {
     /// WITH (common table expressions, or CTEs)
     pub ctes: CteBlock<T>,
@@ -224,6 +224,7 @@ impl<T: AstInfo> AstDisplay for SelectOption<T> {
 pub struct Select<T: AstInfo> {
     pub distinct: Option<Distinct<T>>,
     /// projection expressions
+    #[todoc(no_name)]
     pub projection: Vec<SelectItem<T>>,
     /// FROM
     pub from: Vec<TableWithJoins<T>>,

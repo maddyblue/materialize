@@ -356,10 +356,10 @@ impl<'a> Parser<'a> {
             if data_type.to_string().as_str() == "interval" {
                 Ok(Expr::Value(parser.parse_interval_value()?))
             } else {
-                Ok(Expr::Cast {
+                Ok(Expr::Cast(Cast {
                     expr: Box::new(Expr::Value(Value::String(parser.parse_literal_string()?))),
                     data_type,
-                })
+                }))
             }
         }));
 
@@ -682,11 +682,11 @@ impl<'a> Parser<'a> {
             self.expect_keyword(WHEN)?;
         }
         let mut conditions = vec![];
-        let mut results = vec![];
         loop {
-            conditions.push(self.parse_expr()?);
+            let when = self.parse_expr()?;
             self.expect_keyword(THEN)?;
-            results.push(self.parse_expr()?);
+            let then = self.parse_expr()?;
+            conditions.push(CaseCondition { when, then });
             if !self.parse_keyword(WHEN) {
                 break;
             }
@@ -700,7 +700,6 @@ impl<'a> Parser<'a> {
         Ok(Expr::Case {
             operand,
             conditions,
-            results,
             else_result,
         })
     }
@@ -712,10 +711,10 @@ impl<'a> Parser<'a> {
         self.expect_keyword(AS)?;
         let data_type = self.parse_data_type()?;
         self.expect_token(&Token::RParen)?;
-        Ok(Expr::Cast {
+        Ok(Expr::Cast(Cast {
             expr: Box::new(expr),
             data_type,
-        })
+        }))
     }
 
     /// Parse a SQL EXISTS expression e.g. `WHERE EXISTS(SELECT ...)`.
@@ -1282,10 +1281,10 @@ impl<'a> Parser<'a> {
 
     /// Parse a postgresql casting style which is in the form of `expr::datatype`
     fn parse_pg_cast(&mut self, expr: Expr<Raw>) -> Result<Expr<Raw>, ParserError> {
-        Ok(Expr::Cast {
+        Ok(Expr::Cast(Cast {
             expr: Box::new(expr),
             data_type: self.parse_data_type()?,
-        })
+        }))
     }
 
     /// Get the precedence of the next token

@@ -19,8 +19,8 @@ use crate::names::Aug;
 use mz_ore::stack::{CheckedRecursion, RecursionGuard};
 use mz_sql_parser::ast::visit_mut::{self, VisitMut};
 use mz_sql_parser::ast::{
-    Expr, Function, FunctionArgs, Ident, Op, OrderByExpr, Query, Select, SelectItem, TableAlias,
-    TableFactor, TableFunction, TableWithJoins, UnresolvedObjectName, Value,
+    CaseCondition, Expr, Function, FunctionArgs, Ident, Op, OrderByExpr, Query, Select, SelectItem,
+    TableAlias, TableFactor, TableFunction, TableWithJoins, UnresolvedObjectName, Value,
 };
 
 use crate::normalize;
@@ -92,8 +92,10 @@ impl<'a> FuncRewriter<'a> {
     fn plan_divide(lhs: Expr<Aug>, rhs: Expr<Aug>) -> Expr<Aug> {
         lhs.divide(Expr::Case {
             operand: None,
-            conditions: vec![rhs.clone().equals(Expr::number("0"))],
-            results: vec![Expr::null()],
+            conditions: vec![CaseCondition {
+                when: rhs.clone().equals(Expr::number("0")),
+                then: Expr::null(),
+            }],
             else_result: Some(Box::new(rhs)),
         })
     }

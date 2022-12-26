@@ -120,12 +120,7 @@ pub enum Expr<T: AstInfo> {
         expr2: Box<Expr<T>>,
     },
     /// CAST an expression to a different data type e.g. `CAST(foo AS VARCHAR(123))`
-    #[todoc(separator = "::")]
-    Cast {
-        #[todoc(prefix = "(", suffix = ")")]
-        expr: Box<Expr<T>>,
-        data_type: T::DataType,
-    },
+    Cast(Cast<T>),
     /// `expr COLLATE collation`
     Collate {
         expr: Box<Expr<T>>,
@@ -138,6 +133,7 @@ pub enum Expr<T: AstInfo> {
     /// dedicated AST node.
     HomogenizingFunction {
         function: HomogenizingFunction,
+        #[todoc(prefix = "(", suffix = ")", no_name)]
         exprs: Vec<Expr<T>>,
     },
     /// NULLIF(expr, expr)
@@ -149,7 +145,7 @@ pub enum Expr<T: AstInfo> {
         r_expr: Box<Expr<T>>,
     },
     /// Nested expression e.g. `(foo > bar)` or `(1)`
-    Nested(Box<Expr<T>>),
+    Nested(#[todoc(prefix = "(", suffix = ")")] Box<Expr<T>>),
     /// A row constructor like `ROW(<expr>...)` or `(<expr>, <expr>...)`.
     Row {
         exprs: Vec<Expr<T>>,
@@ -163,10 +159,13 @@ pub enum Expr<T: AstInfo> {
     /// Note we only recognize a complete single expression as `<condition>`,
     /// not `< 0` nor `1, 2, 3` as allowed in a `<simple when clause>` per
     /// <https://jakewheat.github.io/sql-overview/sql-2011-foundation-grammar.html#simple-when-clause>
+    #[todoc(nest = "CASE", nest_suffix = "END")]
     Case {
+        #[todoc(no_name)]
         operand: Option<Box<Expr<T>>>,
-        conditions: Vec<Expr<T>>,
-        results: Vec<Expr<T>>,
+        #[todoc(separator = "", no_name)]
+        conditions: Vec<CaseCondition<T>>,
+        #[todoc(nest = "ELSE", no_name)]
         else_result: Option<Box<Expr<T>>>,
     },
     /// An exists expression `EXISTS(SELECT ...)`, used in expressions like
@@ -174,17 +173,19 @@ pub enum Expr<T: AstInfo> {
     Exists(Box<Query<T>>),
     /// A parenthesized subquery `(SELECT ...)`, used in expression like
     /// `SELECT (subquery) AS x` or `WHERE (subquery) = x`
-    Subquery(Box<Query<T>>),
+    Subquery(#[todoc(prefix = "(", suffix = ")")] Box<Query<T>>),
     /// `<expr> <op> ANY/SOME (<query>)`
     AnySubquery {
         left: Box<Expr<T>>,
         op: Op,
+        #[todoc(prefix = "ANY (", suffix = ")")]
         right: Box<Query<T>>,
     },
     /// `<expr> <op> ANY (<array_expr>)`
     AnyExpr {
         left: Box<Expr<T>>,
         op: Op,
+        #[todoc(prefix = "ANY (", suffix = ")")]
         right: Box<Expr<T>>,
     },
     /// `<expr> <op> ALL (<query>)`
@@ -336,40 +337,7 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
                 f.write_str(" ");
                 f.write_node(&expr2);
             }
-            Expr::Cast { expr, data_type } => {
-                // We are potentially rewriting an expression like
-                //     CAST(<expr> OP <expr> AS <type>)
-                // to
-                //     <expr> OP <expr>::<type>
-                // which could incorrectly change the meaning of the expression
-                // as the `::` binds tightly. To be safe, we wrap the inner
-                // expression in parentheses
-                //    (<expr> OP <expr>)::<type>
-                // unless the inner expression is of a type that we know is
-                // safe to follow with a `::` to without wrapping.
-                let _needs_wrap = !matches!(
-                    **expr,
-                    Expr::Nested(_)
-                        | Expr::Value(_)
-                        | Expr::Cast { .. }
-                        | Expr::Function { .. }
-                        | Expr::Identifier { .. }
-                        | Expr::Collate { .. }
-                        | Expr::HomogenizingFunction { .. }
-                        | Expr::NullIf { .. }
-                );
-                // ToDoc hack:
-                let needs_wrap = true;
-                if needs_wrap {
-                    f.write_str('(');
-                }
-                f.write_node(&expr);
-                if needs_wrap {
-                    f.write_str(')');
-                }
-                f.write_str("::");
-                f.write_node(data_type);
-            }
+            Expr::Cast(cast) => cast.fmt(f),
             Expr::Collate { expr, collation } => {
                 f.write_node(&expr);
                 f.write_str(" COLLATE ");
@@ -405,7 +373,6 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
             Expr::Case {
                 operand,
                 conditions,
-                results,
                 else_result,
             } => {
                 f.write_str("CASE");
@@ -413,11 +380,11 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
                     f.write_str(" ");
                     f.write_node(&operand);
                 }
-                for (c, r) in conditions.iter().zip(results) {
+                for c in conditions.iter() {
                     f.write_str(" WHEN ");
-                    f.write_node(c);
+                    f.write_node(&c.when);
                     f.write_str(" THEN ");
-                    f.write_node(r);
+                    f.write_node(&c.then);
                 }
 
                 if let Some(else_result) = else_result {
@@ -620,6 +587,59 @@ impl<T: AstInfo> Expr<T> {
         mem::replace(self, Expr::Identifier(vec![]))
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
+pub struct CaseCondition<T: AstInfo> {
+    #[todoc(nest = "WHEN")]
+    pub when: Expr<T>,
+    #[todoc(nest = "THEN")]
+    pub then: Expr<T>,
+}
+
+/// CAST an expression to a different data type e.g. `CAST(foo AS VARCHAR(123))`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Cast<T: AstInfo> {
+    pub expr: Box<Expr<T>>,
+    pub data_type: T::DataType,
+}
+
+impl<T: AstInfo> AstDisplay for Cast<T> {
+    fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
+        // We are potentially rewriting an expression like
+        //     CAST(<expr> OP <expr> AS <type>)
+        // to
+        //     <expr> OP <expr>::<type>
+        // which could incorrectly change the meaning of the expression
+        // as the `::` binds tightly. To be safe, we wrap the inner
+        // expression in parentheses
+        //    (<expr> OP <expr>)::<type>
+        // unless the inner expression is of a type that we know is
+        // safe to follow with a `::` to without wrapping.
+        let needs_wrap = !matches!(
+            *self.expr,
+            Expr::Nested(_)
+                | Expr::Value(_)
+                | Expr::Cast { .. }
+                | Expr::Function { .. }
+                | Expr::Identifier { .. }
+                | Expr::Collate { .. }
+                | Expr::HomogenizingFunction { .. }
+                | Expr::NullIf { .. }
+        );
+        if needs_wrap {
+            f.write_str('(');
+        }
+        f.write_node(&self.expr);
+        if needs_wrap {
+            f.write_str(')');
+        }
+        f.write_str("::");
+        f.write_node(&self.data_type);
+    }
+}
+impl_display_t!(Cast);
+impl_to_doc_t!(Cast);
 
 /// A reference to an operator.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
