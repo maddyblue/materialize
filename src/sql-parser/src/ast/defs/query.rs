@@ -316,7 +316,7 @@ impl<T: AstInfo> AstDisplay for Distinct<T> {
 /// The block can either be entirely "simple" (traditional SQL `WITH` block),
 /// or "mutually recursive", which introduce their bindings before the block
 /// and may result in mutually recursive definitions.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CteBlock<T: AstInfo> {
     Simple(Vec<Cte<T>>),
     MutuallyRecursive(Vec<CteMutRec<T>>),
@@ -352,6 +352,7 @@ impl<T: AstInfo> CteBlock<T> {
         names.into_iter()
     }
 }
+impl_to_doc_t!(CteBlock);
 
 impl<T: AstInfo> AstDisplay for CteBlock<T> {
     fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
@@ -437,8 +438,13 @@ impl_display_t!(CteMutRecColumnDef);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum SelectItem<T: AstInfo> {
     /// An expression, optionally followed by `[ AS ] alias`.
-    Expr { expr: Expr<T>, alias: Option<Ident> },
+    Expr {
+        expr: Expr<T>,
+        #[todoc(rename = "AS")]
+        alias: Option<Ident>,
+    },
     /// An unqualified `*`.
+    #[todoc(rename = "*")]
     Wildcard,
 }
 
@@ -459,6 +465,7 @@ impl<T: AstInfo> AstDisplay for SelectItem<T> {
 impl_display_t!(SelectItem);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct TableWithJoins<T: AstInfo> {
     pub relation: TableFactor<T>,
     pub joins: Vec<Join<T>>,

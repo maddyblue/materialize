@@ -35,9 +35,12 @@ use crate::ast::{
     UnresolvedSchemaName, Value,
 };
 
+use crate::ast::display::ToDoc;
+use astdisplay::*;
+
 /// A top-level statement (SELECT, INSERT, CREATE, etc.)
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumKind)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumKind, ToDoc)]
 #[enum_kind(StatementKind)]
 pub enum Statement<T: AstInfo> {
     Select(SelectStatement<T>),
@@ -155,7 +158,8 @@ impl<T: AstInfo> AstDisplay for Statement<T> {
 impl_display_t!(Statement);
 
 /// `SELECT`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct SelectStatement<T: AstInfo> {
     pub query: Query<T>,
     pub as_of: Option<AsOf<T>>,
@@ -173,7 +177,7 @@ impl<T: AstInfo> AstDisplay for SelectStatement<T> {
 impl_display_t!(SelectStatement);
 
 /// `INSERT`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct InsertStatement<T: AstInfo> {
     /// TABLE
     pub table_name: T::ObjectName,
@@ -204,7 +208,7 @@ impl<T: AstInfo> AstDisplay for InsertStatement<T> {
 }
 impl_display_t!(InsertStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CopyRelation<T: AstInfo> {
     Table {
         name: T::ObjectName,
@@ -214,7 +218,7 @@ pub enum CopyRelation<T: AstInfo> {
     Subscribe(SubscribeStatement<T>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CopyDirection {
     To,
     From,
@@ -230,7 +234,7 @@ impl AstDisplay for CopyDirection {
 }
 impl_display!(CopyDirection);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CopyTarget {
     Stdin,
     Stdout,
@@ -246,7 +250,7 @@ impl AstDisplay for CopyTarget {
 }
 impl_display!(CopyTarget);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CopyOptionName {
     Format,
     Delimiter,
@@ -269,7 +273,7 @@ impl AstDisplay for CopyOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CopyOption<T: AstInfo> {
     pub name: CopyOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -286,7 +290,7 @@ impl<T: AstInfo> AstDisplay for CopyOption<T> {
 }
 
 /// `COPY`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CopyStatement<T: AstInfo> {
     /// RELATION
     pub relation: CopyRelation<T>,
@@ -335,13 +339,15 @@ impl<T: AstInfo> AstDisplay for CopyStatement<T> {
 impl_display_t!(CopyStatement);
 
 /// `UPDATE`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct UpdateStatement<T: AstInfo> {
     /// `FROM`
     pub table_name: T::ObjectName,
     /// Column assignments
+    #[todoc(rename = "SET")]
     pub assignments: Vec<Assignment<T>>,
     /// WHERE
+    #[todoc(rename = "WHERE")]
     pub selection: Option<Expr<T>>,
 }
 
@@ -362,7 +368,7 @@ impl<T: AstInfo> AstDisplay for UpdateStatement<T> {
 impl_display_t!(UpdateStatement);
 
 /// `DELETE`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DeleteStatement<T: AstInfo> {
     /// `FROM`
     pub table_name: T::ObjectName,
@@ -395,7 +401,7 @@ impl<T: AstInfo> AstDisplay for DeleteStatement<T> {
 impl_display_t!(DeleteStatement);
 
 /// `CREATE DATABASE`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateDatabaseStatement {
     pub name: UnresolvedDatabaseName,
     pub if_not_exists: bool,
@@ -413,7 +419,7 @@ impl AstDisplay for CreateDatabaseStatement {
 impl_display!(CreateDatabaseStatement);
 
 /// `CREATE SCHEMA`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSchemaStatement {
     pub name: UnresolvedSchemaName,
     pub if_not_exists: bool,
@@ -446,6 +452,7 @@ impl<T: AstInfo> AstDisplay for KafkaBroker<T> {
 }
 
 impl_display_t!(KafkaBroker);
+impl_to_doc_t!(KafkaBroker);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum KafkaBrokerTunnel<T: AstInfo> {
@@ -472,8 +479,9 @@ impl<T: AstInfo> AstDisplay for KafkaBrokerTunnel<T> {
 }
 
 impl_display_t!(KafkaBrokerTunnel);
+impl_to_doc_t!(KafkaBrokerTunnel);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum KafkaBrokerAwsPrivatelinkOptionName {
     Port,
 }
@@ -487,7 +495,7 @@ impl AstDisplay for KafkaBrokerAwsPrivatelinkOptionName {
 }
 impl_display!(KafkaBrokerAwsPrivatelinkOptionName);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct KafkaBrokerAwsPrivatelinkOption<T: AstInfo> {
     pub name: KafkaBrokerAwsPrivatelinkOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -504,7 +512,7 @@ impl<T: AstInfo> AstDisplay for KafkaBrokerAwsPrivatelinkOption<T> {
 }
 impl_display_t!(KafkaBrokerAwsPrivatelinkOption);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct KafkaBrokerAwsPrivatelink<T: AstInfo> {
     pub connection: T::ObjectName,
     pub options: Vec<KafkaBrokerAwsPrivatelinkOption<T>>,
@@ -524,11 +532,11 @@ impl<T: AstInfo> AstDisplay for KafkaBrokerAwsPrivatelink<T> {
 impl_display_t!(KafkaBrokerAwsPrivatelink);
 
 /// `CREATE CONNECTION`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateConnectionStatement<T: AstInfo> {
+    pub if_not_exists: bool,
     pub name: UnresolvedObjectName,
     pub connection: CreateConnection<T>,
-    pub if_not_exists: bool,
 }
 
 impl<T: AstInfo> AstDisplay for CreateConnectionStatement<T> {
@@ -545,7 +553,7 @@ impl<T: AstInfo> AstDisplay for CreateConnectionStatement<T> {
 impl_display_t!(CreateConnectionStatement);
 
 /// `CREATE SOURCE`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSourceStatement<T: AstInfo> {
     pub name: UnresolvedObjectName,
     pub col_names: Vec<Ident>,
@@ -608,7 +616,7 @@ impl<T: AstInfo> AstDisplay for CreateSourceStatement<T> {
 impl_display_t!(CreateSourceStatement);
 
 /// A selected subsource in a FOR TABLES (..) statement
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSourceSubsource<T: AstInfo> {
     pub reference: UnresolvedObjectName,
     pub subsource: Option<DeferredObjectName<T>>,
@@ -625,7 +633,7 @@ impl<T: AstInfo> AstDisplay for CreateSourceSubsource<T> {
 }
 impl_display_t!(CreateSourceSubsource);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CreateReferencedSubsources<T: AstInfo> {
     /// A subset defined with FOR TABLES (...)
     Subset(Vec<CreateSourceSubsource<T>>),
@@ -648,7 +656,7 @@ impl<T: AstInfo> AstDisplay for CreateReferencedSubsources<T> {
 impl_display_t!(CreateReferencedSubsources);
 
 /// `CREATE SUBSOURCE`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSubsourceStatement<T: AstInfo> {
     pub name: UnresolvedObjectName,
     pub columns: Vec<ColumnDef<T>>,
@@ -675,7 +683,7 @@ impl<T: AstInfo> AstDisplay for CreateSubsourceStatement<T> {
 impl_display_t!(CreateSubsourceStatement);
 
 /// An option in a `CREATE SINK` statement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CreateSinkOptionName {
     Remote,
     Size,
@@ -698,7 +706,7 @@ impl AstDisplay for CreateSinkOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSinkOption<T: AstInfo> {
     pub name: CreateSinkOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -715,7 +723,7 @@ impl<T: AstInfo> AstDisplay for CreateSinkOption<T> {
 }
 
 /// `CREATE SINK`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSinkStatement<T: AstInfo> {
     pub name: UnresolvedObjectName,
     pub if_not_exists: bool,
@@ -755,7 +763,7 @@ impl<T: AstInfo> AstDisplay for CreateSinkStatement<T> {
 }
 impl_display_t!(CreateSinkStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ViewDefinition<T: AstInfo> {
     /// View name
     pub name: UnresolvedObjectName,
@@ -780,7 +788,7 @@ impl<T: AstInfo> AstDisplay for ViewDefinition<T> {
 impl_display_t!(ViewDefinition);
 
 /// `CREATE VIEW`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateViewStatement<T: AstInfo> {
     pub if_exists: IfExistsBehavior,
     pub temporary: bool,
@@ -810,7 +818,7 @@ impl<T: AstInfo> AstDisplay for CreateViewStatement<T> {
 impl_display_t!(CreateViewStatement);
 
 /// `CREATE MATERIALIZED VIEW`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateMaterializedViewStatement<T: AstInfo> {
     pub if_exists: IfExistsBehavior,
     pub name: UnresolvedObjectName,
@@ -853,7 +861,7 @@ impl<T: AstInfo> AstDisplay for CreateMaterializedViewStatement<T> {
 impl_display_t!(CreateMaterializedViewStatement);
 
 /// `CREATE TABLE`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateTableStatement<T: AstInfo> {
     /// Table name
     pub name: UnresolvedObjectName,
@@ -935,9 +943,10 @@ impl<T: AstInfo> AstDisplay for CreateIndexStatement<T> {
     }
 }
 impl_display_t!(CreateIndexStatement);
+impl_to_doc_t!(CreateIndexStatement);
 
 /// An option in a `CREATE CLUSTER` statement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum IndexOptionName {
     // The `LOGICAL COMPACTION WINDOW` option
     LogicalCompactionWindow,
@@ -953,7 +962,7 @@ impl AstDisplay for IndexOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct IndexOption<T: AstInfo> {
     pub name: IndexOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -970,7 +979,7 @@ impl<T: AstInfo> AstDisplay for IndexOption<T> {
 }
 
 /// A `CREATE ROLE` statement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateRoleStatement {
     /// Whether this was actually a `CREATE USER` statement.
     pub is_user: bool,
@@ -998,7 +1007,7 @@ impl AstDisplay for CreateRoleStatement {
 impl_display!(CreateRoleStatement);
 
 /// Options that can be attached to [`CreateRoleStatement`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CreateRoleOption {
     /// The `SUPERUSER` option.
     SuperUser,
@@ -1023,7 +1032,7 @@ impl AstDisplay for CreateRoleOption {
 impl_display!(CreateRoleOption);
 
 /// A `CREATE SECRET` statement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSecretStatement<T: AstInfo> {
     pub name: UnresolvedObjectName,
     pub if_not_exists: bool,
@@ -1044,7 +1053,7 @@ impl<T: AstInfo> AstDisplay for CreateSecretStatement<T> {
 impl_display_t!(CreateSecretStatement);
 
 /// `CREATE TYPE ..`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateTypeStatement<T: AstInfo> {
     /// Name of the created type.
     pub name: UnresolvedObjectName,
@@ -1086,7 +1095,7 @@ impl<T: AstInfo> AstDisplay for CreateTypeStatement<T> {
 }
 impl_display_t!(CreateTypeStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum ClusterOptionName {
     /// The `REPLICAS` option.
     Replicas,
@@ -1100,7 +1109,7 @@ impl AstDisplay for ClusterOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 /// An option in a `CREATE CLUSTER` ostatement.
 pub struct ClusterOption<T: AstInfo> {
     pub name: ClusterOptionName,
@@ -1118,7 +1127,7 @@ impl<T: AstInfo> AstDisplay for ClusterOption<T> {
 }
 
 /// `CREATE CLUSTER ..`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateClusterStatement<T: AstInfo> {
     /// Name of the created cluster.
     pub name: Ident,
@@ -1138,7 +1147,7 @@ impl<T: AstInfo> AstDisplay for CreateClusterStatement<T> {
 }
 impl_display_t!(CreateClusterStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ReplicaDefinition<T: AstInfo> {
     /// Name of the created replica.
     pub name: Ident,
@@ -1159,7 +1168,7 @@ impl<T: AstInfo> AstDisplay for ReplicaDefinition<T> {
 impl_display_t!(ReplicaDefinition);
 
 /// `CREATE CLUSTER REPLICA ..`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateClusterReplicaStatement<T: AstInfo> {
     /// Name of the replica's cluster.
     pub of_cluster: Ident,
@@ -1179,7 +1188,7 @@ impl<T: AstInfo> AstDisplay for CreateClusterReplicaStatement<T> {
 }
 impl_display_t!(CreateClusterReplicaStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum ReplicaOptionName {
     /// The `REMOTE [<host> [, <host> ...]]` option.
     Remote,
@@ -1211,7 +1220,7 @@ impl AstDisplay for ReplicaOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 /// An option in a `CREATE CLUSTER REPLICA` statement.
 pub struct ReplicaOption<T: AstInfo> {
     pub name: ReplicaOptionName,
@@ -1229,7 +1238,7 @@ impl<T: AstInfo> AstDisplay for ReplicaOption<T> {
 }
 
 /// `CREATE TYPE .. AS <TYPE>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CreateTypeAs<T: AstInfo> {
     List {
         options: Vec<CreateTypeListOption<T>>,
@@ -1253,7 +1262,7 @@ impl<T: AstInfo> AstDisplay for CreateTypeAs<T> {
 }
 impl_display_t!(CreateTypeAs);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CreateTypeListOptionName {
     ElementType,
 }
@@ -1266,7 +1275,7 @@ impl AstDisplay for CreateTypeListOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateTypeListOption<T: AstInfo> {
     pub name: CreateTypeListOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -1282,7 +1291,7 @@ impl<T: AstInfo> AstDisplay for CreateTypeListOption<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CreateTypeMapOptionName {
     KeyType,
     ValueType,
@@ -1297,7 +1306,7 @@ impl AstDisplay for CreateTypeMapOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateTypeMapOption<T: AstInfo> {
     pub name: CreateTypeMapOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -1314,7 +1323,7 @@ impl<T: AstInfo> AstDisplay for CreateTypeMapOption<T> {
 }
 
 /// `ALTER <OBJECT> ... RENAME TO`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterObjectRenameStatement {
     pub object_type: ObjectType,
     pub if_exists: bool,
@@ -1337,14 +1346,14 @@ impl AstDisplay for AlterObjectRenameStatement {
 }
 impl_display!(AlterObjectRenameStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum AlterIndexAction<T: AstInfo> {
     SetOptions(Vec<IndexOption<T>>),
     ResetOptions(Vec<IndexOptionName>),
 }
 
 /// `ALTER INDEX ... {RESET, SET}`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterIndexStatement<T: AstInfo> {
     pub index_name: UnresolvedObjectName,
     pub if_exists: bool,
@@ -1377,13 +1386,13 @@ impl<T: AstInfo> AstDisplay for AlterIndexStatement<T> {
 
 impl_display_t!(AlterIndexStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum AlterSinkAction<T: AstInfo> {
     SetOptions(Vec<CreateSinkOption<T>>),
     ResetOptions(Vec<CreateSinkOptionName>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterSinkStatement<T: AstInfo> {
     pub sink_name: UnresolvedObjectName,
     pub if_exists: bool,
@@ -1414,13 +1423,13 @@ impl<T: AstInfo> AstDisplay for AlterSinkStatement<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum AlterSourceAction<T: AstInfo> {
     SetOptions(Vec<CreateSourceOption<T>>),
     ResetOptions(Vec<CreateSourceOptionName>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterSourceStatement<T: AstInfo> {
     pub source_name: UnresolvedObjectName,
     pub if_exists: bool,
@@ -1454,7 +1463,7 @@ impl<T: AstInfo> AstDisplay for AlterSourceStatement<T> {
 impl_display_t!(AlterSourceStatement);
 
 /// `ALTER SECRET ... AS`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterSecretStatement<T: AstInfo> {
     pub name: UnresolvedObjectName,
     pub if_exists: bool,
@@ -1476,7 +1485,7 @@ impl<T: AstInfo> AstDisplay for AlterSecretStatement<T> {
 impl_display_t!(AlterSecretStatement);
 
 /// `ALTER CONNECTION ... ROTATE KEYS`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterConnectionStatement {
     pub name: UnresolvedObjectName,
     pub if_exists: bool,
@@ -1495,7 +1504,7 @@ impl AstDisplay for AlterConnectionStatement {
 
 impl_display!(AlterConnectionStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DiscardStatement {
     pub target: DiscardTarget,
 }
@@ -1508,7 +1517,7 @@ impl AstDisplay for DiscardStatement {
 }
 impl_display!(DiscardStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum DiscardTarget {
     Plans,
     Sequences,
@@ -1528,7 +1537,7 @@ impl AstDisplay for DiscardTarget {
 }
 impl_display!(DiscardTarget);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropDatabaseStatement {
     pub name: UnresolvedDatabaseName,
     pub if_exists: bool,
@@ -1549,7 +1558,7 @@ impl AstDisplay for DropDatabaseStatement {
 }
 impl_display!(DropDatabaseStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropSchemaStatement {
     pub name: UnresolvedSchemaName,
     pub if_exists: bool,
@@ -1571,7 +1580,7 @@ impl AstDisplay for DropSchemaStatement {
 impl_display!(DropSchemaStatement);
 
 /// `DROP`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropObjectsStatement {
     /// The type of the object to drop: TABLE, VIEW, etc.
     pub object_type: ObjectType,
@@ -1600,7 +1609,7 @@ impl AstDisplay for DropObjectsStatement {
 }
 impl_display!(DropObjectsStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropRolesStatement {
     /// An optional `IF EXISTS` clause. (Non-standard.)
     pub if_exists: bool,
@@ -1619,7 +1628,7 @@ impl AstDisplay for DropRolesStatement {
 }
 impl_display!(DropRolesStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropClustersStatement {
     /// An optional `IF EXISTS` clause. (Non-standard.)
     pub if_exists: bool,
@@ -1644,7 +1653,7 @@ impl AstDisplay for DropClustersStatement {
 }
 impl_display!(DropClustersStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct QualifiedReplica {
     pub cluster: Ident,
     pub replica: Ident,
@@ -1659,7 +1668,7 @@ impl AstDisplay for QualifiedReplica {
 }
 impl_display!(QualifiedReplica);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropClusterReplicasStatement {
     /// An optional `IF EXISTS` clause. (Non-standard.)
     pub if_exists: bool,
@@ -1683,7 +1692,7 @@ impl_display!(DropClusterReplicasStatement);
 /// Note: this is not a standard SQL statement, but it is supported by at
 /// least MySQL and PostgreSQL. Not all MySQL-specific syntactic forms are
 /// supported yet.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct SetVariableStatement {
     pub local: bool,
     pub variable: Ident,
@@ -1707,7 +1716,7 @@ impl_display!(SetVariableStatement);
 ///
 /// Note: this is not a standard SQL statement, but it is supported by at
 /// least MySQL and PostgreSQL. Not all syntactic forms are supported yet.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ResetVariableStatement {
     pub variable: Ident,
 }
@@ -1721,7 +1730,7 @@ impl AstDisplay for ResetVariableStatement {
 impl_display!(ResetVariableStatement);
 
 /// `SHOW <variable>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowVariableStatement {
     pub variable: Ident,
 }
@@ -1735,7 +1744,7 @@ impl AstDisplay for ShowVariableStatement {
 impl_display!(ShowVariableStatement);
 
 /// `SHOW DATABASES`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowDatabasesStatement<T: AstInfo> {
     pub filter: Option<ShowStatementFilter<T>>,
 }
@@ -1752,7 +1761,7 @@ impl<T: AstInfo> AstDisplay for ShowDatabasesStatement<T> {
 impl_display_t!(ShowDatabasesStatement);
 
 /// `SHOW SCHEMAS`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowSchemasStatement<T: AstInfo> {
     pub from: Option<T::DatabaseName>,
     pub filter: Option<ShowStatementFilter<T>>,
@@ -1774,7 +1783,7 @@ impl<T: AstInfo> AstDisplay for ShowSchemasStatement<T> {
 }
 impl_display_t!(ShowSchemasStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum ShowObjectType<T: AstInfo> {
     MaterializedView {
         in_cluster: Option<T::ClusterName>,
@@ -1803,7 +1812,7 @@ pub enum ShowObjectType<T: AstInfo> {
 /// SHOW VIEWS;
 /// SHOW SINKS;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowObjectsStatement<T: AstInfo> {
     pub object_type: ShowObjectType<T>,
     pub from: Option<T::SchemaName>,
@@ -1864,7 +1873,7 @@ impl_display_t!(ShowObjectsStatement);
 /// `SHOW COLUMNS`
 ///
 /// Note: this is a MySQL-specific statement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowColumnsStatement<T: AstInfo> {
     pub table_name: T::ObjectName,
     pub filter: Option<ShowStatementFilter<T>>,
@@ -1884,7 +1893,7 @@ impl<T: AstInfo> AstDisplay for ShowColumnsStatement<T> {
 impl_display_t!(ShowColumnsStatement);
 
 /// `SHOW CREATE VIEW <view>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowCreateViewStatement<T: AstInfo> {
     pub view_name: T::ObjectName,
 }
@@ -1898,7 +1907,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateViewStatement<T> {
 impl_display_t!(ShowCreateViewStatement);
 
 /// `SHOW CREATE MATERIALIZED VIEW <name>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowCreateMaterializedViewStatement<T: AstInfo> {
     pub materialized_view_name: T::ObjectName,
 }
@@ -1912,7 +1921,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateMaterializedViewStatement<T> {
 impl_display_t!(ShowCreateMaterializedViewStatement);
 
 /// `SHOW CREATE SOURCE <source>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowCreateSourceStatement<T: AstInfo> {
     pub source_name: T::ObjectName,
 }
@@ -1926,7 +1935,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateSourceStatement<T> {
 impl_display_t!(ShowCreateSourceStatement);
 
 /// `SHOW CREATE TABLE <table>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowCreateTableStatement<T: AstInfo> {
     pub table_name: T::ObjectName,
 }
@@ -1940,7 +1949,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateTableStatement<T> {
 impl_display_t!(ShowCreateTableStatement);
 
 /// `SHOW CREATE SINK <sink>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowCreateSinkStatement<T: AstInfo> {
     pub sink_name: T::ObjectName,
 }
@@ -1954,7 +1963,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateSinkStatement<T> {
 impl_display_t!(ShowCreateSinkStatement);
 
 /// `SHOW CREATE INDEX <index>`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowCreateIndexStatement<T: AstInfo> {
     pub index_name: T::ObjectName,
 }
@@ -1967,7 +1976,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateIndexStatement<T> {
 }
 impl_display_t!(ShowCreateIndexStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ShowCreateConnectionStatement<T: AstInfo> {
     pub connection_name: T::ObjectName,
 }
@@ -1980,7 +1989,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateConnectionStatement<T> {
 }
 
 /// `{ BEGIN [ TRANSACTION | WORK ] | START TRANSACTION } ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct StartTransactionStatement {
     pub modes: Vec<TransactionMode>,
 }
@@ -1997,7 +2006,7 @@ impl AstDisplay for StartTransactionStatement {
 impl_display!(StartTransactionStatement);
 
 /// `SET TRANSACTION ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct SetTransactionStatement {
     pub modes: Vec<TransactionMode>,
 }
@@ -2014,7 +2023,7 @@ impl AstDisplay for SetTransactionStatement {
 impl_display!(SetTransactionStatement);
 
 /// `COMMIT [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ]`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CommitStatement {
     pub chain: bool,
 }
@@ -2030,7 +2039,7 @@ impl AstDisplay for CommitStatement {
 impl_display!(CommitStatement);
 
 /// `ROLLBACK [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ]`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct RollbackStatement {
     pub chain: bool,
 }
@@ -2045,7 +2054,7 @@ impl AstDisplay for RollbackStatement {
 }
 impl_display!(RollbackStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum SubscribeOptionName {
     Snapshot,
     Progress,
@@ -2061,7 +2070,7 @@ impl AstDisplay for SubscribeOptionName {
 }
 impl_display!(SubscribeOptionName);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct SubscribeOption<T: AstInfo> {
     pub name: SubscribeOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -2079,7 +2088,7 @@ impl<T: AstInfo> AstDisplay for SubscribeOption<T> {
 impl_display_t!(SubscribeOption);
 
 /// `SUBSCRIBE`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct SubscribeStatement<T: AstInfo> {
     pub relation: SubscribeRelation<T>,
     pub options: Vec<SubscribeOption<T>>,
@@ -2103,7 +2112,7 @@ impl<T: AstInfo> AstDisplay for SubscribeStatement<T> {
 }
 impl_display_t!(SubscribeStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum SubscribeRelation<T: AstInfo> {
     Name(T::ObjectName),
     Query(Query<T>),
@@ -2123,11 +2132,14 @@ impl<T: AstInfo> AstDisplay for SubscribeRelation<T> {
 }
 impl_display_t!(SubscribeRelation);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ExplainStatement<T: AstInfo> {
     pub stage: ExplainStage,
+    #[todoc(prefix = "WITH(", suffix = ")", no_name)]
     pub config_flags: Vec<Ident>,
+    #[todoc(nest = "AS")]
     pub format: ExplainFormat,
+    #[todoc(nest = "FOR")]
     pub explainee: Explainee<T>,
 }
 
@@ -2148,7 +2160,7 @@ impl<T: AstInfo> AstDisplay for ExplainStatement<T> {
 }
 impl_display_t!(ExplainStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum InsertSource<T: AstInfo> {
     Query(Query<T>),
     DefaultValues,
@@ -2164,7 +2176,7 @@ impl<T: AstInfo> AstDisplay for InsertSource<T> {
 }
 impl_display_t!(InsertSource);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, ToDoc)]
 pub enum ObjectType {
     Table,
     View,
@@ -2225,6 +2237,7 @@ impl<T: AstInfo> AstDisplay for ShowStatementFilter<T> {
     }
 }
 impl_display_t!(ShowStatementFilter);
+impl_to_doc_t!(ShowStatementFilter);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WithOptionValue<T: AstInfo> {
@@ -2271,7 +2284,7 @@ impl<T: AstInfo> AstDisplay for WithOptionValue<T> {
 impl_display_t!(WithOptionValue);
 impl_to_doc_t!(WithOptionValue);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum TransactionMode {
     AccessMode(TransactionAccessMode),
     IsolationLevel(TransactionIsolationLevel),
@@ -2291,7 +2304,7 @@ impl AstDisplay for TransactionMode {
 }
 impl_display!(TransactionMode);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum TransactionAccessMode {
     ReadOnly,
     ReadWrite,
@@ -2308,7 +2321,7 @@ impl AstDisplay for TransactionAccessMode {
 }
 impl_display!(TransactionAccessMode);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum TransactionIsolationLevel {
     ReadUncommitted,
     ReadCommitted,
@@ -2331,7 +2344,7 @@ impl AstDisplay for TransactionIsolationLevel {
 }
 impl_display!(TransactionIsolationLevel);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum SetVariableValue {
     Ident(Ident),
     Idents(Vec<Ident>),
@@ -2355,9 +2368,11 @@ impl AstDisplay for SetVariableValue {
 impl_display!(SetVariableValue);
 
 /// SQL assignment `foo = expr` as used in SQLUpdate
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct Assignment<T: AstInfo> {
     pub id: Ident,
+    #[todoc(nest = "=")]
     pub value: Expr<T>,
 }
 
@@ -2372,7 +2387,7 @@ impl_display_t!(Assignment);
 
 /// Specifies what [Statement::Explain] is actually explaining
 /// The new API
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ToDoc)]
 pub enum ExplainStage {
     /// The mz_sql::HirRelationExpr after parsing
     RawPlan,
@@ -2387,6 +2402,7 @@ pub enum ExplainStage {
     /// The mz_compute_client::plan::Plan
     PhysicalPlan,
     /// The complete trace of the plan through the optimizer
+    #[todoc(rename = "OPTIMIZER TRACE")]
     Trace,
     /// The dependent and selected timestamps
     Timestamp,
@@ -2424,14 +2440,16 @@ impl AstDisplay for ExplainStage {
 }
 impl_display!(ExplainStage);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum Explainee<T: AstInfo> {
+    #[todoc(nest = "VIEW")]
     View(T::ObjectName),
+    #[todoc(nest = "MATERIALIZED VIEW")]
     MaterializedView(T::ObjectName),
     Query(Query<T>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ExplainOptions {
     pub typed: bool,
     pub timing: bool,
@@ -2454,7 +2472,7 @@ impl<T: AstInfo> AstDisplay for Explainee<T> {
 }
 impl_display_t!(Explainee);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum ExplainFormat {
     /// Human readable display format
     Text,
@@ -2473,7 +2491,7 @@ impl AstDisplay for ExplainFormat {
 }
 impl_display!(ExplainFormat);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ToDoc)]
 pub enum IfExistsBehavior {
     Error,
     Skip,
@@ -2481,7 +2499,7 @@ pub enum IfExistsBehavior {
 }
 
 /// `DECLARE ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DeclareStatement<T: AstInfo> {
     pub name: Ident,
     pub stmt: Box<T::NestedStatement>,
@@ -2498,7 +2516,7 @@ impl<T: AstInfo> AstDisplay for DeclareStatement<T> {
 impl_display_t!(DeclareStatement);
 
 /// `CLOSE ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CloseStatement {
     pub name: Ident,
 }
@@ -2511,7 +2529,7 @@ impl AstDisplay for CloseStatement {
 }
 impl_display!(CloseStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum FetchOptionName {
     Timeout,
 }
@@ -2524,7 +2542,7 @@ impl AstDisplay for FetchOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct FetchOption<T: AstInfo> {
     pub name: FetchOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -2541,7 +2559,7 @@ impl<T: AstInfo> AstDisplay for FetchOption<T> {
 }
 
 /// `FETCH ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct FetchStatement<T: AstInfo> {
     pub name: Ident,
     pub count: Option<FetchDirection>,
@@ -2579,9 +2597,10 @@ impl AstDisplay for FetchDirection {
     }
 }
 impl_display!(FetchDirection);
+impl_to_doc!(FetchDirection);
 
 /// `PREPARE ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct PrepareStatement<T: AstInfo> {
     pub name: Ident,
     pub stmt: Box<T::NestedStatement>,
@@ -2598,7 +2617,7 @@ impl<T: AstInfo> AstDisplay for PrepareStatement<T> {
 impl_display_t!(PrepareStatement);
 
 /// `EXECUTE ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ExecuteStatement<T: AstInfo> {
     pub name: Ident,
     pub params: Vec<Expr<T>>,
@@ -2618,7 +2637,7 @@ impl<T: AstInfo> AstDisplay for ExecuteStatement<T> {
 impl_display_t!(ExecuteStatement);
 
 /// `DEALLOCATE ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DeallocateStatement {
     pub name: Option<Ident>,
 }
@@ -2635,7 +2654,7 @@ impl AstDisplay for DeallocateStatement {
 impl_display!(DeallocateStatement);
 
 /// `RAISE ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct RaiseStatement {
     pub severity: NoticeSeverity,
 }
@@ -2648,7 +2667,7 @@ impl AstDisplay for RaiseStatement {
 }
 impl_display!(RaiseStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum NoticeSeverity {
     Debug,
     Info,
@@ -2671,7 +2690,7 @@ impl AstDisplay for NoticeSeverity {
 impl_display!(NoticeSeverity);
 
 /// `ALTER SYSTEM SET ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterSystemSetStatement {
     pub name: Ident,
     pub value: SetVariableValue,
@@ -2688,7 +2707,7 @@ impl AstDisplay for AlterSystemSetStatement {
 impl_display!(AlterSystemSetStatement);
 
 /// `ALTER SYSTEM RESET ...`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterSystemResetStatement {
     pub name: Ident,
 }
@@ -2711,8 +2730,9 @@ impl AstDisplay for AlterSystemResetAllStatement {
     }
 }
 impl_display!(AlterSystemResetAllStatement);
+impl_to_doc!(AlterSystemResetAllStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum AsOf<T: AstInfo> {
     At(Expr<T>),
     AtLeast(Expr<T>),

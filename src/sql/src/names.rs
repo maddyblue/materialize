@@ -21,6 +21,7 @@ use mz_expr::LocalId;
 use mz_ore::cast::CastFrom;
 use mz_ore::str::StrExt;
 use mz_repr::GlobalId;
+use mz_sql_parser::impl_to_doc;
 
 use crate::ast::display::{AstDisplay, AstFormatter};
 use crate::ast::fold::{Fold, FoldNode};
@@ -415,7 +416,7 @@ impl std::fmt::Display for ResolvedObjectName {
         f.write_str(self.to_ast_string().as_str())
     }
 }
-mz_sql_parser::impl_to_doc!(ResolvedObjectName);
+impl_to_doc!(ResolvedObjectName);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum ResolvedSchemaName {
@@ -453,6 +454,7 @@ impl AstDisplay for ResolvedSchemaName {
         }
     }
 }
+impl_to_doc!(ResolvedSchemaName);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum ResolvedDatabaseName {
@@ -468,6 +470,7 @@ impl AstDisplay for ResolvedDatabaseName {
         }
     }
 }
+impl_to_doc!(ResolvedDatabaseName);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ResolvedClusterName {
@@ -490,6 +493,7 @@ impl AstDisplay for ResolvedClusterName {
         }
     }
 }
+impl_to_doc!(ResolvedClusterName);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum ResolvedDataType {

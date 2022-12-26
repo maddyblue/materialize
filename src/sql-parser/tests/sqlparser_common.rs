@@ -64,6 +64,19 @@ fn datadriven() {
                     Ok(parsed) => parsed.into_element(),
                     Err(err) => return format!("reparse failed: {}\n", err),
                 };
+                let s2 = parser::parse_statements(&stmt.to_ast_string_stable())
+                    .unwrap()
+                    .into_element();
+                for doc in pdoc(&s2) {
+                    println!();
+                    dbg!(&s2, &stmt);
+                    println!("INPUT: {input}");
+                    println!("STMT2: {s2}");
+                    println!("STMT1: {stmt}");
+                    println!("  DOC: {doc}");
+                    let n = parser::parse_statements(&doc).unwrap().into_element();
+                    assert_eq!(n, s2, "doc: {doc}, orig: {s2}");
+                }
                 if parsed != stmt {
                     return format!("reparse comparison failed:\n{:?}\n!=\n{:?}\n", stmt, parsed);
                 }

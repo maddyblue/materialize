@@ -41,15 +41,15 @@ use crate::ast::display::ToDoc;
 /// sql/src/names.rs:resolve.
 pub trait AstInfo: Clone {
     /// The type used for nested statements.
-    type NestedStatement: AstDisplay + Clone + Hash + Debug + Eq;
+    type NestedStatement: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type used for table references.
     type ObjectName: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type used for schema names.
-    type SchemaName: AstDisplay + Clone + Hash + Debug + Eq;
+    type SchemaName: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type used for database names.
-    type DatabaseName: AstDisplay + Clone + Hash + Debug + Eq;
+    type DatabaseName: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type used for cluster names.
-    type ClusterName: AstDisplay + Clone + Hash + Debug + Eq;
+    type ClusterName: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type used for data types.
     type DataType: AstDisplay + Clone + Hash + Debug + Eq + ToDoc;
     /// The type stored next to CTEs for their assigned ID.
@@ -137,6 +137,7 @@ impl AstDisplay for RawClusterName {
     }
 }
 impl_display!(RawClusterName);
+impl_to_doc!(RawClusterName);
 
 impl<T> FoldNode<Raw, T> for RawClusterName
 where
