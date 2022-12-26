@@ -369,6 +369,7 @@ impl_display_t!(UpdateStatement);
 
 /// `DELETE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(rename = "DELETE FROM")]
 pub struct DeleteStatement<T: AstInfo> {
     /// `FROM`
     pub table_name: T::ObjectName,
