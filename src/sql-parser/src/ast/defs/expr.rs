@@ -201,10 +201,10 @@ pub enum Expr<T: AstInfo> {
         right: Box<Expr<T>>,
     },
     /// `ARRAY[<expr>*]`
-    Array(#[todoc(prefix = "ARRAY[", suffix = "]", no_name)] Vec<Expr<T>>),
+    Array(#[todoc(prefix = "ARRAY[", suffix = "]", no_name, show_empty)] Vec<Expr<T>>),
     ArraySubquery(Box<Query<T>>),
     /// `LIST[<expr>*]`
-    List(#[todoc(prefix = "LIST[", suffix = "]", no_name)] Vec<Expr<T>>),
+    List(#[todoc(prefix = "LIST[", suffix = "]", no_name, show_empty)] Vec<Expr<T>>),
     ListSubquery(Box<Query<T>>),
     /// `<expr>([<expr>(:<expr>)?])+`
     Subscript {
