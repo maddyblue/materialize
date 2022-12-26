@@ -39,6 +39,7 @@ pub enum Expr<T: AstInfo> {
     /// Qualified wildcard, e.g. `alias.*` or `schema.table.*`.
     QualifiedWildcard(Vec<Ident>),
     /// A field access, like `(expr).foo`.
+    #[todoc(separator = ".")]
     FieldAccess {
         expr: Box<Expr<T>>,
         field: Ident,
@@ -49,7 +50,7 @@ pub enum Expr<T: AstInfo> {
     /// wildcard access occurs on an arbitrary expression, rather than a
     /// qualified name. The distinction is important for PostgreSQL
     /// compatibility.
-    WildcardAccess(Box<Expr<T>>),
+    WildcardAccess(#[todoc(suffix = ".*")] Box<Expr<T>>),
     /// A positional parameter, e.g., `$1` or `$42`
     #[todoc(prefix = "$")]
     Parameter(usize),
@@ -209,6 +210,7 @@ pub enum Expr<T: AstInfo> {
     /// `<expr>([<expr>(:<expr>)?])+`
     Subscript {
         expr: Box<Expr<T>>,
+        #[todoc(prefix = "[", suffix = "]", no_name, separator = "][")]
         positions: Vec<SubscriptPosition<T>>,
     },
 }
