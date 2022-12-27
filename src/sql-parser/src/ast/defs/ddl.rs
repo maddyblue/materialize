@@ -1254,7 +1254,7 @@ impl_to_doc!(S3KeySource);
 
 /// A table-level constraint, specified in a `CREATE TABLE` or an
 /// `ALTER TABLE ADD <constraint>` statement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TableConstraint<T: AstInfo> {
     /// `[ CONSTRAINT <name> ] { PRIMARY KEY | UNIQUE } (<columns>)`
     Unique {
@@ -1321,6 +1321,7 @@ impl<T: AstInfo> AstDisplay for TableConstraint<T> {
     }
 }
 impl_display_t!(TableConstraint);
+impl_to_doc_t!(TableConstraint);
 
 /// A key constraint, specified in a `CREATE SOURCE`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
@@ -1391,6 +1392,7 @@ pub struct ColumnDef<T: AstInfo> {
     pub name: Ident,
     pub data_type: T::DataType,
     pub collation: Option<UnresolvedObjectName>,
+    #[todoc(no_name, separator = "")]
     pub options: Vec<ColumnOptionDef<T>>,
 }
 
@@ -1427,7 +1429,7 @@ impl_display_t!(ColumnDef);
 /// For maximum flexibility, we don't distinguish between constraint and
 /// non-constraint options, lumping them all together under the umbrella of
 /// "column options," and we allow any column option to be named.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ColumnOptionDef<T: AstInfo> {
     pub name: Option<Ident>,
     pub option: ColumnOption<T>,
@@ -1440,6 +1442,7 @@ impl<T: AstInfo> AstDisplay for ColumnOptionDef<T> {
     }
 }
 impl_display_t!(ColumnOptionDef);
+impl_to_doc_t!(ColumnOptionDef);
 
 /// `ColumnOption`s are modifiers that follow a column definition in a `CREATE
 /// TABLE` statement.

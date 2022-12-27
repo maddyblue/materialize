@@ -43,10 +43,44 @@ pub struct Query<T: AstInfo> {
     pub order_by: Vec<OrderByExpr<T>>,
     /// `LIMIT { <N> | ALL }`
     /// `FETCH { FIRST | NEXT } <N> { ROW | ROWS } | { ONLY | WITH TIES }`
-    #[todoc(no_name)]
+    #[todoc(doc_fn = "to_doc_limit")]
     pub limit: Option<Limit<T>>,
     /// `OFFSET <N> { ROW | ROWS }`
+    #[todoc(ignore)]
     pub offset: Option<Expr<T>>,
+}
+
+fn to_doc_limit<T: AstInfo>(q: &Query<T>) -> Option<pretty::RcDoc> {
+    use pretty::RcDoc;
+
+    let mut docs = Vec::new();
+
+    let write_offset = |docs: &mut Vec<RcDoc>| {
+        if let Some(offset) = &q.offset {
+            docs.push(RcDoc::text(format!("OFFSET {offset}")));
+        }
+    };
+
+    if let Some(limit) = &q.limit {
+        if limit.with_ties {
+            write_offset(&mut docs);
+            docs.push(RcDoc::text(format!(
+                "FETCH FIRST {} ROWS WITH TIES",
+                limit.quantity
+            )));
+        } else {
+            docs.push(RcDoc::text(format!("LIMIT {}", limit.quantity)));
+            write_offset(&mut docs);
+        }
+    } else {
+        write_offset(&mut docs);
+    }
+
+    if docs.is_empty() {
+        None
+    } else {
+        Some(RcDoc::intersperse(docs, RcDoc::line()))
+    }
 }
 
 impl<T: AstInfo> AstDisplay for Query<T> {
@@ -515,6 +549,7 @@ pub enum TableFactor<T: AstInfo> {
         with_ordinality: bool,
     },
     RowsFrom {
+        #[todoc(prefix = "ROWS FROM (", suffix = ")", no_name)]
         functions: Vec<TableFunction<T>>,
         #[todoc(rename = "AS")]
         alias: Option<TableAlias>,

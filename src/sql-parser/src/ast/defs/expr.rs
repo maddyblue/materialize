@@ -145,7 +145,9 @@ pub enum Expr<T: AstInfo> {
     /// While NULLIF has the same syntax as a function call, it is not evaluated
     /// as a function within Postgres.
     NullIf {
+        #[todoc(prefix = "NULLIF(", suffix = ",")]
         l_expr: Box<Expr<T>>,
+        #[todoc(suffix = ")")]
         r_expr: Box<Expr<T>>,
     },
     /// Nested expression e.g. `(foo > bar)` or `(1)`
@@ -207,10 +209,10 @@ pub enum Expr<T: AstInfo> {
     },
     /// `ARRAY[<expr>*]`
     Array(#[todoc(prefix = "ARRAY[", suffix = "]", no_name, show_empty)] Vec<Expr<T>>),
-    ArraySubquery(Box<Query<T>>),
+    ArraySubquery(#[todoc(prefix = "ARRAY(", suffix = ")")] Box<Query<T>>),
     /// `LIST[<expr>*]`
     List(#[todoc(prefix = "LIST[", suffix = "]", no_name, show_empty)] Vec<Expr<T>>),
-    ListSubquery(Box<Query<T>>),
+    ListSubquery(#[todoc(prefix = "LIST(", suffix = ")")] Box<Query<T>>),
     /// `<expr>([<expr>(:<expr>)?])+`
     Subscript {
         expr: Box<Expr<T>>,

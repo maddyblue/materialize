@@ -869,15 +869,18 @@ impl_display_t!(CreateMaterializedViewStatement);
 
 /// `CREATE TABLE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(rename = "CREATE", suffix = ")")]
 pub struct CreateTableStatement<T: AstInfo> {
+    pub temporary: bool,
+    #[todoc(rename = "IF NOT EXISTS TABLE", else = "TABLE")]
+    pub if_not_exists: bool,
     /// Table name
     pub name: UnresolvedObjectName,
     /// Optional schema
-    #[todoc(prefix = "(", suffix = ")", no_name)]
+    #[todoc(prefix = "(", no_name, show_empty)]
     pub columns: Vec<ColumnDef<T>>,
+    #[todoc(prefix = ",", no_name)]
     pub constraints: Vec<TableConstraint<T>>,
-    pub if_not_exists: bool,
-    pub temporary: bool,
 }
 
 impl<T: AstInfo> AstDisplay for CreateTableStatement<T> {
@@ -2752,7 +2755,7 @@ impl_to_doc!(AlterSystemResetAllStatement);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum AsOf<T: AstInfo> {
     At(Expr<T>),
-    AtLeast(Expr<T>),
+    AtLeast(#[todoc(prefix = "AT LEAST ")] Expr<T>),
 }
 
 impl<T: AstInfo> AstDisplay for AsOf<T> {

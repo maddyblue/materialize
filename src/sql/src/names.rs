@@ -10,7 +10,6 @@
 //! Structured name types for SQL objects.
 
 use anyhow::anyhow;
-use mz_sql_parser::ast::LimitOffset;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -885,10 +884,8 @@ impl<'a> Fold<Raw, Aug> for NameResolver<'a> {
         let result = Query {
             ctes,
             body: self.fold_set_expr(q.body),
-            limit: LimitOffset {
-                limit: q.limit.limit.map(|l| self.fold_limit(l)),
-                offset: q.limit.offset.map(|l| self.fold_expr(l)),
-            },
+            limit: q.limit.map(|l| self.fold_limit(l)),
+            offset: q.offset.map(|l| self.fold_expr(l)),
             order_by: q
                 .order_by
                 .into_iter()

@@ -413,14 +413,14 @@ SELECT * FROM customers WHERE segment IN (SELECT segm FROM bar)
 ----
 SELECT * FROM customers WHERE segment IN (SELECT segm FROM bar)
 =>
-Select(SelectStatement { query: Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Wildcard], from: [TableWithJoins { relation: Table { name: Name(UnresolvedObjectName([Ident("customers")])), alias: None }, joins: [] }], selection: Some(InSubquery { expr: Identifier([Ident("segment")]), subquery: Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Expr { expr: Identifier([Ident("segm")]), alias: None }], from: [TableWithJoins { relation: Table { name: Name(UnresolvedObjectName([Ident("bar")])), alias: None }, joins: [] }], selection: None, group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None }, negated: false }), group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None }, as_of: None })
+Select(SelectStatement { query: Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Wildcard], from: [TableWithJoins { relation: Table { name: Name(UnresolvedObjectName([Ident("customers")])), alias: None }, joins: [] }], selection: Some(InSubquery { expr: Identifier([Ident("segment")]), negated: false, subquery: Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Expr { expr: Identifier([Ident("segm")]), alias: None }], from: [TableWithJoins { relation: Table { name: Name(UnresolvedObjectName([Ident("bar")])), alias: None }, joins: [] }], selection: None, group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None } }), group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None }, as_of: None })
 
 parse-statement
 SELECT * FROM t WHERE x IN (VALUES (1))
 ----
 SELECT * FROM t WHERE x IN (VALUES (1))
 =>
-Select(SelectStatement { query: Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Wildcard], from: [TableWithJoins { relation: Table { name: Name(UnresolvedObjectName([Ident("t")])), alias: None }, joins: [] }], selection: Some(InSubquery { expr: Identifier([Ident("x")]), subquery: Query { ctes: Simple([]), body: Values(Values([[Value(Number("1"))]])), order_by: [], limit: None, offset: None }, negated: false }), group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None }, as_of: None })
+Select(SelectStatement { query: Query { ctes: Simple([]), body: Select(Select { distinct: None, projection: [Wildcard], from: [TableWithJoins { relation: Table { name: Name(UnresolvedObjectName([Ident("t")])), alias: None }, joins: [] }], selection: Some(InSubquery { expr: Identifier([Ident("x")]), negated: false, subquery: Query { ctes: Simple([]), body: Values(Values([[Value(Number("1"))]])), order_by: [], limit: None, offset: None } }), group_by: [], having: None, options: [] }), order_by: [], limit: None, offset: None }, as_of: None })
 
 parse-statement
 SELECT * FROM customers WHERE age BETWEEN 25 AND 32
