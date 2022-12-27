@@ -856,13 +856,33 @@ impl<T: AstInfo> AstDisplay for CreateViewStatement<T> {
 impl_display_t!(CreateViewStatement);
 
 /// `CREATE MATERIALIZED VIEW`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct CreateMaterializedViewStatement<T: AstInfo> {
+    #[todoc(doc_fn = "create_materialized_view_doc")]
     pub if_exists: IfExistsBehavior,
     pub name: UnresolvedObjectName,
+    #[todoc(prefix = "(", suffix = ")", no_name)]
     pub columns: Vec<Ident>,
     pub in_cluster: Option<T::ClusterName>,
+    #[todoc(nest = "AS")]
     pub query: Query<T>,
+}
+
+fn create_materialized_view_doc<T: AstInfo>(
+    v: &CreateMaterializedViewStatement<T>,
+) -> Option<pretty::RcDoc> {
+    use pretty::RcDoc;
+
+    let mut doc = RcDoc::text("CREATE");
+    if v.if_exists == IfExistsBehavior::Replace {
+        doc = doc.append(RcDoc::text(" OR REPLACE"));
+    }
+    doc = doc.append(RcDoc::text(" MATERIALIZED VIEW"));
+    if v.if_exists == IfExistsBehavior::Skip {
+        doc = doc.append(RcDoc::text(" IF NOT EXISTS"));
+    }
+    Some(doc)
 }
 
 impl<T: AstInfo> AstDisplay for CreateMaterializedViewStatement<T> {
@@ -897,7 +917,6 @@ impl<T: AstInfo> AstDisplay for CreateMaterializedViewStatement<T> {
     }
 }
 impl_display_t!(CreateMaterializedViewStatement);
-impl_to_doc_t!(CreateMaterializedViewStatement);
 
 /// `CREATE TABLE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
