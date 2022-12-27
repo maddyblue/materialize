@@ -419,7 +419,7 @@ impl AstDisplay for SourceIncludeMetadata {
 }
 impl_display!(SourceIncludeMetadata);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Envelope {
     None,
     Debezium(DbzMode),
@@ -463,6 +463,7 @@ impl AstDisplay for Envelope {
     }
 }
 impl_display!(Envelope);
+impl_to_doc!(Envelope);
 
 impl<T: AstInfo> AstDisplay for Format<T> {
     fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
@@ -1369,7 +1370,7 @@ impl AstDisplay for CreateSourceOptionName {
 }
 impl_display!(CreateSourceOptionName);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// An option in a `CREATE SOURCE...` statement.
 pub struct CreateSourceOption<T: AstInfo> {
     pub name: CreateSourceOptionName,
@@ -1386,6 +1387,7 @@ impl<T: AstInfo> AstDisplay for CreateSourceOption<T> {
     }
 }
 impl_display_t!(CreateSourceOption);
+impl_to_doc_t!(CreateSourceOption);
 
 /// SQL column definition
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]

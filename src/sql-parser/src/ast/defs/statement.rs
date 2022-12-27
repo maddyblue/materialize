@@ -180,8 +180,10 @@ impl_display_t!(SelectStatement);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct InsertStatement<T: AstInfo> {
     /// TABLE
+    #[todoc(prefix = "INTO ")]
     pub table_name: T::ObjectName,
     /// COLUMNS
+    #[todoc(prefix = "(", suffix = ")", no_name)]
     pub columns: Vec<Ident>,
     /// A SQL query that specifies what to insert.
     pub source: InsertSource<T>,
@@ -571,8 +573,10 @@ pub struct CreateSourceStatement<T: AstInfo> {
     pub format: CreateSourceFormat<T>,
     pub envelope: Option<Envelope>,
     pub key_constraint: Option<KeyConstraint>,
-    pub with_options: Vec<CreateSourceOption<T>>,
+    #[todoc(no_name)]
     pub subsources: Option<CreateReferencedSubsources<T>>,
+    #[todoc(prefix = "WITH (", suffix = ")", no_name)]
+    pub with_options: Vec<CreateSourceOption<T>>,
 }
 
 impl<T: AstInfo> AstDisplay for CreateSourceStatement<T> {
@@ -641,7 +645,7 @@ impl<T: AstInfo> AstDisplay for CreateSourceSubsource<T> {
 }
 impl_display_t!(CreateSourceSubsource);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CreateReferencedSubsources<T: AstInfo> {
     /// A subset defined with FOR TABLES (...)
     Subset(Vec<CreateSourceSubsource<T>>),
@@ -662,6 +666,7 @@ impl<T: AstInfo> AstDisplay for CreateReferencedSubsources<T> {
     }
 }
 impl_display_t!(CreateReferencedSubsources);
+impl_to_doc_t!(CreateReferencedSubsources);
 
 /// `CREATE SUBSOURCE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
@@ -995,7 +1000,7 @@ impl<T: AstInfo> AstDisplay for IndexOption<T> {
 }
 
 /// A `CREATE ROLE` statement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateRoleStatement {
     /// Whether this was actually a `CREATE USER` statement.
     pub is_user: bool,
@@ -1021,6 +1026,7 @@ impl AstDisplay for CreateRoleStatement {
     }
 }
 impl_display!(CreateRoleStatement);
+impl_to_doc!(CreateRoleStatement);
 
 /// Options that can be attached to [`CreateRoleStatement`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
@@ -1050,8 +1056,9 @@ impl_display!(CreateRoleOption);
 /// A `CREATE SECRET` statement.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSecretStatement<T: AstInfo> {
-    pub name: UnresolvedObjectName,
     pub if_not_exists: bool,
+    pub name: UnresolvedObjectName,
+    #[todoc(nest = "AS")]
     pub value: Expr<T>,
 }
 
@@ -1069,7 +1076,7 @@ impl<T: AstInfo> AstDisplay for CreateSecretStatement<T> {
 impl_display_t!(CreateSecretStatement);
 
 /// `CREATE TYPE ..`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateTypeStatement<T: AstInfo> {
     /// Name of the created type.
     pub name: UnresolvedObjectName,
@@ -1110,6 +1117,7 @@ impl<T: AstInfo> AstDisplay for CreateTypeStatement<T> {
     }
 }
 impl_display_t!(CreateTypeStatement);
+impl_to_doc_t!(CreateTypeStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum ClusterOptionName {
@@ -1185,7 +1193,7 @@ impl<T: AstInfo> AstDisplay for ReplicaDefinition<T> {
 impl_display_t!(ReplicaDefinition);
 
 /// `CREATE CLUSTER REPLICA ..`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateClusterReplicaStatement<T: AstInfo> {
     /// Name of the replica's cluster.
     pub of_cluster: Ident,
@@ -1204,6 +1212,7 @@ impl<T: AstInfo> AstDisplay for CreateClusterReplicaStatement<T> {
     }
 }
 impl_display_t!(CreateClusterReplicaStatement);
+impl_to_doc_t!(CreateClusterReplicaStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum ReplicaOptionName {
@@ -1487,8 +1496,9 @@ impl_to_doc_t!(AlterSourceStatement);
 /// `ALTER SECRET ... AS`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterSecretStatement<T: AstInfo> {
-    pub name: UnresolvedObjectName,
     pub if_exists: bool,
+    pub name: UnresolvedObjectName,
+    #[todoc(nest = "AS")]
     pub value: Expr<T>,
 }
 
@@ -1638,6 +1648,7 @@ pub struct DropRolesStatement {
     /// An optional `IF EXISTS` clause. (Non-standard.)
     pub if_exists: bool,
     /// One or more objects to drop. (ANSI SQL requires exactly one.)
+    #[todoc(no_name)]
     pub names: Vec<UnresolvedObjectName>,
 }
 
@@ -1657,6 +1668,7 @@ pub struct DropClustersStatement {
     /// An optional `IF EXISTS` clause. (Non-standard.)
     pub if_exists: bool,
     /// One or more objects to drop. (ANSI SQL requires exactly one.)
+    #[todoc(no_name)]
     pub names: Vec<UnresolvedObjectName>,
     /// Whether `CASCADE` was specified. This will be `false` when
     /// `RESTRICT` or no drop behavior at all was specified.
@@ -1677,7 +1689,7 @@ impl AstDisplay for DropClustersStatement {
 }
 impl_display!(DropClustersStatement);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct QualifiedReplica {
     pub cluster: Ident,
     pub replica: Ident,
@@ -1691,12 +1703,14 @@ impl AstDisplay for QualifiedReplica {
     }
 }
 impl_display!(QualifiedReplica);
+impl_to_doc!(QualifiedReplica);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropClusterReplicasStatement {
     /// An optional `IF EXISTS` clause. (Non-standard.)
     pub if_exists: bool,
     /// One or more objects to drop. (ANSI SQL requires exactly one.)
+    #[todoc(no_name)]
     pub names: Vec<QualifiedReplica>,
 }
 
@@ -1717,9 +1731,11 @@ impl_display!(DropClusterReplicasStatement);
 /// least MySQL and PostgreSQL. Not all MySQL-specific syntactic forms are
 /// supported yet.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(rename = "SET")]
 pub struct SetVariableStatement {
     pub local: bool,
     pub variable: Ident,
+    #[todoc(nest = "=")]
     pub value: SetVariableValue,
 }
 
@@ -1741,6 +1757,7 @@ impl_display!(SetVariableStatement);
 /// Note: this is not a standard SQL statement, but it is supported by at
 /// least MySQL and PostgreSQL. Not all syntactic forms are supported yet.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(rename = "RESET")]
 pub struct ResetVariableStatement {
     pub variable: Ident,
 }
@@ -1755,6 +1772,7 @@ impl_display!(ResetVariableStatement);
 
 /// `SHOW <variable>`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(rename = "SHOW")]
 pub struct ShowVariableStatement {
     pub variable: Ident,
 }
@@ -2639,6 +2657,7 @@ impl_to_doc!(FetchDirection);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct PrepareStatement<T: AstInfo> {
     pub name: Ident,
+    #[todoc(nest = "AS")]
     pub stmt: Box<T::NestedStatement>,
 }
 
@@ -2656,6 +2675,7 @@ impl_display_t!(PrepareStatement);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ExecuteStatement<T: AstInfo> {
     pub name: Ident,
+    #[todoc(prefix = "(", suffix = ")", no_name)]
     pub params: Vec<Expr<T>>,
 }
 
@@ -2675,6 +2695,7 @@ impl_display_t!(ExecuteStatement);
 /// `DEALLOCATE ...`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DeallocateStatement {
+    #[todoc(else = "ALL", no_name)]
     pub name: Option<Ident>,
 }
 
@@ -2729,6 +2750,7 @@ impl_display!(NoticeSeverity);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct AlterSystemSetStatement {
     pub name: Ident,
+    #[todoc(nest = "=")]
     pub value: SetVariableValue,
 }
 

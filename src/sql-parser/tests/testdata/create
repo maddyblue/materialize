@@ -193,14 +193,14 @@ CREATE TABLE "table_name" (col_name int)
 ----
 CREATE TABLE table_name (col_name int4)
 =>
-CreateTable(CreateTableStatement { name: UnresolvedObjectName([Ident("table_name")]), columns: [ColumnDef { name: Ident("col_name"), data_type: Other { name: Name(UnresolvedObjectName([Ident("int4")])), typ_mod: [] }, collation: None, options: [] }], constraints: [], if_not_exists: false, temporary: false })
+CreateTable(CreateTableStatement { temporary: false, if_not_exists: false, name: UnresolvedObjectName([Ident("table_name")]), columns: [ColumnDef { name: Ident("col_name"), data_type: Other { name: Name(UnresolvedObjectName([Ident("int4")])), typ_mod: [] }, collation: None, options: [] }], constraints: [] })
 
 parse-statement
 CREATE TABLE schema_name.table_name (col_name int)
 ----
 CREATE TABLE schema_name.table_name (col_name int4)
 =>
-CreateTable(CreateTableStatement { name: UnresolvedObjectName([Ident("schema_name"), Ident("table_name")]), columns: [ColumnDef { name: Ident("col_name"), data_type: Other { name: Name(UnresolvedObjectName([Ident("int4")])), typ_mod: [] }, collation: None, options: [] }], constraints: [], if_not_exists: false, temporary: false })
+CreateTable(CreateTableStatement { temporary: false, if_not_exists: false, name: UnresolvedObjectName([Ident("schema_name"), Ident("table_name")]), columns: [ColumnDef { name: Ident("col_name"), data_type: Other { name: Name(UnresolvedObjectName([Ident("int4")])), typ_mod: [] }, collation: None, options: [] }], constraints: [] })
 
 parse-statement
 CREATE TABLE "" (col_name int)
