@@ -542,6 +542,7 @@ impl_display_t!(KafkaBrokerAwsPrivatelink);
 pub struct CreateConnectionStatement<T: AstInfo> {
     pub if_not_exists: bool,
     pub name: UnresolvedObjectName,
+    #[todoc(nest = "TO")]
     pub connection: CreateConnection<T>,
 }
 
@@ -561,13 +562,14 @@ impl_display_t!(CreateConnectionStatement);
 /// `CREATE SOURCE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSourceStatement<T: AstInfo> {
+    pub if_not_exists: bool,
     pub name: UnresolvedObjectName,
     pub col_names: Vec<Ident>,
+    #[todoc(prefix = "FROM ")]
     pub connection: CreateSourceConnection<T>,
     pub include_metadata: Vec<SourceIncludeMetadata>,
     pub format: CreateSourceFormat<T>,
     pub envelope: Option<Envelope>,
-    pub if_not_exists: bool,
     pub key_constraint: Option<KeyConstraint>,
     pub with_options: Vec<CreateSourceOption<T>>,
     pub subsources: Option<CreateReferencedSubsources<T>>,
@@ -712,7 +714,7 @@ impl AstDisplay for CreateSinkOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateSinkOption<T: AstInfo> {
     pub name: CreateSinkOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -727,9 +729,10 @@ impl<T: AstInfo> AstDisplay for CreateSinkOption<T> {
         }
     }
 }
+impl_to_doc_t!(CreateSinkOption);
 
 /// `CREATE SINK`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateSinkStatement<T: AstInfo> {
     pub name: UnresolvedObjectName,
     pub if_not_exists: bool,
@@ -768,6 +771,7 @@ impl<T: AstInfo> AstDisplay for CreateSinkStatement<T> {
     }
 }
 impl_display_t!(CreateSinkStatement);
+impl_to_doc_t!(CreateSinkStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ViewDefinition<T: AstInfo> {
@@ -825,7 +829,7 @@ impl_display_t!(CreateViewStatement);
 impl_to_doc_t!(CreateViewStatement);
 
 /// `CREATE MATERIALIZED VIEW`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateMaterializedViewStatement<T: AstInfo> {
     pub if_exists: IfExistsBehavior,
     pub name: UnresolvedObjectName,
@@ -866,13 +870,14 @@ impl<T: AstInfo> AstDisplay for CreateMaterializedViewStatement<T> {
     }
 }
 impl_display_t!(CreateMaterializedViewStatement);
+impl_to_doc_t!(CreateMaterializedViewStatement);
 
 /// `CREATE TABLE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 #[todoc(rename = "CREATE", suffix = ")")]
 pub struct CreateTableStatement<T: AstInfo> {
     pub temporary: bool,
-    #[todoc(rename = "IF NOT EXISTS TABLE", else = "TABLE")]
+    #[todoc(rename = "TABLE IF NOT EXISTS", else = "TABLE")]
     pub if_not_exists: bool,
     /// Table name
     pub name: UnresolvedObjectName,
@@ -1138,7 +1143,7 @@ impl<T: AstInfo> AstDisplay for ClusterOption<T> {
 }
 
 /// `CREATE CLUSTER ..`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateClusterStatement<T: AstInfo> {
     /// Name of the created cluster.
     pub name: Ident,
@@ -1157,6 +1162,7 @@ impl<T: AstInfo> AstDisplay for CreateClusterStatement<T> {
     }
 }
 impl_display_t!(CreateClusterStatement);
+impl_to_doc_t!(CreateClusterStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct ReplicaDefinition<T: AstInfo> {
@@ -1335,10 +1341,12 @@ impl<T: AstInfo> AstDisplay for CreateTypeMapOption<T> {
 
 /// `ALTER <OBJECT> ... RENAME TO`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(rename = "ALTER")]
 pub struct AlterObjectRenameStatement {
     pub object_type: ObjectType,
     pub if_exists: bool,
     pub name: UnresolvedObjectName,
+    #[todoc(prefix = "RENAME TO ")]
     pub to_item_name: Ident,
 }
 
@@ -1364,7 +1372,7 @@ pub enum AlterIndexAction<T: AstInfo> {
 }
 
 /// `ALTER INDEX ... {RESET, SET}`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AlterIndexStatement<T: AstInfo> {
     pub index_name: UnresolvedObjectName,
     pub if_exists: bool,
@@ -1396,6 +1404,7 @@ impl<T: AstInfo> AstDisplay for AlterIndexStatement<T> {
 }
 
 impl_display_t!(AlterIndexStatement);
+impl_to_doc_t!(AlterIndexStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum AlterSinkAction<T: AstInfo> {
@@ -1403,7 +1412,7 @@ pub enum AlterSinkAction<T: AstInfo> {
     ResetOptions(Vec<CreateSinkOptionName>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AlterSinkStatement<T: AstInfo> {
     pub sink_name: UnresolvedObjectName,
     pub if_exists: bool,
@@ -1433,6 +1442,7 @@ impl<T: AstInfo> AstDisplay for AlterSinkStatement<T> {
         }
     }
 }
+impl_to_doc_t!(AlterSinkStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum AlterSourceAction<T: AstInfo> {
@@ -1440,10 +1450,10 @@ pub enum AlterSourceAction<T: AstInfo> {
     ResetOptions(Vec<CreateSourceOptionName>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AlterSourceStatement<T: AstInfo> {
-    pub source_name: UnresolvedObjectName,
     pub if_exists: bool,
+    pub source_name: UnresolvedObjectName,
     pub action: AlterSourceAction<T>,
 }
 
@@ -1472,6 +1482,7 @@ impl<T: AstInfo> AstDisplay for AlterSourceStatement<T> {
 }
 
 impl_display_t!(AlterSourceStatement);
+impl_to_doc_t!(AlterSourceStatement);
 
 /// `ALTER SECRET ... AS`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
@@ -1550,8 +1561,8 @@ impl_display!(DiscardTarget);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DropDatabaseStatement {
-    pub name: UnresolvedDatabaseName,
     pub if_exists: bool,
+    pub name: UnresolvedDatabaseName,
     pub restrict: bool,
 }
 
@@ -1592,12 +1603,14 @@ impl_display!(DropSchemaStatement);
 
 /// `DROP`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(rename = "DROP")]
 pub struct DropObjectsStatement {
     /// The type of the object to drop: TABLE, VIEW, etc.
     pub object_type: ObjectType,
     /// An optional `IF EXISTS` clause. (Non-standard.)
     pub if_exists: bool,
     /// One or more objects to drop. (ANSI SQL requires exactly one.)
+    #[todoc(no_name)]
     pub names: Vec<UnresolvedObjectName>,
     /// Whether `CASCADE` was specified. This will be `false` when
     /// `RESTRICT` or no drop behavior at all was specified.
@@ -2086,8 +2099,10 @@ impl AstDisplay for SubscribeOptionName {
 impl_display!(SubscribeOptionName);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct SubscribeOption<T: AstInfo> {
     pub name: SubscribeOptionName,
+    #[todoc(no_name, prefix = "= ")]
     pub value: Option<WithOptionValue<T>>,
 }
 
@@ -2106,6 +2121,7 @@ impl_display_t!(SubscribeOption);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct SubscribeStatement<T: AstInfo> {
     pub relation: SubscribeRelation<T>,
+    #[todoc(prefix = " WITH (", suffix = ")", no_name)]
     pub options: Vec<SubscribeOption<T>>,
     pub as_of: Option<AsOf<T>>,
 }
@@ -2130,7 +2146,7 @@ impl_display_t!(SubscribeStatement);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum SubscribeRelation<T: AstInfo> {
     Name(T::ObjectName),
-    Query(Query<T>),
+    Query(#[todoc(prefix = "(", suffix = ")")] Query<T>),
 }
 
 impl<T: AstInfo> AstDisplay for SubscribeRelation<T> {

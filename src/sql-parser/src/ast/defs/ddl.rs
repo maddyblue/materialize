@@ -817,7 +817,7 @@ impl<T: AstInfo> AstDisplay for SshConnectionOption<T> {
 }
 impl_display_t!(SshConnectionOption);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CreateConnection<T: AstInfo> {
     Aws {
         with_options: Vec<AwsConnectionOption<T>>,
@@ -876,6 +876,7 @@ impl<T: AstInfo> AstDisplay for CreateConnection<T> {
     }
 }
 impl_display_t!(CreateConnection);
+impl_to_doc_t!(CreateConnection);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum KafkaConfigOptionName {
@@ -1159,7 +1160,7 @@ impl<T: AstInfo> AstDisplay for LoadGeneratorOption<T> {
 }
 impl_display_t!(LoadGeneratorOption);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CreateSinkConnection<T: AstInfo> {
     Kafka {
         connection: KafkaConnection<T>,
@@ -1181,6 +1182,7 @@ impl<T: AstInfo> AstDisplay for CreateSinkConnection<T> {
     }
 }
 impl_display_t!(CreateSinkConnection);
+impl_to_doc_t!(CreateSinkConnection);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct KafkaSinkKey {
