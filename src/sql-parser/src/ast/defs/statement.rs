@@ -779,10 +779,13 @@ impl_display_t!(CreateSinkStatement);
 impl_to_doc_t!(CreateSinkStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct ViewDefinition<T: AstInfo> {
     /// View name
     pub name: UnresolvedObjectName,
+    #[todoc(prefix = "(", suffix = ")", no_name)]
     pub columns: Vec<Ident>,
+    #[todoc(nest = "AS")]
     pub query: Query<T>,
 }
 
@@ -803,11 +806,31 @@ impl<T: AstInfo> AstDisplay for ViewDefinition<T> {
 impl_display_t!(ViewDefinition);
 
 /// `CREATE VIEW`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct CreateViewStatement<T: AstInfo> {
+    #[todoc(doc_fn = "create_view_doc")]
     pub if_exists: IfExistsBehavior,
+    #[todoc(ignore)]
     pub temporary: bool,
     pub definition: ViewDefinition<T>,
+}
+
+fn create_view_doc<T: AstInfo>(v: &CreateViewStatement<T>) -> Option<pretty::RcDoc> {
+    use pretty::RcDoc;
+
+    let mut doc = RcDoc::text("CREATE");
+    if v.if_exists == IfExistsBehavior::Replace {
+        doc = doc.append(RcDoc::text(" OR REPLACE"));
+    }
+    if v.temporary {
+        doc = doc.append(RcDoc::text(" TEMPORARY"));
+    }
+    doc = doc.append(RcDoc::text(" VIEW"));
+    if v.if_exists == IfExistsBehavior::Skip {
+        doc = doc.append(RcDoc::text(" IF NOT EXISTS"));
+    }
+    Some(doc)
 }
 
 impl<T: AstInfo> AstDisplay for CreateViewStatement<T> {
@@ -831,7 +854,6 @@ impl<T: AstInfo> AstDisplay for CreateViewStatement<T> {
     }
 }
 impl_display_t!(CreateViewStatement);
-impl_to_doc_t!(CreateViewStatement);
 
 /// `CREATE MATERIALIZED VIEW`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
