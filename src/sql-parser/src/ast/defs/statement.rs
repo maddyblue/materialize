@@ -427,8 +427,8 @@ impl_display!(CreateDatabaseStatement);
 /// `CREATE SCHEMA`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CreateSchemaStatement {
-    pub name: UnresolvedSchemaName,
     pub if_not_exists: bool,
+    pub name: UnresolvedSchemaName,
 }
 
 impl AstDisplay for CreateSchemaStatement {
