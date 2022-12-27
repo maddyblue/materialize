@@ -43,6 +43,7 @@ pub struct Query<T: AstInfo> {
     pub order_by: Vec<OrderByExpr<T>>,
     /// `LIMIT { <N> | ALL }`
     /// `FETCH { FIRST | NEXT } <N> { ROW | ROWS } | { ONLY | WITH TIES }`
+    #[todoc(no_name)]
     pub limit: Option<Limit<T>>,
     /// `OFFSET <N> { ROW | ROWS }`
     pub offset: Option<Expr<T>>,
@@ -125,12 +126,12 @@ pub enum SetExpr<T: AstInfo> {
     Select(Box<Select<T>>),
     /// Parenthesized SELECT subquery, which may include more set operations
     /// in its body and an optional ORDER BY / LIMIT.
-    Query(Box<Query<T>>),
+    Query(#[todoc(prefix = "(", suffix = ")")] Box<Query<T>>),
     /// UNION/EXCEPT/INTERSECT of two queries
     SetOperation {
+        left: Box<SetExpr<T>>,
         op: SetOperator,
         all: bool,
-        left: Box<SetExpr<T>>,
         right: Box<SetExpr<T>>,
     },
     Values(Values<T>),
@@ -222,6 +223,7 @@ impl<T: AstInfo> AstDisplay for SelectOption<T> {
 /// to a set operation like `UNION`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct Select<T: AstInfo> {
+    #[todoc(no_name)]
     pub distinct: Option<Distinct<T>>,
     /// projection expressions
     #[todoc(no_name)]
@@ -229,6 +231,7 @@ pub struct Select<T: AstInfo> {
     /// FROM
     pub from: Vec<TableWithJoins<T>>,
     /// WHERE
+    #[todoc(rename = "WHERE")]
     pub selection: Option<Expr<T>>,
     /// GROUP BY
     pub group_by: Vec<Expr<T>>,
@@ -291,7 +294,7 @@ impl<T: AstInfo> Select<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Distinct<T: AstInfo> {
     EntireRow,
     On(Vec<Expr<T>>),
@@ -310,6 +313,7 @@ impl<T: AstInfo> AstDisplay for Distinct<T> {
         }
     }
 }
+impl_to_doc_t!(Distinct);
 
 /// A block of common table expressions (CTEs).
 ///
@@ -378,6 +382,7 @@ impl<T: AstInfo> AstDisplay for CteBlock<T> {
 /// number of columns in the query matches the number of columns in the query.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct Cte<T: AstInfo> {
+    #[todoc(rename = "AS")]
     pub alias: TableAlias,
     #[todoc(ignore)]
     pub id: T::CteId,
@@ -468,6 +473,7 @@ impl_display_t!(SelectItem);
 #[todoc(no_name)]
 pub struct TableWithJoins<T: AstInfo> {
     pub relation: TableFactor<T>,
+    #[todoc(no_name, separator = "")]
     pub joins: Vec<Join<T>>,
 }
 
@@ -499,21 +505,26 @@ impl<T: AstInfo> TableWithJoins<T> {
 pub enum TableFactor<T: AstInfo> {
     Table {
         name: T::ObjectName,
+        #[todoc(rename = "AS")]
         alias: Option<TableAlias>,
     },
     Function {
         function: TableFunction<T>,
+        #[todoc(rename = "AS")]
         alias: Option<TableAlias>,
         with_ordinality: bool,
     },
     RowsFrom {
         functions: Vec<TableFunction<T>>,
+        #[todoc(rename = "AS")]
         alias: Option<TableAlias>,
         with_ordinality: bool,
     },
     Derived {
         lateral: bool,
+        #[todoc(prefix = "(", suffix = ")")]
         subquery: Box<Query<T>>,
+        #[todoc(rename = "AS")]
         alias: Option<TableAlias>,
     },
     /// Represents a parenthesized join expression, such as
@@ -521,7 +532,9 @@ pub enum TableFactor<T: AstInfo> {
     /// The inner `TableWithJoins` can have no joins only if its
     /// `relation` is itself a `TableFactor::NestedJoin`.
     NestedJoin {
+        #[todoc(prefix = "(", suffix = ")")]
         join: Box<TableWithJoins<T>>,
+        #[todoc(rename = "AS")]
         alias: Option<TableAlias>,
     },
 }
@@ -597,8 +610,10 @@ impl<T: AstInfo> AstDisplay for TableFactor<T> {
 impl_display_t!(TableFactor);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct TableFunction<T: AstInfo> {
     pub name: UnresolvedObjectName,
+    #[todoc(prefix = "(", suffix = ")")]
     pub args: FunctionArgs<T>,
 }
 impl<T: AstInfo> AstDisplay for TableFunction<T> {
@@ -636,11 +651,12 @@ impl AstDisplay for TableAlias {
 impl_display!(TableAlias);
 impl_to_doc!(TableAlias);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Join<T: AstInfo> {
     pub relation: TableFactor<T>,
     pub join_operator: JoinOperator<T>,
 }
+impl_to_doc_t!(Join);
 
 impl<T: AstInfo> AstDisplay for Join<T> {
     fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
@@ -722,6 +738,7 @@ pub enum JoinOperator<T: AstInfo> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum JoinConstraint<T: AstInfo> {
+    #[todoc(prefix = "ON")]
     On(Expr<T>),
     Using(Vec<Ident>),
     Natural,

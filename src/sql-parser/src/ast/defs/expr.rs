@@ -37,7 +37,7 @@ pub enum Expr<T: AstInfo> {
     /// Identifier e.g. table name or column name
     Identifier(#[todoc(separator = ".", no_name)] Vec<Ident>),
     /// Qualified wildcard, e.g. `alias.*` or `schema.table.*`.
-    QualifiedWildcard(Vec<Ident>),
+    QualifiedWildcard(#[todoc(no_name, suffix = ".*")] Vec<Ident>),
     /// A field access, like `(expr).foo`.
     #[todoc(separator = ".")]
     FieldAccess {
@@ -87,8 +87,10 @@ pub enum Expr<T: AstInfo> {
     /// `[ NOT ] IN (SELECT ...)`
     InSubquery {
         expr: Box<Expr<T>>,
-        subquery: Box<Query<T>>,
+        #[todoc(rename = "NOT IN", else = "IN")]
         negated: bool,
+        #[todoc(prefix = "(", suffix = ")")]
+        subquery: Box<Query<T>>,
     },
     /// `<expr> [ NOT ] {LIKE, ILIKE} <pattern> [ ESCAPE <escape> ]`
     Like {
@@ -125,6 +127,7 @@ pub enum Expr<T: AstInfo> {
     /// `expr COLLATE collation`
     Collate {
         expr: Box<Expr<T>>,
+        #[todoc(prefix = "COLLATE ")]
         collation: UnresolvedObjectName,
     },
     /// COALESCE(<expr>, ...) or GREATEST(<expr>, ...) or LEAST(<expr>, ...)
@@ -149,6 +152,7 @@ pub enum Expr<T: AstInfo> {
     Nested(#[todoc(prefix = "(", suffix = ")")] Box<Expr<T>>),
     /// A row constructor like `ROW(<expr>...)` or `(<expr>, <expr>...)`.
     Row {
+        #[todoc(prefix = "ROW(", suffix = ")", no_name, show_empty)]
         exprs: Vec<Expr<T>>,
     },
     /// A literal value, such as string, number, date or NULL
@@ -171,7 +175,7 @@ pub enum Expr<T: AstInfo> {
     },
     /// An exists expression `EXISTS(SELECT ...)`, used in expressions like
     /// `WHERE EXISTS (SELECT ...)`.
-    Exists(Box<Query<T>>),
+    Exists(#[todoc(prefix = "EXISTS (", suffix = ")")] Box<Query<T>>),
     /// A parenthesized subquery `(SELECT ...)`, used in expression like
     /// `SELECT (subquery) AS x` or `WHERE (subquery) = x`
     Subquery(#[todoc(prefix = "(", suffix = ")")] Box<Query<T>>),

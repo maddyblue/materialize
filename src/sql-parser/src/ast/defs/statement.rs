@@ -212,10 +212,11 @@ impl_display_t!(InsertStatement);
 pub enum CopyRelation<T: AstInfo> {
     Table {
         name: T::ObjectName,
+        #[todoc(prefix = "(", suffix = ")", no_name)]
         columns: Vec<Ident>,
     },
-    Select(SelectStatement<T>),
-    Subscribe(SubscribeStatement<T>),
+    Select(#[todoc(prefix = "(", suffix = ")")] SelectStatement<T>),
+    Subscribe(#[todoc(prefix = "(", suffix = ")")] SubscribeStatement<T>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
@@ -273,7 +274,7 @@ impl AstDisplay for CopyOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CopyOption<T: AstInfo> {
     pub name: CopyOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -288,6 +289,7 @@ impl<T: AstInfo> AstDisplay for CopyOption<T> {
         }
     }
 }
+impl_to_doc_t!(CopyOption);
 
 /// `COPY`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
@@ -299,6 +301,7 @@ pub struct CopyStatement<T: AstInfo> {
     // TARGET
     pub target: CopyTarget,
     // OPTIONS
+    #[todoc(prefix = "WITH (", suffix = ")", no_name)]
     pub options: Vec<CopyOption<T>>,
 }
 
@@ -369,15 +372,17 @@ impl_display_t!(UpdateStatement);
 
 /// `DELETE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
-#[todoc(rename = "DELETE FROM")]
 pub struct DeleteStatement<T: AstInfo> {
     /// `FROM`
+    #[todoc(nest = "FROM")]
     pub table_name: T::ObjectName,
     /// `AS`
+    #[todoc(rename = "AS")]
     pub alias: Option<TableAlias>,
     /// `USING`
     pub using: Vec<TableWithJoins<T>>,
     /// `WHERE`
+    #[todoc(rename = "WHERE")]
     pub selection: Option<Expr<T>>,
 }
 
@@ -789,7 +794,7 @@ impl<T: AstInfo> AstDisplay for ViewDefinition<T> {
 impl_display_t!(ViewDefinition);
 
 /// `CREATE VIEW`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CreateViewStatement<T: AstInfo> {
     pub if_exists: IfExistsBehavior,
     pub temporary: bool,
@@ -817,6 +822,7 @@ impl<T: AstInfo> AstDisplay for CreateViewStatement<T> {
     }
 }
 impl_display_t!(CreateViewStatement);
+impl_to_doc_t!(CreateViewStatement);
 
 /// `CREATE MATERIALIZED VIEW`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
@@ -867,6 +873,7 @@ pub struct CreateTableStatement<T: AstInfo> {
     /// Table name
     pub name: UnresolvedObjectName,
     /// Optional schema
+    #[todoc(prefix = "(", suffix = ")", no_name)]
     pub columns: Vec<ColumnDef<T>>,
     pub constraints: Vec<TableConstraint<T>>,
     pub if_not_exists: bool,
@@ -1992,6 +1999,7 @@ impl<T: AstInfo> AstDisplay for ShowCreateConnectionStatement<T> {
 /// `{ BEGIN [ TRANSACTION | WORK ] | START TRANSACTION } ...`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct StartTransactionStatement {
+    #[todoc(no_name)]
     pub modes: Vec<TransactionMode>,
 }
 
@@ -2009,6 +2017,7 @@ impl_display!(StartTransactionStatement);
 /// `SET TRANSACTION ...`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct SetTransactionStatement {
+    #[todoc(no_name)]
     pub modes: Vec<TransactionMode>,
 }
 
@@ -2026,6 +2035,7 @@ impl_display!(SetTransactionStatement);
 /// `COMMIT [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ]`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct CommitStatement {
+    #[todoc(prefix = "AND ")]
     pub chain: bool,
 }
 
@@ -2042,6 +2052,7 @@ impl_display!(CommitStatement);
 /// `ROLLBACK [ TRANSACTION | WORK ] [ AND [ NO ] CHAIN ]`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct RollbackStatement {
+    #[todoc(prefix = "AND ")]
     pub chain: bool,
 }
 
@@ -2288,6 +2299,7 @@ impl_to_doc_t!(WithOptionValue);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum TransactionMode {
     AccessMode(TransactionAccessMode),
+    #[todoc(prefix = "ISOLATION LEVEL ")]
     IsolationLevel(TransactionIsolationLevel),
 }
 
@@ -2503,6 +2515,7 @@ pub enum IfExistsBehavior {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct DeclareStatement<T: AstInfo> {
     pub name: Ident,
+    #[todoc(nest = "CURSOR FOR")]
     pub stmt: Box<T::NestedStatement>,
 }
 
@@ -2543,7 +2556,7 @@ impl AstDisplay for FetchOptionName {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FetchOption<T: AstInfo> {
     pub name: FetchOptionName,
     pub value: Option<WithOptionValue<T>>,
@@ -2558,12 +2571,15 @@ impl<T: AstInfo> AstDisplay for FetchOption<T> {
         }
     }
 }
+impl_to_doc_t!(FetchOption);
 
 /// `FETCH ...`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct FetchStatement<T: AstInfo> {
-    pub name: Ident,
+    #[todoc(no_name)]
     pub count: Option<FetchDirection>,
+    pub name: Ident,
+    #[todoc(prefix = "WITH (", suffix = ")", no_name)]
     pub options: Vec<FetchOption<T>>,
 }
 

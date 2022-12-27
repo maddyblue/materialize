@@ -1386,6 +1386,7 @@ impl_display_t!(CreateSourceOption);
 
 /// SQL column definition
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct ColumnDef<T: AstInfo> {
     pub name: Ident,
     pub data_type: T::DataType,
