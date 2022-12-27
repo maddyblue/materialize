@@ -691,7 +691,34 @@ pub struct Join<T: AstInfo> {
     pub relation: TableFactor<T>,
     pub join_operator: JoinOperator<T>,
 }
-impl_to_doc_t!(Join);
+
+impl<T: AstInfo> ToDoc for Join<T> {
+    fn to_doc(&self) -> pretty::RcDoc<()> {
+        use pretty::RcDoc;
+
+        let (constraint, op) = match &self.join_operator {
+            JoinOperator::Inner(constraint) => (Some(constraint), ""),
+            JoinOperator::LeftOuter(constraint) => (Some(constraint), "LEFT "),
+            JoinOperator::RightOuter(constraint) => (Some(constraint), "RIGHT "),
+            JoinOperator::FullOuter(constraint) => (Some(constraint), "FULL "),
+            JoinOperator::CrossJoin => (None, "CROSS "),
+        };
+        let mut doc = RcDoc::text(format!(
+            "{}{}JOIN",
+            match constraint {
+                Some(JoinConstraint::Natural) => "NATURAL ",
+                _ => "",
+            },
+            op
+        ))
+        .append(RcDoc::line())
+        .append(self.relation.to_doc());
+        if let Some(constraint) = constraint {
+            doc = doc.append(RcDoc::line()).append(constraint.to_doc());
+        }
+        doc
+    }
+}
 
 impl<T: AstInfo> AstDisplay for Join<T> {
     fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
@@ -773,9 +800,10 @@ pub enum JoinOperator<T: AstInfo> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum JoinConstraint<T: AstInfo> {
-    #[todoc(prefix = "ON")]
+    #[todoc(nest = "ON")]
     On(Expr<T>),
-    Using(Vec<Ident>),
+    Using(#[todoc(prefix = "USING (", suffix = ")", no_name)] Vec<Ident>),
+    #[todoc(ignore)]
     Natural,
 }
 
