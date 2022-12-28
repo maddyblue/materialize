@@ -24,7 +24,7 @@ use unicode_width::UnicodeWidthStr;
 
 use mz_ore::collections::CollectionExt;
 use mz_ore::fmt::FormatBuffer;
-use mz_sql_parser::ast::display::AstDisplay;
+use mz_sql_parser::ast::display::{AstDisplay, ToDoc};
 use mz_sql_parser::ast::visit::Visit;
 use mz_sql_parser::ast::visit_mut::{self, VisitMut};
 use mz_sql_parser::ast::{AstInfo, Expr, Ident, Raw, RawDataType, RawObjectName};
@@ -64,18 +64,24 @@ fn datadriven() {
                     Ok(parsed) => parsed.into_element(),
                     Err(err) => return format!("reparse failed: {}\n", err),
                 };
-                let s2 = parser::parse_statements(&stmt.to_ast_string_stable())
-                    .unwrap()
-                    .into_element();
+                let stmt_str = stmt.to_ast_string_stable();
+                let s2 = parser::parse_statements(&stmt_str).unwrap().into_element();
                 for doc in pdoc(&s2) {
-                    println!();
-                    dbg!(&s2, &stmt);
-                    println!("INPUT: {input}");
-                    println!("STMT2: {s2}");
-                    println!("STMT1: {stmt}");
-                    println!("  DOC: {doc}");
+                    // println!();
+                    // dbg!(&s2, &stmt);
+                    // println!("INPUT: {input}");
+                    // println!("STMT2: {s2}");
+                    // println!("STMT1: {stmt}");
+                    // println!("  DOC: {doc}");
                     let n = parser::parse_statements(&doc).unwrap().into_element();
                     assert_eq!(n, s2, "doc: {doc}, orig: {s2}");
+                }
+                {
+                    let doc = s2.to_doc();
+                    let mut cur = Vec::new();
+                    doc.render(100_000, &mut cur).unwrap();
+                    let rendered = String::from_utf8(cur).unwrap();
+                    assert_eq!(rendered, stmt_str, "\nAST: {stmt_str}\nDOC: {rendered}\n");
                 }
                 if parsed != stmt {
                     return format!("reparse comparison failed:\n{:?}\n!=\n{:?}\n", stmt, parsed);
@@ -102,12 +108,12 @@ fn datadriven() {
                     if matches!(s, Expr::Function { .. }) {
                         break;
                     }
-                    println!();
-                    dbg!(&s2, &s);
-                    println!("INPUT: {input}");
-                    println!("EXPR2: {s2}");
-                    println!("EXPR1: {s}");
-                    println!("  DOC: {doc}");
+                    // println!();
+                    // dbg!(&s2, &s);
+                    // println!("INPUT: {input}");
+                    // println!("EXPR2: {s2}");
+                    // println!("EXPR1: {s}");
+                    // println!("  DOC: {doc}");
                     let n = parser::parse_expr(&doc).unwrap();
                     assert_eq!(n, s2, "doc: {doc}, orig: {s2}");
                 }

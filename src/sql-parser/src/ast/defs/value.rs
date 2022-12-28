@@ -23,10 +23,8 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::ast::display::{self, AstDisplay, AstFormatter};
+use crate::ast::display::{self, AstDisplay, AstFormatter, ToDoc};
 use crate::ast::Ident;
-
-use crate::ast::display::ToDoc;
 
 #[derive(Debug)]
 pub struct ValueError(pub(crate) String);

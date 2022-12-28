@@ -21,11 +21,10 @@
 use std::fmt;
 use std::mem;
 
-use crate::ast::display::{self, AstDisplay, AstFormatter};
-use crate::ast::{AstInfo, Ident, OrderByExpr, Query, UnresolvedObjectName, Value};
+use mz_display_derive::ToDoc;
 
-use crate::ast::display::ToDoc;
-use astdisplay::*;
+use crate::ast::display::{self, AstDisplay, AstFormatter, ToDoc};
+use crate::ast::{AstInfo, Ident, OrderByExpr, Query, UnresolvedObjectName, Value};
 
 /// An SQL expression of any type.
 ///

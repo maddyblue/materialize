@@ -135,7 +135,7 @@ macro_rules! impl_to_doc {
     ($name:ident) => {
         impl ToDoc for $name {
             fn to_doc(&self) -> pretty::RcDoc<()> {
-                pretty::RcDoc::text(self.to_ast_string())
+                pretty::RcDoc::text(self.to_ast_string_stable())
             }
         }
     };
@@ -145,7 +145,7 @@ macro_rules! impl_to_doc_t {
     ($name:ident) => {
         impl<T: AstInfo> crate::ast::display::ToDoc for $name<T> {
             fn to_doc(&self) -> pretty::RcDoc<()> {
-                pretty::RcDoc::text(self.to_ast_string())
+                pretty::RcDoc::text(self.to_ast_string_stable())
             }
         }
     };

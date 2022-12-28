@@ -26,7 +26,9 @@ use std::fmt;
 
 use enum_kinds::EnumKind;
 
-use crate::ast::display::{self, AstDisplay, AstFormatter};
+use mz_display_derive::ToDoc;
+
+use crate::ast::display::{self, AstDisplay, AstFormatter, ToDoc};
 use crate::ast::{
     AstInfo, ColumnDef, CreateConnection, CreateSinkConnection, CreateSourceConnection,
     CreateSourceFormat, CreateSourceOption, CreateSourceOptionName, DeferredObjectName, Envelope,
@@ -34,9 +36,6 @@ use crate::ast::{
     TableConstraint, TableWithJoins, UnresolvedDatabaseName, UnresolvedObjectName,
     UnresolvedSchemaName, Value,
 };
-
-use crate::ast::display::ToDoc;
-use astdisplay::*;
 
 /// A top-level statement (SELECT, INSERT, CREATE, etc.)
 #[allow(clippy::large_enum_variant)]

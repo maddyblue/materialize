@@ -16,13 +16,11 @@
 use std::fmt::{self, Debug};
 use std::hash::Hash;
 
-use crate::ast::display::{self, AstDisplay, AstFormatter};
+use crate::ast::display::{self, AstDisplay, AstFormatter, ToDoc};
 use crate::ast::fold::{Fold, FoldNode};
 use crate::ast::{
     Ident, Statement, UnresolvedDatabaseName, UnresolvedObjectName, UnresolvedSchemaName,
 };
-
-use crate::ast::display::ToDoc;
 
 /// This represents the metadata that lives next to an AST, as we take it through
 /// various stages in the planning process.

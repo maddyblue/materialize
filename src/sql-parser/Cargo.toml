@@ -17,7 +17,7 @@ tracing = "0.1.37"
 uncased = "0.9.7"
 #workspace-hack = { version = "0.0.0", path = "../workspace-hack" }
 
-astdisplay = { path = "/home/mjibson/scratch/astdisplay/astdisplay" }
+mz-display-derive = { path = "../display-derive" }
 pretty = "0.11.3"
 
 [dev-dependencies]

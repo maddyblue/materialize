@@ -22,13 +22,12 @@ use std::fmt::{self, Debug};
 use std::hash::Hash;
 use std::mem;
 
-use crate::ast::display::{self, AstDisplay, AstFormatter};
+use mz_display_derive::ToDoc;
+
+use crate::ast::display::{self, AstDisplay, AstFormatter, ToDoc};
 use crate::ast::{
     AstInfo, Expr, FunctionArgs, Ident, ShowStatement, UnresolvedObjectName, WithOptionValue,
 };
-
-use crate::ast::display::ToDoc;
-use astdisplay::*;
 
 /// The most complete variant of a `SELECT` query expression, optionally
 /// including `WITH`, `UNION` / other set operations, and `ORDER BY`.
@@ -36,6 +35,7 @@ use astdisplay::*;
 #[todoc(no_name)]
 pub struct Query<T: AstInfo> {
     /// WITH (common table expressions, or CTEs)
+    #[todoc(doc_fn = "to_doc_cte_block")]
     pub ctes: CteBlock<T>,
     /// SELECT or UNION / EXCEPT / INTERSECT
     pub body: SetExpr<T>,
@@ -48,6 +48,14 @@ pub struct Query<T: AstInfo> {
     /// `OFFSET <N> { ROW | ROWS }`
     #[todoc(ignore)]
     pub offset: Option<Expr<T>>,
+}
+
+fn to_doc_cte_block<T: AstInfo>(q: &Query<T>) -> Option<pretty::RcDoc> {
+    match &q.ctes {
+        CteBlock::Simple(v) if v.is_empty() => None,
+        CteBlock::MutuallyRecursive(v) if v.is_empty() => None,
+        _ => Some(q.ctes.to_doc()),
+    }
 }
 
 fn to_doc_limit<T: AstInfo>(q: &Query<T>) -> Option<pretty::RcDoc> {

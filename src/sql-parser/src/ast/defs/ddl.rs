@@ -23,11 +23,10 @@
 
 use std::fmt;
 
-use crate::ast::display::{self, AstDisplay, AstFormatter};
-use crate::ast::{AstInfo, Expr, Ident, UnresolvedObjectName, WithOptionValue};
+use mz_display_derive::ToDoc;
 
-use crate::ast::display::ToDoc;
-use astdisplay::*;
+use crate::ast::display::{self, AstDisplay, AstFormatter, ToDoc};
+use crate::ast::{AstInfo, Expr, Ident, UnresolvedObjectName, WithOptionValue};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Schema {

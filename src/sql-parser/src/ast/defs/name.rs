@@ -20,11 +20,9 @@
 
 use std::fmt;
 
-use crate::ast::display::{self, AstDisplay, AstFormatter};
+use crate::ast::display::{self, AstDisplay, AstFormatter, ToDoc};
 use crate::ast::AstInfo;
 use crate::keywords::Keyword;
-
-use crate::ast::display::ToDoc;
 
 /// An identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
