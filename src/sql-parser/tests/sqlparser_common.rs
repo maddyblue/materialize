@@ -78,6 +78,7 @@ fn datadriven() {
                 }
                 {
                     let doc = s2.to_doc();
+                    dbg!(&doc);
                     let mut cur = Vec::new();
                     doc.render(100_000, &mut cur).unwrap();
                     let rendered = String::from_utf8(cur).unwrap();
