@@ -4067,7 +4067,6 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
- "workspace-hack",
 ]
 
 [[package]]
@@ -4541,7 +4540,6 @@ dependencies = [
  "tracing",
  "uncased",
  "unicode-width",
- "workspace-hack",
 ]
 
 [[package]]

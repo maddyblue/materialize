@@ -78,6 +78,7 @@ mod target32 {
     cast_from!(usize, u32);
     cast_from!(isize, i32);
     cast_from!(u32, usize);
+    cast_from!(u64, usize);
     cast_from!(i32, isize);
 }
 #[cfg(target_pointer_width = "32")]
