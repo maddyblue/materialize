@@ -34,7 +34,7 @@ use crate::ast::{AstInfo, Ident, OrderByExpr, Query, UnresolvedObjectName, Value
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum Expr<T: AstInfo> {
     /// Identifier e.g. table name or column name
-    Identifier(#[todoc(separator = ".", no_name)] Vec<Ident>),
+    Identifier(#[todoc(separator = ".", separator_noline, no_name)] Vec<Ident>),
     /// Qualified wildcard, e.g. `alias.*` or `schema.table.*`.
     QualifiedWildcard(#[todoc(no_name, suffix = ".*")] Vec<Ident>),
     /// A field access, like `(expr).foo`.
