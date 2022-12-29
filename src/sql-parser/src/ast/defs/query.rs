@@ -362,10 +362,10 @@ impl_to_doc_t!(Distinct);
 /// The block can either be entirely "simple" (traditional SQL `WITH` block),
 /// or "mutually recursive", which introduce their bindings before the block
 /// and may result in mutually recursive definitions.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CteBlock<T: AstInfo> {
-    Simple(Vec<Cte<T>>),
-    MutuallyRecursive(Vec<CteMutRec<T>>),
+    Simple(#[todoc(rename = "WITH")] Vec<Cte<T>>),
+    MutuallyRecursive(#[todoc(rename = "WITH MUTUALLY RECURSIVE")] Vec<CteMutRec<T>>),
 }
 
 impl<T: AstInfo> CteBlock<T> {
@@ -398,7 +398,6 @@ impl<T: AstInfo> CteBlock<T> {
         names.into_iter()
     }
 }
-impl_to_doc_t!(CteBlock);
 
 impl<T: AstInfo> AstDisplay for CteBlock<T> {
     fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
@@ -423,11 +422,12 @@ impl<T: AstInfo> AstDisplay for CteBlock<T> {
 /// of the columns returned by the query. The parser does not validate that the
 /// number of columns in the query matches the number of columns in the query.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct Cte<T: AstInfo> {
-    #[todoc(rename = "AS")]
     pub alias: TableAlias,
     #[todoc(ignore)]
     pub id: T::CteId,
+    #[todoc(nest = "AS", prefix = "(", suffix = ")")]
     pub query: Query<T>,
 }
 

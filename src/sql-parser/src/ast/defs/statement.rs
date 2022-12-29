@@ -211,6 +211,7 @@ impl_display_t!(InsertStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CopyRelation<T: AstInfo> {
+    #[todoc(separator_noline)]
     Table {
         name: T::ObjectName,
         #[todoc(prefix = "(", suffix = ")", no_name)]

@@ -38,7 +38,7 @@ pub enum Expr<T: AstInfo> {
     /// Qualified wildcard, e.g. `alias.*` or `schema.table.*`.
     QualifiedWildcard(#[todoc(no_name, suffix = ".*")] Vec<Ident>),
     /// A field access, like `(expr).foo`.
-    #[todoc(separator = ".")]
+    #[todoc(separator = ".", separator_noline)]
     FieldAccess {
         expr: Box<Expr<T>>,
         field: Ident,
