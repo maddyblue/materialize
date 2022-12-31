@@ -442,11 +442,14 @@ impl<T: AstInfo> AstDisplay for Cte<T> {
 impl_display_t!(Cte);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct CteMutRec<T: AstInfo> {
     pub name: Ident,
+    #[todoc(prefix = "(", suffix = ")", no_name)]
     pub columns: Vec<CteMutRecColumnDef<T>>,
     #[todoc(ignore)]
     pub id: T::CteId,
+    #[todoc(nest = "AS", prefix = "(", suffix = ")")]
     pub query: Query<T>,
 }
 
@@ -467,6 +470,7 @@ impl_display_t!(CteMutRec);
 
 /// A column definition in a [`CteMutRec`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
+#[todoc(no_name)]
 pub struct CteMutRecColumnDef<T: AstInfo> {
     pub name: Ident,
     pub data_type: T::DataType,
@@ -653,7 +657,7 @@ impl<T: AstInfo> AstDisplay for TableFactor<T> {
 impl_display_t!(TableFactor);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
-#[todoc(no_name)]
+#[todoc(no_name, separator_noline)]
 pub struct TableFunction<T: AstInfo> {
     pub name: UnresolvedObjectName,
     #[todoc(prefix = "(", suffix = ")")]
@@ -722,7 +726,12 @@ impl<T: AstInfo> ToDoc for Join<T> {
         .append(RcDoc::line())
         .append(self.relation.to_doc());
         if let Some(constraint) = constraint {
-            doc = doc.append(RcDoc::line()).append(constraint.to_doc());
+            // TODO(mjibson): ToDoc should probably have a to_doc_opt fn to explicitly
+            // allow things not existing instead of having to coerce them to nil, which
+            // ends up producing empty lines in output sometimes.
+            if !matches!(constraint, JoinConstraint::Natural) {
+                doc = doc.append(RcDoc::line()).append(constraint.to_doc());
+            }
         }
         doc
     }
