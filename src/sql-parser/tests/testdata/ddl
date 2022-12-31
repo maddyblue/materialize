@@ -616,18 +616,16 @@ CREATE INDEX IF EXISTS myschema.ind ON foo(b)
 parse-statement
 DROP DATABASE mydb
 ----
-reparse comparison failed:
+DROP DATABASE mydb
+=>
 DropDatabase(DropDatabaseStatement { if_exists: false, name: UnresolvedDatabaseName(Ident("mydb")), restrict: false })
-!=
-DropDatabase(DropDatabaseStatement { if_exists: true, name: UnresolvedDatabaseName(Ident("mydb")), restrict: true })
 
 parse-statement
 DROP DATABASE IF EXISTS mydb
 ----
-reparse comparison failed:
+DROP DATABASE IF EXISTS mydb
+=>
 DropDatabase(DropDatabaseStatement { if_exists: true, name: UnresolvedDatabaseName(Ident("mydb")), restrict: false })
-!=
-DropDatabase(DropDatabaseStatement { if_exists: true, name: UnresolvedDatabaseName(Ident("mydb")), restrict: true })
 
 parse-statement
 DROP DATABASE mydb.nope
@@ -639,18 +637,16 @@ DROP DATABASE mydb.nope
 parse-statement
 DROP DATABASE mydb CASCADE
 ----
-reparse comparison failed:
+DROP DATABASE mydb
+=>
 DropDatabase(DropDatabaseStatement { if_exists: false, name: UnresolvedDatabaseName(Ident("mydb")), restrict: false })
-!=
-DropDatabase(DropDatabaseStatement { if_exists: true, name: UnresolvedDatabaseName(Ident("mydb")), restrict: true })
 
 parse-statement
 DROP DATABASE mydb RESTRICT
 ----
-reparse comparison failed:
+DROP DATABASE mydb RESTRICT
+=>
 DropDatabase(DropDatabaseStatement { if_exists: false, name: UnresolvedDatabaseName(Ident("mydb")), restrict: true })
-!=
-DropDatabase(DropDatabaseStatement { if_exists: true, name: UnresolvedDatabaseName(Ident("mydb")), restrict: true })
 
 parse-statement
 DROP DATABASE mydb CASCADE RESTRICT

@@ -86,7 +86,7 @@ fn datadriven() {
                     assert_eq!(rendered, stmt_str, "\nAST: {stmt_str}\nDOC: {rendered}\n");
                 }
                 if parsed != stmt {
-                    return format!("reparse comparison failed:\n{:?}\n!=\n{:?}\n", stmt, parsed);
+                    panic!("reparse comparison failed:\n{:?}\n!=\n{:?}\n", stmt, parsed);
                 }
                 if tc.args.get("roundtrip").is_some() {
                     format!("{}\n", stmt)

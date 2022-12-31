@@ -570,6 +570,7 @@ pub struct CreateSourceStatement<T: AstInfo> {
     #[todoc(prefix = "FROM ")]
     pub connection: CreateSourceConnection<T>,
     pub include_metadata: Vec<SourceIncludeMetadata>,
+    #[todoc(doc_fn = "doc_create_source_format")]
     pub format: CreateSourceFormat<T>,
     pub envelope: Option<Envelope>,
     pub key_constraint: Option<KeyConstraint>,
@@ -577,6 +578,13 @@ pub struct CreateSourceStatement<T: AstInfo> {
     pub subsources: Option<CreateReferencedSubsources<T>>,
     #[todoc(prefix = "WITH (", suffix = ")", no_name)]
     pub with_options: Vec<CreateSourceOption<T>>,
+}
+
+fn doc_create_source_format<T: AstInfo>(s: &CreateSourceStatement<T>) -> Option<pretty::RcDoc> {
+    match &s.format {
+        CreateSourceFormat::None => None,
+        _ => Some(s.format.to_doc()),
+    }
 }
 
 impl<T: AstInfo> AstDisplay for CreateSourceStatement<T> {
@@ -920,17 +928,18 @@ impl_display_t!(CreateMaterializedViewStatement);
 
 /// `CREATE TABLE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
-#[todoc(rename = "CREATE", suffix = ")")]
+#[todoc(rename = "CREATE", suffix = ")", separator_noline)]
 pub struct CreateTableStatement<T: AstInfo> {
+    #[todoc(suffix = " ")]
     pub temporary: bool,
-    #[todoc(rename = "TABLE IF NOT EXISTS", else = "TABLE")]
+    #[todoc(rename = "TABLE IF NOT EXISTS ", else = "TABLE ")]
     pub if_not_exists: bool,
     /// Table name
     pub name: UnresolvedObjectName,
     /// Optional schema
-    #[todoc(prefix = "(", no_name, show_empty)]
+    #[todoc(prefix = " (", no_name, show_empty)]
     pub columns: Vec<ColumnDef<T>>,
-    #[todoc(prefix = ",", no_name)]
+    #[todoc(prefix = ", ", no_name)]
     pub constraints: Vec<TableConstraint<T>>,
 }
 
@@ -2180,7 +2189,7 @@ impl_display_t!(SubscribeOption);
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub struct SubscribeStatement<T: AstInfo> {
     pub relation: SubscribeRelation<T>,
-    #[todoc(prefix = " WITH (", suffix = ")", no_name)]
+    #[todoc(prefix = "WITH (", suffix = ")", no_name)]
     pub options: Vec<SubscribeOption<T>>,
     pub as_of: Option<AsOf<T>>,
 }

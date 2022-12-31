@@ -304,11 +304,11 @@ impl AstDisplay for CsrSeedProtobufSchema {
 impl_display!(CsrSeedProtobufSchema);
 impl_to_doc!(CsrSeedProtobufSchema);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ToDoc)]
 pub enum CreateSourceFormat<T: AstInfo> {
     None,
     /// `CREATE SOURCE .. FORMAT`
-    Bare(Format<T>),
+    Bare(#[todoc(prefix = "FORMAT ")] Format<T>),
     /// `CREATE SOURCE .. KEY FORMAT .. VALUE FORMAT`
     KeyValue {
         key: Format<T>,
@@ -334,7 +334,6 @@ impl<T: AstInfo> AstDisplay for CreateSourceFormat<T> {
     }
 }
 impl_display_t!(CreateSourceFormat);
-impl_to_doc_t!(CreateSourceFormat);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Format<T: AstInfo> {

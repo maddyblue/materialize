@@ -414,7 +414,7 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
                 f.write_node(&left);
                 f.write_str(" ");
                 f.write_str(op);
-                f.write_str("ANY (");
+                f.write_str(" ANY (");
                 f.write_node(&right);
                 f.write_str(")");
             }
@@ -422,7 +422,7 @@ impl<T: AstInfo> AstDisplay for Expr<T> {
                 f.write_node(&left);
                 f.write_str(" ");
                 f.write_str(op);
-                f.write_str("ANY (");
+                f.write_str(" ANY (");
                 f.write_node(&right);
                 f.write_str(")");
             }
