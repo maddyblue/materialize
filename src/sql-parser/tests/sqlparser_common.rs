@@ -67,19 +67,19 @@ fn datadriven() {
                 let stmt_str = stmt.to_ast_string_stable();
                 let s2 = parser::parse_statements(&stmt_str).unwrap().into_element();
                 for doc in pdoc(&s2) {
-                    println!();
-                    dbg!(&s2, &stmt);
-                    println!("INPUT: {input}");
-                    println!("STMT2: {s2}");
-                    println!("STMT1: {stmt}");
-                    println!("  DOC: {doc}");
+                    // println!();
+                    // dbg!(&s2, &stmt);
+                    // println!("INPUT: {input}");
+                    // println!("STMT2: {s2}");
+                    // println!("STMT1: {stmt}");
+                    // println!("  DOC: {doc}");
                     let n = parser::parse_statements(&doc).unwrap().into_element();
                     assert_eq!(n, s2, "doc: {doc}, orig: {s2}");
                 }
                 {
                     let doc = s2.to_doc();
-                    dbg!(&s2);
-                    dbg!(&doc);
+                    // dbg!(&s2);
+                    // dbg!(&doc);
                     let mut cur = Vec::new();
                     doc.render(100_000, &mut cur).unwrap();
                     let rendered = String::from_utf8(cur).unwrap();
