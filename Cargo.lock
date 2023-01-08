@@ -676,7 +676,7 @@ dependencies = [
 [[package]]
 name = "axum"
 version = "0.6.1"
-source = "git+https://github.com/tokio-rs/axum.git#978ae6335862b264b4368e01a52177d98c42b2d9"
+source = "git+https://github.com/tokio-rs/axum.git#be9a8c038026bc5fb5c7142ced5d9e4ff580510c"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -712,7 +712,7 @@ dependencies = [
 [[package]]
 name = "axum-core"
 version = "0.3.0"
-source = "git+https://github.com/tokio-rs/axum.git#978ae6335862b264b4368e01a52177d98c42b2d9"
+source = "git+https://github.com/tokio-rs/axum.git#be9a8c038026bc5fb5c7142ced5d9e4ff580510c"
 dependencies = [
  "async-trait",
  "bytes",
@@ -7083,9 +7083,9 @@ dependencies = [
 
 [[package]]
 name = "tiberius"
-version = "0.11.3"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "348c8abe373536f3b08b75794b8d0588ecaad3ab7e5618b25eee2b6bfb8e89e8"
+checksum = "90d8b2068378137ddeaa98644240f8db94483ee0f33f51909e0510830abb2875"
 dependencies = [
  "async-trait",
  "asynchronous-codec",
