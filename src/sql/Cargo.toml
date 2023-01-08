@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.68"
 aws-arn = "0.3.1"
 aws-sdk-sts = { version = "0.22.0", default-features = false, features = ["native-tls", "rt-tokio"] }
 bitflags = "1.3.2"

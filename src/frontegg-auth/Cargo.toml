@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.68"
 base64 = "0.13.1"
 derivative = "2.2.0"
 jsonwebtoken = "8.2.0"
