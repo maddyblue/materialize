@@ -109,17 +109,12 @@ impl Attrs {
         self.remove("rename").unwrap_or_else(|| name.to_string())
     }
 
-    fn name(&mut self, mut doc: TokenStream2, name: &str) -> TokenStream2 {
-        let name = self.rename(name);
-        if self.remove("no_name").is_none() {
-            doc = quote! { #doc.map(|doc|
-                pretty::RcDoc::text(#name)
-                .append(pretty::RcDoc::line())
-                .append(doc)
-                .nest(#NEST)
-            ) };
+    fn name(&mut self, name: &str) -> Option<String> {
+        if self.remove("no_name").is_some() {
+            None
+        } else {
+            Some(self.rename(name))
         }
-        doc
     }
 
     fn prefix(&mut self, mut doc: TokenStream2) -> TokenStream2 {
@@ -205,7 +200,7 @@ pub fn derive_to_doc(item: TokenStream) -> TokenStream {
                     .remove("rename")
                     .unwrap_or_else(|| fmt_ident(&variant.ident));
                 let FromFields { fields, doc } =
-                    from_fields(&variant.fields, &name, variant_attrs.separator(""));
+                    from_fields(&variant.fields, Some(name), variant_attrs.separator(""));
                 let doc = if variant_attrs.remove("ignore").is_some() {
                     quote! { None }
                 } else {
@@ -232,17 +227,17 @@ pub fn derive_to_doc(item: TokenStream) -> TokenStream {
         Item::Struct(item) => {
             let mut struct_attrs = Attrs::new(&item.attrs);
             let name = fmt_ident(&item.ident);
+            let name = struct_attrs.name(&name);
             let FromFields { fields, doc } =
-                from_fields(&item.fields, &name, struct_attrs.separator(""));
+                from_fields(&item.fields, name, struct_attrs.separator(""));
             let item_ident = item.ident;
             let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
-            let doc = struct_attrs.name(doc, &name);
             let doc = struct_attrs.suffix(doc);
             quote! {
                 impl #impl_generics ToDoc for #item_ident #ty_generics #where_clause {
                     fn to_doc(&self) -> pretty::RcDoc<()> {
                         let Self #fields = self;
-                        #doc.unwrap_or_else(|| pretty::RcDoc::text(#name)).group()
+                        #doc.unwrap_or_else(pretty::RcDoc::nil).group()
                     }
                 }
             }
@@ -308,10 +303,10 @@ struct FromFields {
     doc: TokenStream2,
 }
 
-fn from_fields(fields: &Fields, name: &str, separator: TokenStream2) -> FromFields {
+fn from_fields(fields: &Fields, name: Option<String>, separator: TokenStream2) -> FromFields {
     match fields {
-        Fields::Named(fields) => named_fields(fields, separator),
-        Fields::Unnamed(fields) => unnamed_fields(fields, name),
+        Fields::Named(fields) => named_fields(fields, name, separator),
+        Fields::Unnamed(fields) => unnamed_fields(fields, name.unwrap()),
         Fields::Unit => FromFields {
             fields: quote! {},
             doc: quote! { Some(pretty::RcDoc::text(#name)) },
@@ -344,9 +339,9 @@ fn unnamed_fields(fields: &FieldsUnnamed, name: &str) -> FromFields {
     }
 }
 
-fn named_fields(fields: &FieldsNamed, separator: TokenStream2) -> FromFields {
+fn named_fields(fields: &FieldsNamed, name: Option<String>, separator: TokenStream2) -> FromFields {
     let mut ignored = false;
-    let (docs, mut idents): (Vec<_>, Vec<_>) = fields
+    let (mut docs, mut idents): (Vec<_>, Vec<_>) = fields
         .named
         .iter()
         .filter_map(|field| {
@@ -360,6 +355,10 @@ fn named_fields(fields: &FieldsNamed, separator: TokenStream2) -> FromFields {
             }
         })
         .unzip();
+    if let Some(name) = name {
+        let name = quote! { pretty::RcDoc::text(#name) };
+        docs.insert(0, name);
+    }
     let doc = quote! { {
         let docs = [#(#docs),*].into_iter().filter_map(|v| v).collect::<Vec<_>>();
         if docs.is_empty() {
