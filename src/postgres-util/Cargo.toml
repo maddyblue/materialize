@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.69"
 mz-cloud-resources = { path = "../cloud-resources" }
 mz-ore = { path = "../ore", features = ["async"] }
 mz-proto = { path = "../proto" }

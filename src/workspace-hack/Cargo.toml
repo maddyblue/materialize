@@ -14,7 +14,7 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-anyhow = { version = "1.0.66", features = ["backtrace", "std"] }
+anyhow = { version = "1.0.69", features = ["backtrace", "std"] }
 aws-sdk-sts = { version = "0.22.0", default-features = false, features = ["native-tls", "rt-tokio"] }
 aws-sig-auth = { version = "0.52.0", default-features = false, features = ["aws-smithy-eventstream", "sign-eventstream"] }
 aws-sigv4 = { version = "0.52.0", features = ["aws-smithy-eventstream", "bytes", "form_urlencoded", "http", "percent-encoding", "sign-eventstream", "sign-http"] }
@@ -113,7 +113,7 @@ uuid = { version = "1.2.2", features = ["getrandom", "rng", "serde", "std", "v4"
 zeroize = { version = "1.5.7", features = ["alloc", "serde"] }
 
 [build-dependencies]
-anyhow = { version = "1.0.66", features = ["backtrace", "std"] }
+anyhow = { version = "1.0.69", features = ["backtrace", "std"] }
 aws-sdk-sts = { version = "0.22.0", default-features = false, features = ["native-tls", "rt-tokio"] }
 aws-sig-auth = { version = "0.52.0", default-features = false, features = ["aws-smithy-eventstream", "sign-eventstream"] }
 aws-sigv4 = { version = "0.52.0", features = ["aws-smithy-eventstream", "bytes", "form_urlencoded", "http", "percent-encoding", "sign-eventstream", "sign-http"] }
