@@ -190,6 +190,22 @@ impl AstDisplay for i64 {
 
 pub trait ToDoc {
     fn to_doc(&self, mode: FormatMode) -> pretty::RcDoc<()>;
+
+    fn to_pretty(&self, width: usize) -> String {
+        let mut buf = String::new();
+        let mut f = AstFormatter::new(&mut buf, FormatMode::Simple);
+        self.to_pretty_formatter(&mut f, width);
+        buf
+    }
+
+    fn to_pretty_formatter<W>(&self, f: &mut AstFormatter<W>, width: usize)
+    where
+        W: fmt::Write,
+    {
+        self.to_doc(f.mode)
+            .render_fmt(width, &mut f.buf)
+            .expect("unexpected error in ToDoc implementation");
+    }
 }
 
 #[macro_export]

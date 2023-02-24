@@ -97,7 +97,7 @@ use mz_ore::fmt::FormatBuffer;
 use mz_sql_parser::ast::display::AstDisplay;
 use mz_sql_parser::ast::visit::Visit;
 use mz_sql_parser::ast::visit_mut::{self, VisitMut};
-use mz_sql_parser::ast::{AstInfo, Expr, Ident, Raw, RawDataType, RawObjectName};
+use mz_sql_parser::ast::{AstInfo, Expr, Ident, Raw, RawDataType, RawObjectName, Statement};
 use mz_sql_parser::parser::{
     self, parse_statements, parse_statements_with_limit, ParserError, MAX_STATEMENT_BATCH_SIZE,
 };
@@ -141,6 +141,7 @@ fn datadriven() {
                 if parsed != stmt {
                     panic!("reparse comparison failed:\n{:?}\n!=\n{:?}\n", stmt, parsed);
                 }
+
                 if tc.args.get("roundtrip").is_some() {
                     format!("{}\n", stmt)
                 } else {
@@ -151,6 +152,29 @@ fn datadriven() {
             }
             Err(e) => render_error(input, e),
         }
+    }
+
+    // Tests that the ToDoc trait of the statement produces the same AST as the AstDisplay trait.
+    fn test_to_doc(stmt: &Statement<Raw>) -> Result<(), String> {
+        let mut res = Vec::new();
+        for n in &[1, 40, 1000000] {
+            let n = *n;
+            let pretty1 = stmt.to_pretty(n);
+            let stmt2 = parse_statements(&pretty1)
+                .unwrap()
+                .into_iter()
+                .next()
+                .unwrap();
+            let pretty2 = stmt2.to_pretty(n);
+            assert_eq!(pretty1, pretty2);
+            assert_eq!(stmt.to_ast_string_stable(), stmt2.to_ast_string_stable());
+            // Everything should always squash to a single line.
+            if n > (tc.input.len() * 2) {
+                assert_eq!(pretty1.lines().count(), 1, "{}: {}", n, pretty1);
+            }
+            res.push(format!("{}: {}", n, pretty1));
+        }
+        format!("{}\n", res.join("\n"))
     }
 
     fn parse_scalar(tc: &TestCase) -> String {
