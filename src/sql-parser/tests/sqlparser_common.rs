@@ -129,17 +129,17 @@ fn datadriven() {
         match parser::parse_statements(input) {
             Ok(s) => {
                 if s.len() != 1 {
-                    return "expected exactly one statement\n".to_string();
+                    panic!("expected exactly one statement");
                 }
                 let stmt = s.into_element();
                 let parsed = match parser::parse_statements(&stmt.to_string()) {
                     Ok(parsed) => parsed.into_element(),
                     Err(err) => {
-                        return format!("reparse failed: {}\noriginal: {input}\ngot: {stmt}", err)
+                        panic!("reparse failed: {}\noriginal: {input}\ngot: {stmt}", err);
                     }
                 };
                 if parsed != stmt {
-                    return format!("reparse comparison failed:\n{:?}\n!=\n{:?}\n", stmt, parsed);
+                    panic!("reparse comparison failed:\n{:?}\n!=\n{:?}\n", stmt, parsed);
                 }
                 if tc.args.get("roundtrip").is_some() {
                     format!("{}\n", stmt)
