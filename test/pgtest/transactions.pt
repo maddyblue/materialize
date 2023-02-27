@@ -307,7 +307,7 @@ DataRow {"fields":["1"]}
 CommandComplete {"tag":"SELECT 1"}
 ParseComplete
 BindComplete
-CommandComplete {"tag":"DISCARD ALL"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"25001"},{"typ":"M","value":"DISCARD ALL cannot be executed within a pipeline"}]}
 ReadyForQuery {"status":"I"}
 
 # Verify DISCARD ALL fails in explicit transaction during extended mode.

@@ -77,6 +77,7 @@
 
 //! Integration tests for pgwire functionality.
 
+use std::env;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -559,6 +560,8 @@ fn test_record_types() {
     assert_eq!(rows.len(), 2);
 }
 
+const PG_TEST_TIMEOUT: Duration = Duration::from_secs(60);
+
 fn pg_test_inner(dir: PathBuf) {
     // We want a new server per file, so we can't use pgtest::walk.
     datadriven::walk(dir.to_str().unwrap(), |tf| {
@@ -571,21 +574,40 @@ fn pg_test_inner(dir: PathBuf) {
             _ => panic!("only tcp connections supported"),
         };
         let user = config.get_user().unwrap();
-        let timeout = Duration::from_secs(60);
 
-        mz_pgtest::run_test(tf, addr, user.to_string(), timeout);
+        mz_pgtest::run_test(tf, addr, user.to_string(), PG_TEST_TIMEOUT);
     });
 }
 
 #[test]
-fn test_pgtest() {
+fn test_pgtest_base() {
     let dir: PathBuf = ["..", "..", "test", "pgtest"].iter().collect();
     pg_test_inner(dir);
 }
 
+// Tests that our pgtest works against postgres to verify we have correct pgtest
+// output.
+#[test]
+fn test_pgtest_pg() {
+    let dir: PathBuf = ["..", "..", "test", "pgtest"].iter().collect();
+    let postgres_url = env::var("POSTGRES_URL").unwrap();
+    let config: postgres::Config = postgres_url.parse().unwrap();
+    let host = &config.get_hosts()[0];
+    let postgres::config::Host::Tcp(host) = host else {
+        panic!("unexpected {host:?}");
+    };
+    let host = format!("{host}:{}", config.get_ports()[0]);
+    mz_pgtest::walk(
+        host,
+        config.get_user().unwrap().into(),
+        PG_TEST_TIMEOUT,
+        &dir.into_os_string().into_string().unwrap(),
+    );
+}
+
 #[test]
 // Materialize's differences from Postgres' responses.
-fn test_pgtest_mz() {
+fn test_pgtest_mz_specific() {
     let dir: PathBuf = ["..", "..", "test", "pgtest-mz"].iter().collect();
     pg_test_inner(dir);
 }

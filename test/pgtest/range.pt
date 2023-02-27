@@ -33,28 +33,7 @@ ReadyForQuery
 ----
 ParseComplete
 BindComplete
-CommandComplete {"tag":"CREATE TABLE"}
-ParseComplete
-BindComplete
-CommandComplete {"tag":"INSERT 0 20"}
-ParseComplete
-BindComplete
-CommandComplete {"tag":"CREATE TABLE"}
-ParseComplete
-BindComplete
-CommandComplete {"tag":"INSERT 0 7"}
-ParseComplete
-BindComplete
-CommandComplete {"tag":"CREATE TABLE"}
-ParseComplete
-BindComplete
-CommandComplete {"tag":"INSERT 0 20"}
-ParseComplete
-BindComplete
-CommandComplete {"tag":"CREATE TABLE"}
-ParseComplete
-BindComplete
-CommandComplete {"tag":"INSERT 0 7"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"42P07"},{"typ":"M","value":"relation \"int4range_values\" already exists"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -91,86 +70,86 @@ ReadyForQuery
 ParseComplete
 BindComplete
 DataRow {"fields":["empty","{empty}"]}
-DataRow {"fields":["(,1)","{empty,(,1),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["(,2)","{empty,(,1),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["(,)","{empty,(,1),(,),[-99,-50),[-1,1),[0,),[50,99)}"]}
-DataRow {"fields":["[-1,1)","{empty,[-1,1)}"]}
-DataRow {"fields":["[-1,2)","{empty,[-1,1)}"]}
+DataRow {"fields":["(,1)","{empty,\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["(,2)","{empty,\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["(,)","{empty,\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1)","{empty,\"[-1,1)\"}"]}
+DataRow {"fields":["[-1,2)","{empty,\"[-1,1)\"}"]}
 DataRow {"fields":["[0,1)","{empty}"]}
 DataRow {"fields":["[0,2)","{empty}"]}
-DataRow {"fields":["[1,)","{empty,[50,99)}"]}
-DataRow {"fields":["[2,)","{empty,[50,99)}"]}
+DataRow {"fields":["[1,)","{empty,\"[50,99)\"}"]}
+DataRow {"fields":["[2,)","{empty,\"[50,99)\"}"]}
 CommandComplete {"tag":"SELECT 10"}
 ParseComplete
 BindComplete
-DataRow {"fields":["empty","{empty,(,1),(,),[-99,-50),[-1,1),[0,),[50,99)}"]}
-DataRow {"fields":["(,1)","{(,1),(,)}"]}
-DataRow {"fields":["(,2)","{(,)}"]}
-DataRow {"fields":["(,)","{(,)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-1,1)}"]}
-DataRow {"fields":["[-1,2)","{(,)}"]}
-DataRow {"fields":["[0,1)","{(,1),(,),[-1,1),[0,)}"]}
-DataRow {"fields":["[0,2)","{(,),[0,)}"]}
-DataRow {"fields":["[1,)","{(,),[0,)}"]}
-DataRow {"fields":["[2,)","{(,),[0,)}"]}
+DataRow {"fields":["empty","{empty,\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["(,2)","{\"(,)\"}"]}
+DataRow {"fields":["(,)","{\"(,)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\"}"]}
+DataRow {"fields":["[-1,2)","{\"(,)\"}"]}
+DataRow {"fields":["[0,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[0,2)","{\"(,)\",\"[0,)\"}"]}
+DataRow {"fields":["[1,)","{\"(,)\",\"[0,)\"}"]}
+DataRow {"fields":["[2,)","{\"(,)\",\"[0,)\"}"]}
 CommandComplete {"tag":"SELECT 10"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{(,1),(,),[-99,-50),[-1,1),[0,)}"]}
-DataRow {"fields":["(,2)","{(,1),(,),[-99,-50),[-1,1),[0,)}"]}
-DataRow {"fields":["(,)","{(,1),(,),[-99,-50),[-1,1),[0,),[50,99)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-1,1),[0,)}"]}
-DataRow {"fields":["[-1,2)","{(,1),(,),[-1,1),[0,)}"]}
-DataRow {"fields":["[0,1)","{(,1),(,),[-1,1),[0,)}"]}
-DataRow {"fields":["[0,2)","{(,1),(,),[-1,1),[0,)}"]}
-DataRow {"fields":["[1,)","{(,),[0,),[50,99)}"]}
-DataRow {"fields":["[2,)","{(,),[0,),[50,99)}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["(,2)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["(,)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[-1,2)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[0,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[0,2)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[1,)","{\"(,)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[2,)","{\"(,)\",\"[0,)\",\"[50,99)\"}"]}
 CommandComplete {"tag":"SELECT 9"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{[50,99)}"]}
-DataRow {"fields":["(,2)","{[50,99)}"]}
-DataRow {"fields":["[-1,1)","{[50,99)}"]}
-DataRow {"fields":["[-1,2)","{[50,99)}"]}
-DataRow {"fields":["[0,1)","{[50,99)}"]}
-DataRow {"fields":["[0,2)","{[50,99)}"]}
+DataRow {"fields":["(,1)","{\"[50,99)\"}"]}
+DataRow {"fields":["(,2)","{\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1)","{\"[50,99)\"}"]}
+DataRow {"fields":["[-1,2)","{\"[50,99)\"}"]}
+DataRow {"fields":["[0,1)","{\"[50,99)\"}"]}
+DataRow {"fields":["[0,2)","{\"[50,99)\"}"]}
 CommandComplete {"tag":"SELECT 6"}
 ParseComplete
 BindComplete
-DataRow {"fields":["[-1,1)","{[-99,-50)}"]}
-DataRow {"fields":["[-1,2)","{[-99,-50)}"]}
-DataRow {"fields":["[0,1)","{[-99,-50)}"]}
-DataRow {"fields":["[0,2)","{[-99,-50)}"]}
-DataRow {"fields":["[1,)","{(,1),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["[2,)","{(,1),[-99,-50),[-1,1)}"]}
+DataRow {"fields":["[-1,1)","{\"[-99,-50)\"}"]}
+DataRow {"fields":["[-1,2)","{\"[-99,-50)\"}"]}
+DataRow {"fields":["[0,1)","{\"[-99,-50)\"}"]}
+DataRow {"fields":["[0,2)","{\"[-99,-50)\"}"]}
+DataRow {"fields":["[1,)","{\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["[2,)","{\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
 CommandComplete {"tag":"SELECT 6"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{(,1),(,),[-1,1),[0,),[50,99)}"]}
-DataRow {"fields":["(,2)","{(,),[0,),[50,99)}"]}
-DataRow {"fields":["(,)","{(,),[0,)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-1,1),[0,),[50,99)}"]}
-DataRow {"fields":["[-1,2)","{(,),[0,),[50,99)}"]}
-DataRow {"fields":["[0,1)","{(,1),(,),[-1,1),[0,),[50,99)}"]}
-DataRow {"fields":["[0,2)","{(,),[0,),[50,99)}"]}
-DataRow {"fields":["[1,)","{(,),[0,)}"]}
-DataRow {"fields":["[2,)","{(,),[0,)}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(,2)","{\"(,)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(,)","{\"(,)\",\"[0,)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[-1,2)","{\"(,)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[0,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[0,2)","{\"(,)\",\"[0,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[1,)","{\"(,)\",\"[0,)\"}"]}
+DataRow {"fields":["[2,)","{\"(,)\",\"[0,)\"}"]}
 CommandComplete {"tag":"SELECT 9"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{(,1),(,)}"]}
-DataRow {"fields":["(,2)","{(,1),(,)}"]}
-DataRow {"fields":["(,)","{(,1),(,)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["[-1,2)","{(,1),(,),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["[0,1)","{(,1),(,),[-99,-50),[-1,1),[0,)}"]}
-DataRow {"fields":["[0,2)","{(,1),(,),[-99,-50),[-1,1),[0,)}"]}
-DataRow {"fields":["[1,)","{(,1),(,),[-99,-50),[-1,1),[0,)}"]}
-DataRow {"fields":["[2,)","{(,1),(,),[-99,-50),[-1,1),[0,)}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["(,2)","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["(,)","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["[-1,2)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["[0,1)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[0,2)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[1,)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\"}"]}
+DataRow {"fields":["[2,)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"[0,)\"}"]}
 CommandComplete {"tag":"SELECT 9"}
 ParseComplete
 BindComplete
-DataRow {"fields":["[1,)","{(,1),[-1,1)}"]}
+DataRow {"fields":["[1,)","{\"(,1)\",\"[-1,1)\"}"]}
 CommandComplete {"tag":"SELECT 1"}
 ReadyForQuery {"status":"I"}
 
@@ -208,93 +187,93 @@ ReadyForQuery
 ParseComplete
 BindComplete
 DataRow {"fields":["empty","{empty}"]}
-DataRow {"fields":["(,1)","{empty,(,1),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["(,1]","{empty,(,1),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["(,)","{empty,(,1),(,),[-99,-50),[-1,1),(-1,),[50,99)}"]}
-DataRow {"fields":["[-1,1)","{empty,[-1,1)}"]}
-DataRow {"fields":["[-1,1]","{empty,[-1,1)}"]}
+DataRow {"fields":["(,1)","{empty,\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["(,1]","{empty,\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["(,)","{empty,\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1)","{empty,\"[-1,1)\"}"]}
+DataRow {"fields":["[-1,1]","{empty,\"[-1,1)\"}"]}
 DataRow {"fields":["(-1,1)","{empty}"]}
 DataRow {"fields":["(-1,1]","{empty}"]}
 DataRow {"fields":["[0,0]","{empty}"]}
-DataRow {"fields":["[1,)","{empty,[50,99)}"]}
-DataRow {"fields":["(1,)","{empty,[50,99)}"]}
+DataRow {"fields":["[1,)","{empty,\"[50,99)\"}"]}
+DataRow {"fields":["(1,)","{empty,\"[50,99)\"}"]}
 CommandComplete {"tag":"SELECT 11"}
 ParseComplete
 BindComplete
-DataRow {"fields":["empty","{empty,(,1),(,),[-99,-50),[-1,1),(-1,),[50,99)}"]}
-DataRow {"fields":["(,1)","{(,1),(,)}"]}
-DataRow {"fields":["(,1]","{(,)}"]}
-DataRow {"fields":["(,)","{(,)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-1,1)}"]}
-DataRow {"fields":["[-1,1]","{(,)}"]}
-DataRow {"fields":["(-1,1)","{(,1),(,),[-1,1),(-1,)}"]}
-DataRow {"fields":["(-1,1]","{(,),(-1,)}"]}
-DataRow {"fields":["[0,0]","{(,1),(,),[-1,1),(-1,)}"]}
-DataRow {"fields":["[1,)","{(,),(-1,)}"]}
-DataRow {"fields":["(1,)","{(,),(-1,)}"]}
+DataRow {"fields":["empty","{empty,\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["(,1]","{\"(,)\"}"]}
+DataRow {"fields":["(,)","{\"(,)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\"}"]}
+DataRow {"fields":["[-1,1]","{\"(,)\"}"]}
+DataRow {"fields":["(-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["(-1,1]","{\"(,)\",\"(-1,)\"}"]}
+DataRow {"fields":["[0,0]","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["[1,)","{\"(,)\",\"(-1,)\"}"]}
+DataRow {"fields":["(1,)","{\"(,)\",\"(-1,)\"}"]}
 CommandComplete {"tag":"SELECT 11"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{(,1),(,),[-99,-50),[-1,1),(-1,)}"]}
-DataRow {"fields":["(,1]","{(,1),(,),[-99,-50),[-1,1),(-1,)}"]}
-DataRow {"fields":["(,)","{(,1),(,),[-99,-50),[-1,1),(-1,),[50,99)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-1,1),(-1,)}"]}
-DataRow {"fields":["[-1,1]","{(,1),(,),[-1,1),(-1,)}"]}
-DataRow {"fields":["(-1,1)","{(,1),(,),[-1,1),(-1,)}"]}
-DataRow {"fields":["(-1,1]","{(,1),(,),[-1,1),(-1,)}"]}
-DataRow {"fields":["[0,0]","{(,1),(,),[-1,1),(-1,)}"]}
-DataRow {"fields":["[1,)","{(,),(-1,),[50,99)}"]}
-DataRow {"fields":["(1,)","{(,),(-1,),[50,99)}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["(,1]","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["(,)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["[-1,1]","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["(-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["(-1,1]","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["[0,0]","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["[1,)","{\"(,)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(1,)","{\"(,)\",\"(-1,)\",\"[50,99)\"}"]}
 CommandComplete {"tag":"SELECT 10"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{[50,99)}"]}
-DataRow {"fields":["(,1]","{[50,99)}"]}
-DataRow {"fields":["[-1,1)","{[50,99)}"]}
-DataRow {"fields":["[-1,1]","{[50,99)}"]}
-DataRow {"fields":["(-1,1)","{[50,99)}"]}
-DataRow {"fields":["(-1,1]","{[50,99)}"]}
-DataRow {"fields":["[0,0]","{[50,99)}"]}
+DataRow {"fields":["(,1)","{\"[50,99)\"}"]}
+DataRow {"fields":["(,1]","{\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1)","{\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1]","{\"[50,99)\"}"]}
+DataRow {"fields":["(-1,1)","{\"[50,99)\"}"]}
+DataRow {"fields":["(-1,1]","{\"[50,99)\"}"]}
+DataRow {"fields":["[0,0]","{\"[50,99)\"}"]}
 CommandComplete {"tag":"SELECT 7"}
 ParseComplete
 BindComplete
-DataRow {"fields":["[-1,1)","{[-99,-50)}"]}
-DataRow {"fields":["[-1,1]","{[-99,-50)}"]}
-DataRow {"fields":["(-1,1)","{[-99,-50)}"]}
-DataRow {"fields":["(-1,1]","{[-99,-50)}"]}
-DataRow {"fields":["[0,0]","{[-99,-50)}"]}
-DataRow {"fields":["[1,)","{(,1),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["(1,)","{(,1),[-99,-50),[-1,1)}"]}
+DataRow {"fields":["[-1,1)","{\"[-99,-50)\"}"]}
+DataRow {"fields":["[-1,1]","{\"[-99,-50)\"}"]}
+DataRow {"fields":["(-1,1)","{\"[-99,-50)\"}"]}
+DataRow {"fields":["(-1,1]","{\"[-99,-50)\"}"]}
+DataRow {"fields":["[0,0]","{\"[-99,-50)\"}"]}
+DataRow {"fields":["[1,)","{\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["(1,)","{\"(,1)\",\"[-99,-50)\",\"[-1,1)\"}"]}
 CommandComplete {"tag":"SELECT 7"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{(,1),(,),[-1,1),(-1,),[50,99)}"]}
-DataRow {"fields":["(,1]","{(,),(-1,),[50,99)}"]}
-DataRow {"fields":["(,)","{(,),(-1,)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-1,1),(-1,),[50,99)}"]}
-DataRow {"fields":["[-1,1]","{(,),(-1,),[50,99)}"]}
-DataRow {"fields":["(-1,1)","{(,1),(,),[-1,1),(-1,),[50,99)}"]}
-DataRow {"fields":["(-1,1]","{(,),(-1,),[50,99)}"]}
-DataRow {"fields":["[0,0]","{(,1),(,),[-1,1),(-1,),[50,99)}"]}
-DataRow {"fields":["[1,)","{(,),(-1,)}"]}
-DataRow {"fields":["(1,)","{(,),(-1,)}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(,1]","{\"(,)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(,)","{\"(,)\",\"(-1,)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[-1,1]","{\"(,)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(-1,1)","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["(-1,1]","{\"(,)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[0,0]","{\"(,1)\",\"(,)\",\"[-1,1)\",\"(-1,)\",\"[50,99)\"}"]}
+DataRow {"fields":["[1,)","{\"(,)\",\"(-1,)\"}"]}
+DataRow {"fields":["(1,)","{\"(,)\",\"(-1,)\"}"]}
 CommandComplete {"tag":"SELECT 10"}
 ParseComplete
 BindComplete
-DataRow {"fields":["(,1)","{(,1),(,)}"]}
-DataRow {"fields":["(,1]","{(,1),(,)}"]}
-DataRow {"fields":["(,)","{(,1),(,)}"]}
-DataRow {"fields":["[-1,1)","{(,1),(,),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["[-1,1]","{(,1),(,),[-99,-50),[-1,1)}"]}
-DataRow {"fields":["(-1,1)","{(,1),(,),[-99,-50),[-1,1),(-1,)}"]}
-DataRow {"fields":["(-1,1]","{(,1),(,),[-99,-50),[-1,1),(-1,)}"]}
-DataRow {"fields":["[0,0]","{(,1),(,),[-99,-50),[-1,1),(-1,)}"]}
-DataRow {"fields":["[1,)","{(,1),(,),[-99,-50),[-1,1),(-1,)}"]}
-DataRow {"fields":["(1,)","{(,1),(,),[-99,-50),[-1,1),(-1,)}"]}
+DataRow {"fields":["(,1)","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["(,1]","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["(,)","{\"(,1)\",\"(,)\"}"]}
+DataRow {"fields":["[-1,1)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["[-1,1]","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\"}"]}
+DataRow {"fields":["(-1,1)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["(-1,1]","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["[0,0]","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["[1,)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\"}"]}
+DataRow {"fields":["(1,)","{\"(,1)\",\"(,)\",\"[-99,-50)\",\"[-1,1)\",\"(-1,)\"}"]}
 CommandComplete {"tag":"SELECT 10"}
 ParseComplete
 BindComplete
-DataRow {"fields":["[1,)","{(,1),[-1,1)}"]}
+DataRow {"fields":["[1,)","{\"(,1)\",\"[-1,1)\"}"]}
 CommandComplete {"tag":"SELECT 1"}
 ReadyForQuery {"status":"I"}
 
@@ -314,48 +293,48 @@ ReadyForQuery
 ----
 ParseComplete
 BindComplete
-DataRow {"fields":["\u0001"]}
-DataRow {"fields":["\u0001"]}
-DataRow {"fields":["\u0001"]}
-DataRow {"fields":["\u0018"]}
-DataRow {"fields":["\u0018"]}
+DataRow {"fields":["\b\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\b\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
 DataRow {"fields":["\u0018"]}
 DataRow {"fields":["\u0018"]}
 DataRow {"fields":["\b\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\b\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
 DataRow {"fields":["\b\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
-DataRow {"fields":["\b\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
-DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
-DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
-DataRow {"fields":["\u0002\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0002\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0002\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
+DataRow {"fields":["\u0018"]}
+DataRow {"fields":["\u0018"]}
 DataRow {"fields":["[2, 0, 0, 0, 4, 255, 255, 255, 255, 0, 0, 0, 4, 0, 0, 0, 1]"]}
 DataRow {"fields":["[2, 0, 0, 0, 4, 255, 255, 255, 255, 0, 0, 0, 4, 0, 0, 0, 2]"]}
+DataRow {"fields":["\u0002\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0002\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
+DataRow {"fields":["\u0001"]}
+DataRow {"fields":["\u0002\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0001"]}
+DataRow {"fields":["\u0001"]}
+DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
+DataRow {"fields":["\u0012\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0002"]}
 CommandComplete {"tag":"SELECT 20"}
 ParseComplete
 BindComplete
-DataRow {"fields":["\u0001"]}
-DataRow {"fields":["\u0001"]}
-DataRow {"fields":["\u0001"]}
-DataRow {"fields":["\u0018"]}
-DataRow {"fields":["\u0018"]}
+DataRow {"fields":["\b\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\f\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
 DataRow {"fields":["\u0018"]}
 DataRow {"fields":["\u0018"]}
 DataRow {"fields":["\b\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\b\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
 DataRow {"fields":["\f\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\f\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0010\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0010\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0012\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0012\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0000\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000@\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0018"]}
+DataRow {"fields":["\u0018"]}
 DataRow {"fields":["\u0002\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000@\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["\u0004\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000@\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
-DataRow {"fields":["[6, 0, 0, 0, 8, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 255, 255, 0, 0, 0, 0]"]}
 DataRow {"fields":["\u0006\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000@\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0000\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000@\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0004\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000@\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0001"]}
+DataRow {"fields":["\u0006\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"]}
+DataRow {"fields":["\u0001"]}
+DataRow {"fields":["\u0001"]}
+DataRow {"fields":["\u0012\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0012\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0010\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
+DataRow {"fields":["\u0010\u0000\u0000\u0000\n\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001"]}
 CommandComplete {"tag":"SELECT 20"}
 ReadyForQuery {"status":"I"}

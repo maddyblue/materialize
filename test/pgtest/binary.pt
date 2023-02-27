@@ -126,10 +126,7 @@ Sync
 until
 ReadyForQuery
 ----
-ParseComplete
-BindComplete
-DataRow {"fields":["\u0000*"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"42704"},{"typ":"M","value":"type \"uint2\" does not exist"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -143,9 +140,7 @@ until
 ReadyForQuery
 ----
 ParseComplete
-BindComplete
-DataRow {"fields":["[128, 0]"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"22003"},{"typ":"M","value":"smallint out of range"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -158,10 +153,7 @@ Sync
 until
 ReadyForQuery
 ----
-ParseComplete
-BindComplete
-DataRow {"fields":["[128, 0]"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"42704"},{"typ":"M","value":"type \"uint2\" does not exist"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -190,10 +182,7 @@ Sync
 until
 ReadyForQuery
 ----
-ParseComplete
-BindComplete
-DataRow {"fields":["\u0000\u0000\u0000*"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"42704"},{"typ":"M","value":"type \"uint4\" does not exist"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -207,9 +196,7 @@ until
 ReadyForQuery
 ----
 ParseComplete
-BindComplete
-DataRow {"fields":["[128, 0, 0, 0]"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"22003"},{"typ":"M","value":"integer out of range"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -222,10 +209,7 @@ Sync
 until
 ReadyForQuery
 ----
-ParseComplete
-BindComplete
-DataRow {"fields":["[128, 0, 0, 0]"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"42704"},{"typ":"M","value":"type \"uint4\" does not exist"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -254,10 +238,7 @@ Sync
 until
 ReadyForQuery
 ----
-ParseComplete
-BindComplete
-DataRow {"fields":["\u0000\u0000\u0000\u0000\u0000\u0000\u0000*"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"42704"},{"typ":"M","value":"type \"uint8\" does not exist"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -271,9 +252,7 @@ until
 ReadyForQuery
 ----
 ParseComplete
-BindComplete
-DataRow {"fields":["[128, 0, 0, 0, 0, 0, 0, 0]"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"22003"},{"typ":"M","value":"bigint out of range"}]}
 ReadyForQuery {"status":"I"}
 
 send
@@ -286,8 +265,5 @@ Sync
 until
 ReadyForQuery
 ----
-ParseComplete
-BindComplete
-DataRow {"fields":["[128, 0, 0, 0, 0, 0, 0, 0]"]}
-CommandComplete {"tag":"SELECT 1"}
+ErrorResponse {"fields":[{"typ":"S","value":"ERROR"},{"typ":"C","value":"42704"},{"typ":"M","value":"type \"uint8\" does not exist"}]}
 ReadyForQuery {"status":"I"}

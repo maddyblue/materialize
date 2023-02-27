@@ -421,11 +421,11 @@ ParseComplete
 BindComplete
 DataRow {"fields":["1"]}
 CommandComplete {"tag":"FETCH 1"}
-CommandComplete {"tag":"FETCH 1"}
+CommandComplete {"tag":"FETCH 0"}
 BindComplete
 DataRow {"fields":["2"]}
 CommandComplete {"tag":"FETCH 1"}
-CommandComplete {"tag":"FETCH 1"}
+CommandComplete {"tag":"FETCH 0"}
 ParseComplete
 BindComplete
 CommandComplete {"tag":"CLOSE CURSOR"}
@@ -473,18 +473,18 @@ BindComplete
 DataRow {"fields":["1"]}
 DataRow {"fields":["2"]}
 CommandComplete {"tag":"FETCH 2"}
-CommandComplete {"tag":"FETCH 2"}
+CommandComplete {"tag":"FETCH 0"}
 BindComplete
 DataRow {"fields":["3"]}
 DataRow {"fields":["4"]}
 CommandComplete {"tag":"FETCH 2"}
-CommandComplete {"tag":"FETCH 2"}
-CommandComplete {"tag":"FETCH 2"}
+CommandComplete {"tag":"FETCH 0"}
+CommandComplete {"tag":"FETCH 0"}
 ParseComplete
 BindComplete
 DataRow {"fields":["5"]}
 CommandComplete {"tag":"FETCH 1"}
-CommandComplete {"tag":"FETCH 1"}
+CommandComplete {"tag":"FETCH 0"}
 ReadyForQuery {"status":"T"}
 CommandComplete {"tag":"COMMIT"}
 ReadyForQuery {"status":"I"}
