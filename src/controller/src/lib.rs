@@ -179,9 +179,6 @@ pub enum ControllerResponse<T = mz_repr::Timestamp> {
 impl<T> From<ComputeControllerResponse<T>> for ControllerResponse<T> {
     fn from(r: ComputeControllerResponse<T>) -> ControllerResponse<T> {
         match r {
-            ComputeControllerResponse::PeekResponse(uuid, peek, otel_ctx) => {
-                ControllerResponse::PeekResponse(uuid, peek, otel_ctx)
-            }
             ComputeControllerResponse::SubscribeResponse(id, tail) => {
                 ControllerResponse::SubscribeResponse(id, tail)
             }

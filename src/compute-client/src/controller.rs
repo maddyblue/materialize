@@ -81,8 +81,6 @@ pub type ReplicaId = u64;
 /// Responses from the compute controller.
 #[derive(Debug)]
 pub enum ComputeControllerResponse<T> {
-    /// See [`ComputeResponse::PeekResponse`](crate::protocol::response::ComputeResponse::PeekResponse).
-    PeekResponse(Uuid, PeekResponse, OpenTelemetryContext),
     /// See [`ComputeResponse::SubscribeResponse`](crate::protocol::response::ComputeResponse::SubscribeResponse).
     SubscribeResponse(GlobalId, SubscribeResponse<T>),
     /// A notification that we heard a response from the given replica at the
@@ -507,6 +505,7 @@ where
         finishing: RowSetFinishing,
         map_filter_project: mz_expr::SafeMfpPlan,
         target_replica: Option<ReplicaId>,
+        rows_tx: tokio::sync::oneshot::Sender<(OpenTelemetryContext, PeekResponse)>,
     ) -> Result<(), PeekError> {
         self.instance(instance_id)?.peek(
             collection_id,
@@ -516,6 +515,7 @@ where
             finishing,
             map_filter_project,
             target_replica,
+            rows_tx,
         )?;
         Ok(())
     }

@@ -45,7 +45,7 @@ use crate::{AdapterError, AdapterNotice};
 use super::id_bundle::CollectionIdBundle;
 
 pub(crate) struct PendingPeek {
-    pub(crate) sender: oneshot::Sender<PeekResponse>,
+    //pub(crate) sender: oneshot::Sender<PeekResponse>,
     pub(crate) conn_id: ConnectionId,
     pub(crate) cluster_id: ClusterId,
     /// All `GlobalId`s that the peek depend on.
@@ -432,7 +432,7 @@ impl crate::coord::Coordinator {
         self.pending_peeks.insert(
             uuid,
             PendingPeek {
-                sender: rows_tx,
+                //sender: rows_tx,
                 conn_id,
                 cluster_id: compute_instance,
                 depends_on: source_ids,
@@ -455,6 +455,7 @@ impl crate::coord::Coordinator {
                 finishing.clone(),
                 map_filter_project,
                 target_replica,
+                rows_tx,
             )
             .unwrap_or_terminate("cannot fail to peek");
 

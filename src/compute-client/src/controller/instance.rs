@@ -705,6 +705,7 @@ where
         finishing: RowSetFinishing,
         map_filter_project: mz_expr::SafeMfpPlan,
         target_replica: Option<ReplicaId>,
+        rows_tx: tokio::sync::oneshot::Sender<(OpenTelemetryContext, PeekResponse)>,
     ) -> Result<(), PeekError> {
         let since = self.compute.collection(id)?.read_capabilities.frontier();
         if !since.less_equal(&timestamp) {
@@ -733,6 +734,7 @@ where
                 target_replica,
                 // TODO(guswynn): can we just hold the `tracing::Span` here instead?
                 otel_ctx: Some(otel_ctx.clone()),
+                rows_tx: Some(rows_tx),
             },
         );
 
@@ -755,24 +757,18 @@ where
     pub fn cancel_peeks(&mut self, uuids: BTreeSet<Uuid>) {
         // Enqueue the response to the cancelation.
         for uuid in &uuids {
-            let otel_ctx = self
-                .compute
-                .peeks
-                .get_mut(uuid)
-                // Canceled peeks should not be further responded to.
-                .map(|pending| pending.otel_ctx.take())
-                .unwrap_or_else(|| {
-                    tracing::warn!("did not find pending peek for {}", uuid);
-                    None
-                });
+            let Some(peek) = self.compute.peeks.get_mut(uuid) else {
+                tracing::warn!("did not find pending peek for {}", uuid);
+                continue;
+            };
+            // Canceled peeks should not be further responded to.
+            let otel_ctx = peek.otel_ctx.take();
             if let Some(ctx) = otel_ctx {
-                self.compute
-                    .ready_responses
-                    .push_back(ComputeControllerResponse::PeekResponse(
-                        *uuid,
-                        PeekResponse::Canceled,
-                        ctx,
-                    ));
+                let _ = peek
+                    .rows_tx
+                    .take()
+                    .expect("must exist")
+                    .send((ctx, PeekResponse::Canceled));
             }
         }
 
@@ -1148,13 +1144,14 @@ where
         // Additionally, we just use the `otel_ctx` from the first worker to
         // respond.
         let replica_targeted = peek.target_replica.unwrap_or(replica_id) == replica_id;
-        let controller_response = if replica_targeted {
-            peek.otel_ctx
+        if replica_targeted && peek.otel_ctx.take().is_some() {
+            // Now receiver means the connection or peek was canceled; not an error.
+            let _ = peek
+                .rows_tx
                 .take()
-                .map(|_| ComputeControllerResponse::PeekResponse(uuid, response, otel_ctx))
-        } else {
-            None
-        };
+                .expect("must exist")
+                .send((otel_ctx, response));
+        }
 
         // Update the per-replica tracking and draw appropriate consequences.
         peek.unfinished.remove(&replica_id);
@@ -1162,7 +1159,7 @@ where
             self.remove_peeks(&[uuid].into());
         }
 
-        controller_response
+        None
     }
 
     fn handle_subscribe_response(
@@ -1258,6 +1255,7 @@ struct PendingPeek<T> {
     /// This value is `Some` as long as we have not yet passed a response up the chain, and `None`
     /// afterwards.
     otel_ctx: Option<OpenTelemetryContext>,
+    rows_tx: Option<tokio::sync::oneshot::Sender<(OpenTelemetryContext, PeekResponse)>>,
 }
 
 impl<T> PendingPeek<T> {
