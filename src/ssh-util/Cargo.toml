@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
-anyhow = { version = "1.0.66" }
+anyhow = { version = "1.0.70" }
 openssh = { version = "0.9.8", default-features = false, features = ["native-mux"] }
 openssl = { version = "0.10.48", features = ["vendored"] }
 rand = "0.8.5"

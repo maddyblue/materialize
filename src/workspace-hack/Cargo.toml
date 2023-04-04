@@ -14,7 +14,7 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
-anyhow = { version = "1.0.66", features = ["backtrace"] }
+anyhow = { version = "1.0.70", features = ["backtrace"] }
 aws-credential-types = { version = "0.53.0", default-features = false, features = ["hardcoded-credentials"] }
 aws-sdk-sts = { version = "0.23.0", default-features = false, features = ["native-tls", "rt-tokio"] }
 aws-sig-auth = { version = "0.53.0", default-features = false, features = ["sign-eventstream"] }
@@ -110,7 +110,7 @@ uuid = { version = "1.2.2", features = ["serde", "v4", "v5"] }
 zeroize = { version = "1.5.7", features = ["serde"] }
 
 [build-dependencies]
-anyhow = { version = "1.0.66", features = ["backtrace"] }
+anyhow = { version = "1.0.70", features = ["backtrace"] }
 aws-credential-types = { version = "0.53.0", default-features = false, features = ["hardcoded-credentials"] }
 aws-sdk-sts = { version = "0.23.0", default-features = false, features = ["native-tls", "rt-tokio"] }
 aws-sig-auth = { version = "0.53.0", default-features = false, features = ["sign-eventstream"] }

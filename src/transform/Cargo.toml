@@ -20,7 +20,7 @@ typemap_rev = "0.3.0"
 workspace-hack = { version = "0.0.0", path = "../workspace-hack" }
 
 [dev-dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.70"
 datadriven = "0.6.0"
 mz-expr-test-util = { path = "../expr-test-util" }
 mz-lowertest = { path = "../lowertest" }
