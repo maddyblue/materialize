@@ -37,7 +37,7 @@ dec = { version = "0.4.8", default-features = false, features = ["serde"] }
 digest = { version = "0.10.6", features = ["mac", "std"] }
 either = { version = "1.8.0" }
 flate2 = { version = "1.0.24", features = ["zlib"] }
-frunk_core = { version = "0.4.0", default-features = false, features = ["std"] }
+frunk_core = { version = "0.4.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.25" }
 futures-channel = { version = "0.3.25", features = ["sink"] }
 futures-core = { version = "0.3.25" }
@@ -134,7 +134,7 @@ dec = { version = "0.4.8", default-features = false, features = ["serde"] }
 digest = { version = "0.10.6", features = ["mac", "std"] }
 either = { version = "1.8.0" }
 flate2 = { version = "1.0.24", features = ["zlib"] }
-frunk_core = { version = "0.4.0", default-features = false, features = ["std"] }
+frunk_core = { version = "0.4.1", default-features = false, features = ["std"] }
 futures = { version = "0.3.25" }
 futures-channel = { version = "0.3.25", features = ["sink"] }
 futures-core = { version = "0.3.25" }
