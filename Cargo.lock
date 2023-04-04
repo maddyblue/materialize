@@ -977,7 +977,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chrono"
 version = "0.4.24"
-source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#4e2c2b4ad23d6822445718ee536b45d5d649040f"
+source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#311d52eb91d360bf8877e37a074ec7693f797daa"
 dependencies = [
  "iana-time-zone",
  "num-integer",
@@ -2712,15 +2712,14 @@ dependencies = [
 
 [[package]]
 name = "junit-report"
-version = "0.7.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6396ba8050c58c3e5c7dc5886b629a00e8f1ffbf7d255945646a50a1fc92b2d"
+checksum = "99a97b4b11e561bd6fb6fea12937abef06db0b5e4303be9cd413adc5a7f9e010"
 dependencies = [
  "derive-getters",
+ "quick-xml",
  "strip-ansi-escapes",
- "thiserror",
  "time",
- "xml-rs",
 ]
 
 [[package]]
@@ -6080,6 +6079,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ac73b1112776fc109b2e61909bc46c7e1bf0d7f690ffb1676553acce16d5cda"
 
 [[package]]
+name = "quick-xml"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f50b1c63b38611e7d4d7f68b82d3ad0cc71a2ad2e7f61fc10f1328d917c93cd"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "quickcheck"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8382,12 +8390,6 @@ checksum = "244c3741f4240ef46274860397c7c74e50eb23624996930e484c16679633a54c"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "xml-rs"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2d7d3948613f75c98fd9328cfdcc45acc4d360655289d0a7d4ec931392200a3"
 
 [[package]]
 name = "xmlparser"
