@@ -977,7 +977,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chrono"
 version = "0.4.24"
-source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#4e2c2b4ad23d6822445718ee536b45d5d649040f"
+source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#311d52eb91d360bf8877e37a074ec7693f797daa"
 dependencies = [
  "iana-time-zone",
  "num-integer",
@@ -6009,11 +6009,12 @@ dependencies = [
 
 [[package]]
 name = "prost-reflect"
-version = "0.9.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d378290cd658b119ce87621931ef448017ef1a0044d7b681159d779e7e07b8f6"
+checksum = "9cf16e75104c951fdc3593c5f0d871eb0b0c6f5afa03c5f1e03a0e0cd339f510"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.21.0",
+ "once_cell",
  "prost",
  "prost-types",
  "serde",
