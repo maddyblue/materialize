@@ -977,7 +977,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chrono"
 version = "0.4.24"
-source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#4e2c2b4ad23d6822445718ee536b45d5d649040f"
+source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#84bbea51313b0c705fcf0ba82196234fe940050f"
 dependencies = [
  "iana-time-zone",
  "num-integer",
@@ -1135,12 +1135,9 @@ dependencies = [
 
 [[package]]
 name = "connection-string"
-version = "0.1.13"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b97faeec45f49581c458f8bf81992c5e3ec17d82cda99f59d3cea14eff62698d"
-dependencies = [
- "wasm-bindgen",
-]
+checksum = "510ca239cf13b7f8d16a2b48f263de7b4f8c566f0af58d901031473c76afb1e3"
 
 [[package]]
 name = "console"
@@ -7252,9 +7249,9 @@ dependencies = [
 
 [[package]]
 name = "tiberius"
-version = "0.11.3"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "348c8abe373536f3b08b75794b8d0588ecaad3ab7e5618b25eee2b6bfb8e89e8"
+checksum = "dc6e2bf3e4b5be181a2a2ceff4b9b12e2684010d436a6958bd564fbc8094d44d"
 dependencies = [
  "async-trait",
  "asynchronous-codec",
@@ -7263,8 +7260,6 @@ dependencies = [
  "connection-string",
  "encoding",
  "enumflags2",
- "futures",
- "futures-sink",
  "futures-util",
  "num-traits",
  "once_cell",
