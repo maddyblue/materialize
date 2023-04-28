@@ -523,6 +523,7 @@ impl CatalogState {
                     mz_storage_client::types::connections::Connection::Postgres { .. } => {
                         "postgres"
                     }
+                    mz_storage_client::types::connections::Connection::Mssql { .. } => "mssql",
                     mz_storage_client::types::connections::Connection::Aws(..) => "aws",
                     mz_storage_client::types::connections::Connection::AwsPrivatelink(..) => {
                         "aws-privatelink"
@@ -551,6 +552,7 @@ impl CatalogState {
             }
             mz_storage_client::types::connections::Connection::Csr(_)
             | mz_storage_client::types::connections::Connection::Postgres(_)
+            | mz_storage_client::types::connections::Connection::Mssql(_)
             | mz_storage_client::types::connections::Connection::Aws(_)
             | mz_storage_client::types::connections::Connection::AwsPrivatelink(_) => {
                 if let Some(aws_principal_context) = self.aws_principal_context.as_ref() {

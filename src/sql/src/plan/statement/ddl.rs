@@ -80,11 +80,11 @@ use crate::ast::{
     IfExistsBehavior, IndexOption, IndexOptionName, KafkaBroker, KafkaBrokerAwsPrivatelinkOption,
     KafkaBrokerAwsPrivatelinkOptionName, KafkaBrokerTunnel, KafkaConfigOptionName,
     KafkaConnectionOption, KafkaConnectionOptionName, KeyConstraint, LoadGeneratorOption,
-    LoadGeneratorOptionName, PgConfigOption, PgConfigOptionName, PostgresConnectionOption,
-    PostgresConnectionOptionName, ProtobufSchema, QualifiedReplica, ReferencedSubsources,
-    ReplicaDefinition, ReplicaOption, ReplicaOptionName, RoleAttribute, SourceIncludeMetadata,
-    SourceIncludeMetadataType, SshConnectionOptionName, Statement, TableConstraint,
-    UnresolvedDatabaseName, ViewDefinition,
+    LoadGeneratorOptionName, MssqlConnectionOption, MssqlConnectionOptionName, PgConfigOption,
+    PgConfigOptionName, PostgresConnectionOption, PostgresConnectionOptionName, ProtobufSchema,
+    QualifiedReplica, ReferencedSubsources, ReplicaDefinition, ReplicaOption, ReplicaOptionName,
+    RoleAttribute, SourceIncludeMetadata, SourceIncludeMetadataType, SshConnectionOptionName,
+    Statement, TableConstraint, UnresolvedDatabaseName, ViewDefinition,
 };
 use crate::catalog::{
     CatalogCluster, CatalogDatabase, CatalogItem, CatalogItemType, CatalogType, CatalogTypeDetails,
@@ -3287,6 +3287,36 @@ impl PostgresConnectionOptionExtracted {
 }
 
 generate_extracted_config!(
+    MssqlConnectionOption,
+    (Database, String),
+    (Host, String),
+    (Password, with_options::Secret),
+    (Port, u16, Default(1433_u16)),
+    (User, StringOrSecret)
+);
+
+impl MssqlConnectionOptionExtracted {
+    fn to_connection(
+        self,
+        _: &StatementContext,
+    ) -> Result<mz_storage_client::types::connections::MssqlConnection, PlanError> {
+        Ok(mz_storage_client::types::connections::MssqlConnection {
+            database: self
+                .database
+                .ok_or_else(|| sql_err!("DATABASE option is required"))?,
+            password: self.password.map(|password| password.into()),
+            host: self
+                .host
+                .ok_or_else(|| sql_err!("HOST option is required"))?,
+            port: self.port,
+            user: self
+                .user
+                .ok_or_else(|| sql_err!("USER option is required"))?,
+        })
+    }
+}
+
+generate_extracted_config!(
     SshConnectionOption,
     (Host, String),
     (Port, u16, Default(22_u16)),
@@ -3394,6 +3424,10 @@ pub fn plan_create_connection(
         CreateConnection::Postgres { with_options } => {
             let c = PostgresConnectionOptionExtracted::try_from(with_options)?;
             Connection::Postgres(c.to_connection(scx)?)
+        }
+        CreateConnection::Mssql { with_options } => {
+            let c = MssqlConnectionOptionExtracted::try_from(with_options)?;
+            Connection::Mssql(c.to_connection(scx)?)
         }
         CreateConnection::Aws { with_options } => {
             let c = AwsConnectionOptionExtracted::try_from(with_options)?;

@@ -1988,7 +1988,7 @@ impl<'a> Parser<'a> {
             _ => unreachable!(),
         };
         let connection = match self
-            .expect_one_of_keywords(&[AWS, KAFKA, CONFLUENT, POSTGRES, SSH])?
+            .expect_one_of_keywords(&[AWS, KAFKA, CONFLUENT, POSTGRES, SSH, MSSQL])?
         {
             AWS => {
                 if self.parse_keyword(PRIVATELINK) {
@@ -2023,6 +2023,14 @@ impl<'a> Parser<'a> {
                 let with_options =
                     self.parse_comma_separated(Parser::parse_csr_connection_option)?;
                 CreateConnection::Csr { with_options }
+            }
+            MSSQL => {
+                if expect_paren {
+                    self.expect_token(&Token::LParen)?;
+                }
+                let with_options =
+                    self.parse_comma_separated(Parser::parse_mssql_connection_option)?;
+                CreateConnection::Mssql { with_options }
             }
             POSTGRES => {
                 if expect_paren {
@@ -2335,6 +2343,22 @@ impl<'a> Parser<'a> {
             _ => unreachable!(),
         };
         Ok(PostgresConnectionOption {
+            name,
+            value: self.parse_optional_option_value()?,
+        })
+    }
+
+    fn parse_mssql_connection_option(&mut self) -> Result<MssqlConnectionOption<Raw>, ParserError> {
+        let name =
+            match self.expect_one_of_keywords(&[DATABASE, HOST, PASSWORD, PORT, USER, USERNAME])? {
+                DATABASE => MssqlConnectionOptionName::Database,
+                HOST => MssqlConnectionOptionName::Host,
+                PASSWORD => MssqlConnectionOptionName::Password,
+                PORT => MssqlConnectionOptionName::Port,
+                USER | USERNAME => MssqlConnectionOptionName::User,
+                _ => unreachable!(),
+            };
+        Ok(MssqlConnectionOption {
             name,
             value: self.parse_optional_option_value()?,
         })

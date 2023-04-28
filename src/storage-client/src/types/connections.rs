@@ -161,6 +161,7 @@ pub enum Connection {
     Kafka(KafkaConnection),
     Csr(CsrConnection),
     Postgres(PostgresConnection),
+    Mssql(MssqlConnection),
     Ssh(SshConnection),
     Aws(AwsConfig),
     AwsPrivatelink(AwsPrivatelinkConnection),
@@ -907,6 +908,86 @@ impl Arbitrary for PostgresConnection {
                     }
                 },
             )
+            .boxed()
+    }
+}
+
+/// A connection to a MssqlQL server.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct MssqlConnection {
+    /// The hostname of the server.
+    pub host: String,
+    /// The port of the server.
+    pub port: u16,
+    /// The name of the database to connect to.
+    pub database: String,
+    /// The username to authenticate as.
+    pub user: StringOrSecret,
+    /// An optional password for authentication.
+    pub password: Option<GlobalId>,
+}
+
+impl MssqlConnection {
+    pub async fn config(
+        &self,
+        secrets_reader: &dyn mz_secrets::SecretsReader,
+    ) -> Result<tiberius::Config, anyhow::Error> {
+        let mut config = tiberius::Config::new();
+        config.host(&self.host);
+        config.port(self.port);
+        config.database(&self.database);
+        if let Some(password) = self.password {
+            let user = &self.user.get_string(secrets_reader).await?;
+            let password = secrets_reader.read_string(password).await?;
+            let auth = tiberius::AuthMethod::sql_server(user, password);
+            config.authentication(auth);
+        }
+
+        Ok(config)
+    }
+}
+
+impl RustType<ProtoMssqlConnection> for MssqlConnection {
+    fn into_proto(&self) -> ProtoMssqlConnection {
+        ProtoMssqlConnection {
+            host: self.host.into_proto(),
+            port: self.port.into_proto(),
+            database: self.database.into_proto(),
+            user: Some(self.user.into_proto()),
+            password: self.password.into_proto(),
+        }
+    }
+
+    fn from_proto(proto: ProtoMssqlConnection) -> Result<Self, TryFromProtoError> {
+        Ok(MssqlConnection {
+            host: proto.host,
+            port: proto.port.into_rust()?,
+            database: proto.database,
+            user: proto.user.into_rust_if_some("ProtoMssqlConnection::user")?,
+            password: proto.password.into_rust()?,
+        })
+    }
+}
+
+impl Arbitrary for MssqlConnection {
+    type Strategy = BoxedStrategy<Self>;
+    type Parameters = ();
+
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        (
+            any::<String>(),
+            any::<u16>(),
+            any::<String>(),
+            any::<StringOrSecret>(),
+            any::<Option<GlobalId>>(),
+        )
+            .prop_map(|(host, port, database, user, password)| MssqlConnection {
+                host,
+                port,
+                database,
+                user,
+                password,
+            })
             .boxed()
     }
 }

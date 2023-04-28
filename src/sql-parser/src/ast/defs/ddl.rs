@@ -727,6 +727,46 @@ impl<T: AstInfo> AstDisplay for PostgresConnectionOption<T> {
 impl_display_t!(PostgresConnectionOption);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MssqlConnectionOptionName {
+    Database,
+    Host,
+    Password,
+    Port,
+    User,
+}
+
+impl AstDisplay for MssqlConnectionOptionName {
+    fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
+        f.write_str(match self {
+            MssqlConnectionOptionName::Database => "DATABASE",
+            MssqlConnectionOptionName::Host => "HOST",
+            MssqlConnectionOptionName::Password => "PASSWORD",
+            MssqlConnectionOptionName::Port => "PORT",
+            MssqlConnectionOptionName::User => "USER",
+        })
+    }
+}
+impl_display!(MssqlConnectionOptionName);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// An option in a `CREATE CONNECTION ... Mssql`.
+pub struct MssqlConnectionOption<T: AstInfo> {
+    pub name: MssqlConnectionOptionName,
+    pub value: Option<WithOptionValue<T>>,
+}
+
+impl<T: AstInfo> AstDisplay for MssqlConnectionOption<T> {
+    fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
+        f.write_node(&self.name);
+        if let Some(v) = &self.value {
+            f.write_str(" = ");
+            f.write_node(v);
+        }
+    }
+}
+impl_display_t!(MssqlConnectionOption);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AwsConnectionOptionName {
     AccessKeyId,
     Endpoint,
@@ -855,6 +895,9 @@ pub enum CreateConnection<T: AstInfo> {
     Postgres {
         with_options: Vec<PostgresConnectionOption<T>>,
     },
+    Mssql {
+        with_options: Vec<MssqlConnectionOption<T>>,
+    },
     Ssh {
         with_options: Vec<SshConnectionOption<T>>,
     },
@@ -875,6 +918,11 @@ impl<T: AstInfo> AstDisplay for CreateConnection<T> {
             }
             Self::Postgres { with_options } => {
                 f.write_str("POSTGRES (");
+                f.write_node(&display::comma_separated(with_options));
+                f.write_str(")");
+            }
+            Self::Mssql { with_options } => {
+                f.write_str("MSSQL (");
                 f.write_node(&display::comma_separated(with_options));
                 f.write_str(")");
             }
