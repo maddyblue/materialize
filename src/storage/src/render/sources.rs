@@ -163,6 +163,20 @@ pub fn render_source<'g, G: Scope<Timestamp = ()>>(
                 .collect();
             (streams, health, cap)
         }
+        GenericSourceConnection::Mssql(connection) => {
+            let (streams, health, cap) = source::create_raw_source(
+                scope,
+                base_source_config.clone(),
+                connection,
+                storage_state.connection_context.clone(),
+                resumption_calculator,
+            );
+            let streams: Vec<_> = streams
+                .into_iter()
+                .map(|(ok, err)| (SourceType::Row(ok), err))
+                .collect();
+            (streams, health, cap)
+        }
         GenericSourceConnection::LoadGenerator(connection) => {
             let (streams, health, cap) = source::create_raw_source(
                 scope,

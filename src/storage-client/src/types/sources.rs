@@ -51,7 +51,7 @@ use timely::progress::{PathSummary, Timestamp};
 use uuid::Uuid;
 
 use crate::controller::{CollectionMetadata, ResumptionFrontierCalculator};
-use crate::types::connections::{KafkaConnection, PostgresConnection};
+use crate::types::connections::{KafkaConnection, MssqlConnection, PostgresConnection};
 use crate::types::errors::{DataflowError, ProtoDataflowError};
 use crate::types::instances::StorageInstanceId;
 use crate::types::sources::encoding::{DataEncoding, DataEncodingInner, SourceDataEncoding};
@@ -1731,6 +1731,11 @@ impl SourceDesc<GenericSourceConnection> {
                 connection: GenericSourceConnection::Postgres(_),
                 ..
             } => false,
+            // Mssql can produce retractions (deletes)
+            SourceDesc {
+                connection: GenericSourceConnection::Mssql(_),
+                ..
+            } => false,
             // Loadgen can produce retractions (deletes)
             SourceDesc {
                 connection: GenericSourceConnection::LoadGenerator(g),
@@ -1761,6 +1766,7 @@ impl SourceDesc<GenericSourceConnection> {
 pub enum GenericSourceConnection {
     Kafka(KafkaSourceConnection),
     Postgres(PostgresSourceConnection),
+    Mssql(MssqlSourceConnection),
     LoadGenerator(LoadGeneratorSourceConnection),
     TestScript(TestScriptSourceConnection),
 }
@@ -1774,6 +1780,12 @@ impl From<KafkaSourceConnection> for GenericSourceConnection {
 impl From<PostgresSourceConnection> for GenericSourceConnection {
     fn from(conn: PostgresSourceConnection) -> Self {
         Self::Postgres(conn)
+    }
+}
+
+impl From<MssqlSourceConnection> for GenericSourceConnection {
+    fn from(conn: MssqlSourceConnection) -> Self {
+        Self::Mssql(conn)
     }
 }
 
@@ -1794,6 +1806,7 @@ impl SourceConnection for GenericSourceConnection {
         match self {
             Self::Kafka(conn) => conn.name(),
             Self::Postgres(conn) => conn.name(),
+            Self::Mssql(conn) => conn.name(),
             Self::LoadGenerator(conn) => conn.name(),
             Self::TestScript(conn) => conn.name(),
         }
@@ -1803,6 +1816,7 @@ impl SourceConnection for GenericSourceConnection {
         match self {
             Self::Kafka(conn) => conn.upstream_name(),
             Self::Postgres(conn) => conn.upstream_name(),
+            Self::Mssql(conn) => conn.upstream_name(),
             Self::LoadGenerator(conn) => conn.upstream_name(),
             Self::TestScript(conn) => conn.upstream_name(),
         }
@@ -1812,6 +1826,7 @@ impl SourceConnection for GenericSourceConnection {
         match self {
             Self::Kafka(conn) => conn.timestamp_desc(),
             Self::Postgres(conn) => conn.timestamp_desc(),
+            Self::Mssql(conn) => conn.timestamp_desc(),
             Self::LoadGenerator(conn) => conn.timestamp_desc(),
             Self::TestScript(conn) => conn.timestamp_desc(),
         }
@@ -1821,6 +1836,7 @@ impl SourceConnection for GenericSourceConnection {
         match self {
             Self::Kafka(conn) => conn.connection_id(),
             Self::Postgres(conn) => conn.connection_id(),
+            Self::Mssql(conn) => conn.connection_id(),
             Self::LoadGenerator(conn) => conn.connection_id(),
             Self::TestScript(conn) => conn.connection_id(),
         }
@@ -1830,6 +1846,7 @@ impl SourceConnection for GenericSourceConnection {
         match self {
             Self::Kafka(conn) => conn.metadata_columns(),
             Self::Postgres(conn) => conn.metadata_columns(),
+            Self::Mssql(conn) => conn.metadata_columns(),
             Self::LoadGenerator(conn) => conn.metadata_columns(),
             Self::TestScript(conn) => conn.metadata_columns(),
         }
@@ -1839,6 +1856,7 @@ impl SourceConnection for GenericSourceConnection {
         match self {
             Self::Kafka(conn) => conn.metadata_column_types(),
             Self::Postgres(conn) => conn.metadata_column_types(),
+            Self::Mssql(conn) => conn.metadata_column_types(),
             Self::LoadGenerator(conn) => conn.metadata_column_types(),
             Self::TestScript(conn) => conn.metadata_column_types(),
         }
@@ -1854,6 +1872,7 @@ impl RustType<ProtoSourceConnection> for GenericSourceConnection {
                 GenericSourceConnection::Postgres(postgres) => {
                     Kind::Postgres(postgres.into_proto())
                 }
+                GenericSourceConnection::Mssql(mssql) => Kind::Mssql(mssql.into_proto()),
                 GenericSourceConnection::LoadGenerator(loadgen) => {
                     Kind::Loadgen(loadgen.into_proto())
                 }
@@ -1872,6 +1891,7 @@ impl RustType<ProtoSourceConnection> for GenericSourceConnection {
         Ok(match kind {
             Kind::Kafka(kafka) => GenericSourceConnection::Kafka(kafka.into_rust()?),
             Kind::Postgres(postgres) => GenericSourceConnection::Postgres(postgres.into_rust()?),
+            Kind::Mssql(mssql) => GenericSourceConnection::Mssql(mssql.into_rust()?),
             Kind::Loadgen(loadgen) => GenericSourceConnection::LoadGenerator(loadgen.into_rust()?),
             Kind::Testscript(testscript) => {
                 GenericSourceConnection::TestScript(testscript.into_rust()?)
@@ -2039,6 +2059,130 @@ impl RustType<ProtoPostgresSourcePublicationDetails> for PostgresSourcePublicati
                 .map(mz_postgres_util::desc::PostgresTableDesc::from_proto)
                 .collect::<Result<_, _>>()?,
             slot: proto.slot,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MssqlSourceConnection {
+    pub connection_id: GlobalId,
+    pub connection: MssqlConnection,
+    /// The cast expressions to convert the incoming string encoded rows to
+    /// their target types, keyed by their position in the source.
+    pub table_casts: BTreeMap<usize, Vec<MirScalarExpr>>,
+}
+
+impl Arbitrary for MssqlSourceConnection {
+    type Strategy = BoxedStrategy<Self>;
+    type Parameters = ();
+
+    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+        (
+            any::<MssqlConnection>(),
+            any::<GlobalId>(),
+            proptest::collection::btree_map(
+                any::<usize>(),
+                proptest::collection::vec(any::<MirScalarExpr>(), 1..4),
+                1..4,
+            ),
+        )
+            .prop_map(|(connection, connection_id, table_casts)| Self {
+                connection,
+                connection_id,
+                table_casts,
+            })
+            .boxed()
+    }
+}
+
+// TODO: FIX
+pub static MSSQL_PROGRESS_DESC: Lazy<RelationDesc> =
+    Lazy::new(|| RelationDesc::empty().with_column("lsn", ScalarType::UInt64.nullable(true)));
+
+impl SourceConnection for MssqlSourceConnection {
+    fn name(&self) -> &'static str {
+        "mssql"
+    }
+
+    fn upstream_name(&self) -> Option<&str> {
+        None
+    }
+
+    fn timestamp_desc(&self) -> RelationDesc {
+        MSSQL_PROGRESS_DESC.clone()
+    }
+
+    fn connection_id(&self) -> Option<GlobalId> {
+        Some(self.connection_id)
+    }
+
+    fn metadata_columns(&self) -> Vec<(&str, ColumnType)> {
+        vec![]
+    }
+
+    fn metadata_column_types(&self) -> Vec<IncludedColumnSource> {
+        vec![]
+    }
+}
+
+impl RustType<ProtoMssqlSourceConnection> for MssqlSourceConnection {
+    fn into_proto(&self) -> ProtoMssqlSourceConnection {
+        use proto_mssql_source_connection::ProtoMssqlTableCast;
+        let mut table_casts = Vec::with_capacity(self.table_casts.len());
+        let mut table_cast_pos = Vec::with_capacity(self.table_casts.len());
+        for (pos, table_cast_cols) in self.table_casts.iter() {
+            table_casts.push(ProtoMssqlTableCast {
+                column_casts: table_cast_cols
+                    .iter()
+                    .cloned()
+                    .map(|cast| cast.into_proto())
+                    .collect(),
+            });
+            table_cast_pos.push(mz_ore::cast::usize_to_u64(*pos));
+        }
+
+        ProtoMssqlSourceConnection {
+            connection: Some(self.connection.into_proto()),
+            connection_id: Some(self.connection_id.into_proto()),
+            table_casts,
+            table_cast_pos,
+        }
+    }
+
+    fn from_proto(proto: ProtoMssqlSourceConnection) -> Result<Self, TryFromProtoError> {
+        // If we get the wrong number of table cast positions, we have to just
+        // accept all of the table casts. This is somewhat harmless, as the
+        // worst thing that happens is that we generate unused snapshots from
+        // the upstream PG publication, and this will (hopefully) correct
+        // itself on the next version upgrade.
+        let table_cast_pos = if proto.table_casts.len() == proto.table_cast_pos.len() {
+            proto.table_cast_pos
+        } else {
+            (1..proto.table_casts.len() + 1)
+                .map(mz_ore::cast::usize_to_u64)
+                .collect()
+        };
+
+        let mut table_casts = BTreeMap::new();
+        for (pos, cast) in table_cast_pos
+            .into_iter()
+            .zip_eq(proto.table_casts.into_iter())
+        {
+            let mut column_casts = vec![];
+            for cast in cast.column_casts {
+                column_casts.push(cast.into_rust()?);
+            }
+            table_casts.insert(mz_ore::cast::u64_to_usize(pos), column_casts);
+        }
+
+        Ok(MssqlSourceConnection {
+            connection: proto
+                .connection
+                .into_rust_if_some("ProtoMssqlSourceConnection::connection")?,
+            connection_id: proto
+                .connection_id
+                .into_rust_if_some("ProtoMssqlSourceConnection::connection_id")?,
+            table_casts,
         })
     }
 }

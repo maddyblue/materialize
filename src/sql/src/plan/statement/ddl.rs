@@ -54,9 +54,10 @@ use mz_storage_client::types::sources::encoding::{
 };
 use mz_storage_client::types::sources::{
     GenericSourceConnection, IncludedColumnPos, KafkaSourceConnection, KeyEnvelope, LoadGenerator,
-    LoadGeneratorSourceConnection, PostgresSourceConnection, PostgresSourcePublicationDetails,
-    ProtoPostgresSourcePublicationDetails, SourceConnection, SourceDesc, SourceEnvelope,
-    TestScriptSourceConnection, Timeline, UnplannedSourceEnvelope, UpsertStyle,
+    LoadGeneratorSourceConnection, MssqlSourceConnection, PostgresSourceConnection,
+    PostgresSourcePublicationDetails, ProtoPostgresSourcePublicationDetails, SourceConnection,
+    SourceDesc, SourceEnvelope, TestScriptSourceConnection, Timeline, UnplannedSourceEnvelope,
+    UpsertStyle,
 };
 use prost::Message;
 use regex::Regex;
@@ -830,6 +831,29 @@ pub fn plan_create_source(
             // we just use the encoding from the format and envelope
             let encoding = get_encoding(scx, format, &envelope, None)?;
             (connection, encoding, None)
+        }
+        CreateSourceConnection::Mssql { connection } => {
+            let connection_item = scx.get_item_by_resolved_name(connection)?;
+            let connection = match connection_item.connection()? {
+                Connection::Mssql(connection) => connection.clone(),
+                _ => sql_bail!("{} is not a mssql connection", connection_item.name()),
+            };
+
+            // Register the available subsources
+            let mut available_subsources = BTreeMap::new();
+            let table_casts = BTreeMap::new();
+
+            let connection = GenericSourceConnection::from(MssqlSourceConnection {
+                connection,
+                connection_id: connection_item.id(),
+                table_casts,
+            });
+            // The mssql source only outputs data to its subsources. The catalog object
+            // representing the source itself is just an empty relation with no columns
+            let encoding = SourceDataEncoding::Single(DataEncoding::new(
+                DataEncodingInner::RowCodec(RelationDesc::empty()),
+            ));
+            (connection, encoding, Some(available_subsources))
         }
     };
 

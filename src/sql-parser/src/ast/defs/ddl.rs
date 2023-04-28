@@ -1080,6 +1080,10 @@ pub enum CreateSourceConnection<T: AstInfo> {
         connection: T::ItemName,
         options: Vec<PgConfigOption<T>>,
     },
+    Mssql {
+        /// The mssql connection.
+        connection: T::ItemName,
+    },
     LoadGenerator {
         generator: LoadGenerator,
         options: Vec<LoadGeneratorOption<T>>,
@@ -1112,6 +1116,10 @@ impl<T: AstInfo> AstDisplay for CreateSourceConnection<T> {
                     f.write_node(&display::comma_separated(options));
                     f.write_str(")");
                 }
+            }
+            CreateSourceConnection::Mssql { connection } => {
+                f.write_str("MSSQL CONNECTION ");
+                f.write_node(connection);
             }
             CreateSourceConnection::LoadGenerator { generator, options } => {
                 f.write_str("LOAD GENERATOR ");

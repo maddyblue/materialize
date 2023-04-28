@@ -168,6 +168,9 @@ pub async fn purify_create_source(
         CreateSourceConnection::Postgres { .. } => {
             &mz_storage_client::types::sources::PG_PROGRESS_DESC
         }
+        CreateSourceConnection::Mssql { .. } => {
+            &mz_storage_client::types::sources::MSSQL_PROGRESS_DESC
+        }
         CreateSourceConnection::LoadGenerator { .. } => {
             &mz_storage_client::types::sources::LOAD_GEN_PROGRESS_DESC
         }
@@ -185,7 +188,9 @@ pub async fn purify_create_source(
                 );
             }
         }
-        CreateSourceConnection::Postgres { .. } | CreateSourceConnection::LoadGenerator { .. } => {}
+        CreateSourceConnection::Postgres { .. }
+        | CreateSourceConnection::Mssql { .. }
+        | CreateSourceConnection::LoadGenerator { .. } => {}
     }
 
     match connection {
@@ -736,6 +741,9 @@ pub async fn purify_create_source(
                 *referenced_subsources =
                     Some(ReferencedSubsources::SubsetTables(targeted_subsources));
             }
+        }
+        CreateSourceConnection::Mssql { connection } => {
+            // TODO
         }
     }
 

@@ -2689,7 +2689,7 @@ impl<'a> Parser<'a> {
     fn parse_create_source_connection(
         &mut self,
     ) -> Result<CreateSourceConnection<Raw>, ParserError> {
-        match self.expect_one_of_keywords(&[KAFKA, POSTGRES, LOAD, TEST])? {
+        match self.expect_one_of_keywords(&[KAFKA, POSTGRES, LOAD, TEST, MSSQL])? {
             POSTGRES => {
                 self.expect_keyword(CONNECTION)?;
                 let connection = self.parse_raw_name()?;
@@ -2706,6 +2706,11 @@ impl<'a> Parser<'a> {
                     connection,
                     options,
                 })
+            }
+            MSSQL => {
+                self.expect_keyword(CONNECTION)?;
+                let connection = self.parse_raw_name()?;
+                Ok(CreateSourceConnection::Mssql { connection })
             }
             KAFKA => {
                 self.expect_keyword(CONNECTION)?;
