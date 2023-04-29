@@ -1,0 +1,62 @@
+docker exec -it materialize_mssql_1 /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Pass12__
+
+
+sqlcmd create mssql --accept-eula --using https://aka.ms/AdventureWorksLT.bak
+sqlcmd query "SELECT DB_NAME()"
+sqlcmd open ads
+
+SELECT name, database_id, create_date  
+FROM sys.databases;  
+GO
+
+create database mz;
+go
+use mz;
+go
+create table a (i int);
+create table b (j int, k int);
+insert into a values (1), (2);
+insert into b values (3,4), (6,7);
+go
+
+select * from a;
+select * from b;
+go
+
+EXEC sys.sp_cdc_enable_db  
+GO  
+
+EXEC sys.sp_cdc_enable_table  
+@source_schema = N'dbo',  
+@source_name   = N'a',  
+@role_name     = NULL
+GO 
+EXEC sys.sp_cdc_enable_table  
+@source_schema = N'dbo',  
+@source_name   = N'b',  
+@role_name     = NULL
+GO 
+
+
+
+USE mz;  
+GO  
+DECLARE @from_lsn binary(10), @to_lsn binary(10);  
+SET @from_lsn = sys.fn_cdc_get_min_lsn(N'dbo_a');  
+SET @to_lsn = sys.fn_cdc_get_max_lsn();  
+SELECT * FROM cdc.fn_cdc_get_all_changes_dbo_a(@from_lsn, @to_lsn, 'all');  
+GO
+
+select * FROM cdc.fn_cdc_get_all_changes_dbo_a(10977524284129332, 11540474078691331, N'all');
+go
+
+select  sys.fn_cdc_get_max_lsn();
+go
+
+
+select  sys.fn_cdc_get_min_lsn('dbo_a');
+go
+
+select sys.fn_cdc_get_min_lsn(N'dbo_a');
+select sys.fn_cdc_get_max_lsn();
+go
