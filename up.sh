@@ -1,0 +1,1 @@
+../scratch/nix/scratch/up.sh

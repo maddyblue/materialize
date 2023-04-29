@@ -1,0 +1,66 @@
+version: '3'
+services:
+  postgres:
+    image: "postgres:14.2"
+    network_mode: host
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_USER=mjibson
+    restart: unless-stopped
+    command: postgres -c log_statement=all -c wal_level=logical -c max_wal_senders=20 -c max_replication_slots=20
+  cockroach:
+    image: "cockroachdb/cockroach:v22.2.5"
+    network_mode: host
+    environment:
+      - COCKROACH_SKIP_ENABLING_DIAGNOSTIC_REPORTING=true
+    restart: unless-stopped
+    command: start-single-node --insecure --http-addr :8088 --store=type=mem,size=8GB
+  # zookeeper:
+  #   image: "confluentinc/cp-zookeeper:7.0.3"
+  #   network_mode: host
+  #   environment:
+  #     - ZOOKEEPER_CLIENT_PORT=2181
+  #   restart: unless-stopped
+  # kafka:
+  #   image: "confluentinc/cp-kafka:7.0.3"
+  #   network_mode: host
+  #   environment:
+  #     - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+  #     - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+  #     - KAFKA_ZOOKEEPER_CONNECT=localhost:2181
+  #     - KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE=false
+  #     - KAFKA_MIN_INSYNC_REPLICAS=1
+  #     - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+  #     - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+  #     - KAFKA_MESSAGE_MAX_BYTES=15728640
+  #     - KAFKA_REPLICA_FETCH_MAX_BYTES=15728640
+  #   restart: unless-stopped
+  # schemareg:
+  #   image: "confluentinc/cp-schema-registry:7.0.3"
+  #   network_mode: host
+  #   environment:
+  #     - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=PLAINTEXT://localhost:9092
+  #     - SCHEMA_REGISTRY_HOST_NAME=localhost
+  #   restart: unless-stopped
+  # jaeger:
+  #   image: "jaegertracing/all-in-one:1.36"
+  #   command: "--collector.grpc-server.max-message-size=16777216"
+  #   network_mode: host
+  #   environment:
+  #     - COLLECTOR_OTLP_ENABLED=true
+  mssql:
+    image: "mcr.microsoft.com/mssql/server:2022-latest"
+    network_mode: host
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Pass12__
+      - MSSQL_AGENT_ENABLED=True
+
+# docker exec -it materialize_cockroach_1 cockroach sql --insecure
+# docker exec -it materialiez_mssql_1 /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P pass
+# go run github.com/mjibson/proxy/fileserve@master -addr :3000
+# backup into 'http://localhost:3000';
+# set sql_safe_updates=false;
+# drop database defaultdb;
+# restore database defaultdb from latest in 'http://localhost:3000';
+# restore database environment_dc22c1f312fa4b90af5fda1b5558229d0 from 'http://localhost:1123';
