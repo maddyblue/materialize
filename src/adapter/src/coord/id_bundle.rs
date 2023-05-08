@@ -9,11 +9,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::Deserialize;
+
 use mz_compute_client::controller::ComputeInstanceId;
 use mz_repr::GlobalId;
 
 /// A bundle of storage and compute collection identifiers.
-#[derive(Debug, Default, Clone)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct CollectionIdBundle {
     /// The identifiers for sources in the storage layer.
     pub storage_ids: BTreeSet<GlobalId>,
