@@ -2484,7 +2484,7 @@ impl_display!(ExplainStage);
 pub enum Explainee<T: AstInfo> {
     View(T::ItemName),
     MaterializedView(T::ItemName),
-    Query(Query<T>),
+    Select(SelectStatement<T>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -2504,7 +2504,7 @@ impl<T: AstInfo> AstDisplay for Explainee<T> {
                 f.write_str("MATERIALIZED VIEW ");
                 f.write_node(name);
             }
-            Self::Query(query) => f.write_node(query),
+            Self::Select(select) => f.write_node(select),
         }
     }
 }

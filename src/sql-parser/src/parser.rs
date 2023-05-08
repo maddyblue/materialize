@@ -273,10 +273,7 @@ impl<'a> Parser<'a> {
             Some(t) => match t {
                 Token::Keyword(SELECT) | Token::Keyword(WITH) | Token::Keyword(VALUES) => {
                     self.prev_token();
-                    Ok(Statement::Select(SelectStatement {
-                        query: self.parse_query()?,
-                        as_of: self.parse_optional_as_of()?,
-                    }))
+                    Ok(Statement::Select(self.parse_select_statement()?))
                 }
                 Token::Keyword(CREATE) => Ok(self.parse_create()?),
                 Token::Keyword(DISCARD) => Ok(self.parse_discard()?),
@@ -4883,6 +4880,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse an unrestricted `SELECT`.
+    fn parse_select_statement(&mut self) -> Result<SelectStatement<Raw>, ParserError> {
+        Ok(SelectStatement {
+            query: self.parse_query()?,
+            as_of: self.parse_optional_as_of()?,
+        })
+    }
+
     /// Parse a restricted `SELECT` statement (no CTEs / `UNION` / `ORDER BY`),
     /// assuming the initial `SELECT` was already consumed
     fn parse_select(&mut self) -> Result<Select<Raw>, ParserError> {
@@ -5800,7 +5805,7 @@ impl<'a> Parser<'a> {
         } else if self.parse_keywords(&[MATERIALIZED, VIEW]) {
             Explainee::MaterializedView(self.parse_raw_name()?)
         } else {
-            Explainee::Query(self.parse_query()?)
+            Explainee::Select(self.parse_select_statement()?)
         };
 
         Ok(Statement::Explain(ExplainStatement {

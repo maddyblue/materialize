@@ -225,16 +225,7 @@ pub fn describe_explain(
 
     Ok(
         StatementDesc::new(Some(relation_desc)).with_params(match explainee {
-            Explainee::Query(q) => {
-                describe_select(
-                    scx,
-                    SelectStatement {
-                        query: q,
-                        as_of: None,
-                    },
-                )?
-                .param_types
-            }
+            Explainee::Select(s) => describe_select(scx, s)?.param_types,
             _ => vec![],
         }),
     )
@@ -310,7 +301,7 @@ pub fn plan_explain(
                 names::resolve(qcx.scx.catalog, query)?.0,
             )
         }
-        Explainee::Query(query) => (mz_repr::explain::Explainee::Query, query),
+        Explainee::Select(select) => (mz_repr::explain::Explainee::Query, select.query),
     };
     // Previously we would bail here for ORDER BY and LIMIT; this has been relaxed to silently
     // report the plan without the ORDER BY and LIMIT decorations (which are done in post).
