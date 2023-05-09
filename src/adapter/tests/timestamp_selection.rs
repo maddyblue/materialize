@@ -88,7 +88,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mz_sql_parser::ast::TransactionIsolationLevel;
 use serde::{Deserialize, Serialize};
 use timely::progress::Antichain;
 
@@ -96,8 +95,10 @@ use mz_adapter::{
     catalog::CatalogState, session::Session, CollectionIdBundle, TimelineContext, TimestampProvider,
 };
 use mz_compute_client::controller::ComputeInstanceId;
-use mz_repr::{GlobalId, Timestamp};
+use mz_expr::MirScalarExpr;
+use mz_repr::{Datum, GlobalId, ScalarType, Timestamp};
 use mz_sql::plan::QueryWhen;
+use mz_sql_parser::ast::TransactionIsolationLevel;
 use mz_storage_client::types::sources::Timeline;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -204,7 +205,7 @@ impl TimestampProvider for Frontiers {
 #[derive(Deserialize, Debug, Clone)]
 struct Determine {
     id_bundle: IdBundle,
-    when: QueryWhen,
+    when: String,
     instance: String,
 }
 
@@ -228,6 +229,28 @@ impl From<IdBundle> for CollectionIdBundle {
     }
 }
 
+fn parse_query_when(s: &str) -> QueryWhen {
+    let s = s.to_lowercase();
+    match s.split_once(':') {
+        Some((when, ts)) => {
+            let ts: i64 = ts.parse().unwrap();
+            let expr = MirScalarExpr::literal_ok(Datum::Int64(ts), ScalarType::Int64);
+            match when {
+                "attimestamp" => QueryWhen::AtTimestamp(expr),
+                "atleasttimestamp" => QueryWhen::AtLeastTimestamp(expr),
+                _ => panic!("bad when {s}"),
+            }
+        }
+        None => match s.as_str() {
+            "freshest" => QueryWhen::Freshest,
+            "immediately" => QueryWhen::Immediately,
+            _ => panic!("bad when {s}"),
+        },
+    }
+}
+
+/// Tests determine_timestamp. The testdrive language is not yet documented; examine the code and
+/// tests for usage.
 #[test]
 fn test_timestamp_selection() {
     datadriven::walk("tests/testdata/timestamp_selection", |tf| {
@@ -237,13 +260,7 @@ fn test_timestamp_selection() {
             oracle: Timestamp::MIN,
         };
         let catalog = CatalogState::empty();
-        let mut session = Session::dummy()
-            .start_transaction(
-                mz_ore::now::to_datetime(0),
-                None,
-                Some(TransactionIsolationLevel::StrictSerializable),
-            )
-            .0;
+        let mut isolation = TransactionIsolationLevel::StrictSerializable;
         tf.run(move |tc| -> String {
             match tc.directive.as_str() {
                 "set-compute" => {
@@ -263,27 +280,27 @@ fn test_timestamp_selection() {
                 }
                 "set-isolation" => {
                     let level = tc.input.trim().to_uppercase();
-                    let set = if level == TransactionIsolationLevel::StrictSerializable.to_string()
-                    {
-                        TransactionIsolationLevel::StrictSerializable
-                    } else if level == TransactionIsolationLevel::Serializable.to_string() {
-                        TransactionIsolationLevel::Serializable
-                    } else {
-                        panic!("unknown level {}", tc.input);
-                    };
-                    session = Session::dummy()
-                        .start_transaction(mz_ore::now::to_datetime(0), None, Some(set))
-                        .0;
+                    isolation =
+                        if level == TransactionIsolationLevel::StrictSerializable.to_string() {
+                            TransactionIsolationLevel::StrictSerializable
+                        } else if level == TransactionIsolationLevel::Serializable.to_string() {
+                            TransactionIsolationLevel::Serializable
+                        } else {
+                            panic!("unknown level {}", tc.input);
+                        };
                     "".into()
                 }
                 "determine" => {
                     let det: Determine = serde_json::from_str(&tc.input).unwrap();
+                    let session = Session::dummy()
+                        .start_transaction(mz_ore::now::to_datetime(0), None, Some(isolation))
+                        .0;
                     let ts = f
                         .determine_timestamp_for(
                             &catalog,
                             &session,
                             &det.id_bundle.into(),
-                            &det.when,
+                            &parse_query_when(&det.when),
                             det.instance.parse().unwrap(),
                             TimelineContext::TimestampDependent,
                             None,

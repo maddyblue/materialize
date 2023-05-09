@@ -101,3 +101,42 @@ determine
 }
 ----
 25
+
+# Test AS OF AT LEAST
+set-oracle
+15
+----
+
+determine full
+{
+  "id_bundle": {
+    "compute_ids": {
+      "s1": [
+        "s10"
+      ]
+    }
+  },
+  "when": "AtLeastTimestamp:5",
+  "instance": "s1"
+}
+----
+{
+  "timestamp_context": {
+    "TimelineTimestamp": [
+      "EpochMilliseconds",
+      15
+    ]
+  },
+  "since": {
+    "elements": [
+      10
+    ]
+  },
+  "upper": {
+    "elements": [
+      20
+    ]
+  },
+  "largest_not_in_advance_of_upper": 19,
+  "oracle_read_ts": 15
+}
