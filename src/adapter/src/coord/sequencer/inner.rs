@@ -22,7 +22,7 @@ use tokio::sync::{mpsc, oneshot, OwnedMutexGuard};
 use tracing::{event, warn, Level};
 
 use mz_cloud_resources::VpcEndpointConfig;
-use mz_compute_client::controller::ComputeReplicaConfig;
+use mz_compute_client::controller::{ComputeInstanceId, ComputeReplicaConfig};
 use mz_compute_client::types::dataflows::{DataflowDesc, DataflowDescription, IndexDesc};
 use mz_compute_client::types::sinks::{
     ComputeSinkConnection, ComputeSinkDesc, SubscribeSinkConnection,
@@ -2858,31 +2858,12 @@ impl Coordinator {
         Ok((format, source_ids, optimized_plan, cluster.id(), id_bundle))
     }
 
-    pub(super) fn sequence_explain_timestamp_finish_inner(
+    pub(crate) fn explain_sources(
         &self,
         session: &Session,
-        format: ExplainFormat,
-        cluster_id: ClusterId,
-        optimized_plan: OptimizedMirRelationExpr,
-        id_bundle: CollectionIdBundle,
-        real_time_recency_ts: Option<Timestamp>,
-    ) -> Result<ExecuteResponse, AdapterError> {
-        let is_json = match format {
-            ExplainFormat::Text => false,
-            ExplainFormat::Json => true,
-            ExplainFormat::Dot => {
-                return Err(AdapterError::Unsupported("EXPLAIN TIMESTAMP AS DOT"));
-            }
-        };
-        let timeline_context = self.validate_timeline_context(optimized_plan.depends_on())?;
-        let determination = self.determine_timestamp(
-            session,
-            &id_bundle,
-            &QueryWhen::Immediately,
-            cluster_id,
-            timeline_context,
-            real_time_recency_ts,
-        )?;
+        cluster_id: ComputeInstanceId,
+        id_bundle: &CollectionIdBundle,
+    ) -> Vec<TimestampSource<mz_repr::Timestamp>> {
         let mut sources = Vec::new();
         {
             for id in id_bundle.storage_ids.iter() {
@@ -2934,6 +2915,35 @@ impl Coordinator {
                 }
             }
         }
+        sources
+    }
+
+    pub(super) fn sequence_explain_timestamp_finish_inner(
+        &self,
+        session: &Session,
+        format: ExplainFormat,
+        cluster_id: ClusterId,
+        optimized_plan: OptimizedMirRelationExpr,
+        id_bundle: CollectionIdBundle,
+        real_time_recency_ts: Option<Timestamp>,
+    ) -> Result<ExecuteResponse, AdapterError> {
+        let is_json = match format {
+            ExplainFormat::Text => false,
+            ExplainFormat::Json => true,
+            ExplainFormat::Dot => {
+                return Err(AdapterError::Unsupported("EXPLAIN TIMESTAMP AS DOT"));
+            }
+        };
+        let timeline_context = self.validate_timeline_context(optimized_plan.depends_on())?;
+        let determination = self.determine_timestamp(
+            session,
+            &id_bundle,
+            &QueryWhen::Immediately,
+            cluster_id,
+            timeline_context,
+            real_time_recency_ts,
+        )?;
+        let sources = self.explain_sources(session, cluster_id, &id_bundle);
         let explanation = TimestampExplanation {
             determination,
             sources,
