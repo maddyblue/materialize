@@ -39,7 +39,7 @@ use enum_kinds::EnumKind;
 use mz_controller::clusters::ClusterId;
 use mz_expr::{CollectionPlan, ColumnOrder, MirRelationExpr, MirScalarExpr, RowSetFinishing};
 use mz_ore::now::{self, NOW_ZERO};
-use mz_pgcopy::CopyFormatParams;
+use mz_pgcopy::{CopyFormatParams, CopyFromTarget};
 use mz_repr::adt::mz_acl_item::{AclMode, MzAclItem};
 use mz_repr::explain::{ExplainConfig, ExplainFormat};
 use mz_repr::role_id::RoleId;
@@ -682,6 +682,7 @@ pub struct CopyFromPlan {
     pub id: GlobalId,
     pub columns: Vec<usize>,
     pub params: CopyFormatParams<'static>,
+    pub target: CopyFromTarget,
 }
 
 #[derive(Debug)]

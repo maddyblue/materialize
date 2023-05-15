@@ -2002,6 +2002,18 @@ UNION ALL
     SELECT id, oid, schema_id, name, 'secret', owner_id, privileges FROM mz_catalog.mz_secrets",
 };
 
+pub const REDSHIFT_STV_INFLIGHT: BuiltinView = BuiltinView {
+    name: "stv_inflight",
+    // Redshift puts this in pg_catalog.
+    schema: PG_CATALOG_SCHEMA,
+    sql: "CREATE VIEW pg_catalog.stv_inflight AS SELECT
+    NULL::pg_catalog.int4 AS userid,
+    NULL::pg_catalog.int4 AS slice,
+    NULL::pg_catalog.int4 AS query
+-- Fivetran needs a row returned here, so use true.
+WHERE true",
+};
+
 pub const MZ_DATAFLOWS_PER_WORKER: BuiltinView = BuiltinView {
     name: "mz_dataflows_per_worker",
     schema: MZ_INTERNAL_SCHEMA,
@@ -2473,7 +2485,10 @@ pub const PG_ATTRIBUTE: BuiltinView = BuiltinView {
     ''::pg_catalog.\"char\" as attgenerated,
     FALSE as attisdropped,
     -- MZ doesn't support COLLATE so attcollation is filled with 0
-    0::pg_catalog.oid as attcollation
+    0::pg_catalog.oid as attcollation,
+    -- Redshift column
+    FALSE as attisdistkey,
+    0::pg_catalog.int4 as attsortkeyord
 FROM (
     -- pg_attribute catalogs columns on relations and indexes
     SELECT id, oid, schema_id, name, type FROM mz_catalog.mz_relations
@@ -3848,6 +3863,7 @@ pub static BUILTINS_STATIC: Lazy<Vec<Builtin<NameReference>>> = Lazy::new(|| {
         Builtin::Index(&MZ_CLUSTER_REPLICA_SIZES_IND),
         Builtin::Index(&MZ_CLUSTER_REPLICA_STATUSES_IND),
         Builtin::Index(&MZ_CLUSTER_REPLICA_METRICS_IND),
+        Builtin::View(&REDSHIFT_STV_INFLIGHT),
     ]);
 
     builtins

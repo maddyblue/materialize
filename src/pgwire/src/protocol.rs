@@ -22,9 +22,11 @@ use mz_adapter::session::{
 use mz_adapter::{AdapterNotice, ExecuteResponse, PeekResponseUnary, RowsFuture};
 use mz_frontegg_auth::{Authentication as FronteggAuthentication, Claims};
 use mz_ore::cast::CastFrom;
+use mz_ore::collections::CollectionExt;
 use mz_ore::netio::AsyncReady;
 use mz_ore::str::StrExt;
 use mz_pgcopy::CopyFormatParams;
+use mz_pgcopy::CopyFromTarget;
 use mz_repr::{Datum, GlobalId, RelationDesc, RelationType, Row, RowArena, ScalarType};
 use mz_sql::ast::display::AstDisplay;
 use mz_sql::ast::{FetchDirection, Ident, Raw, Statement};
@@ -35,7 +37,7 @@ use postgres::error::SqlState;
 use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::select;
 use tokio::time::{self, Duration, Instant};
-use tracing::{debug, warn, Instrument};
+use tracing::{debug, trace, warn, Instrument};
 
 use crate::codec::FramedConn;
 use crate::message::{
@@ -117,6 +119,8 @@ where
             ))
             .await;
     }
+
+    trace!("run connection");
 
     let user = params.remove("user").unwrap_or_else(String::new);
 
@@ -1394,10 +1398,11 @@ where
                 id,
                 columns,
                 params,
+                target,
             } => {
                 let row_desc =
                     row_desc.expect("missing row description for ExecuteResponse::CopyFrom");
-                self.copy_from(id, columns, params, row_desc).await
+                self.copy_from(target, id, columns, params, row_desc).await
             }
 
             ExecuteResponse::AlteredIndexLogicalCompaction
@@ -1742,50 +1747,85 @@ where
     /// data to the server.
     async fn copy_from(
         &mut self,
+        target: CopyFromTarget,
         id: GlobalId,
         columns: Vec<usize>,
         params: CopyFormatParams<'_>,
         row_desc: RelationDesc,
     ) -> Result<State, io::Error> {
         let typ = row_desc.typ();
-        let column_formats = vec![mz_pgrepr::Format::Text; typ.column_types.len()];
-        self.send(BackendMessage::CopyInResponse {
-            overall_format: mz_pgrepr::Format::Text,
-            column_formats,
-        })
-        .await?;
-        self.conn.flush().await?;
-
-        let mut data = Vec::new();
         let mut next_state = State::Ready;
-        loop {
-            let message = self.conn.recv().await?;
-            match message {
-                Some(FrontendMessage::CopyData(buf)) => data.extend(buf),
-                Some(FrontendMessage::CopyDone) => break,
-                Some(FrontendMessage::CopyFail(err)) => {
-                    return self
-                        .error(ErrorResponse::error(
-                            SqlState::QUERY_CANCELED,
-                            format!("COPY from stdin failed: {}", err),
-                        ))
-                        .await
+
+        dbg!("COPYTARGET", &target);
+
+        let data = match target {
+            CopyFromTarget::Stdin => {
+                let column_formats = vec![mz_pgrepr::Format::Text; typ.column_types.len()];
+                self.send(BackendMessage::CopyInResponse {
+                    overall_format: mz_pgrepr::Format::Text,
+                    column_formats,
+                })
+                .await?;
+                self.conn.flush().await?;
+
+                let mut data = Vec::new();
+                loop {
+                    let message = self.conn.recv().await?;
+                    match message {
+                        Some(FrontendMessage::CopyData(buf)) => data.extend(buf),
+                        Some(FrontendMessage::CopyDone) => break,
+                        Some(FrontendMessage::CopyFail(err)) => {
+                            return self
+                                .error(ErrorResponse::error(
+                                    SqlState::QUERY_CANCELED,
+                                    format!("COPY from stdin failed: {}", err),
+                                ))
+                                .await
+                        }
+                        Some(FrontendMessage::Flush) | Some(FrontendMessage::Sync) => {}
+                        Some(_) => {
+                            return self
+                                .error(ErrorResponse::error(
+                                    SqlState::PROTOCOL_VIOLATION,
+                                    "unexpected message type during COPY from stdin",
+                                ))
+                                .await
+                        }
+                        _ => {
+                            next_state = State::Done;
+                            break;
+                        }
+                    }
                 }
-                Some(FrontendMessage::Flush) | Some(FrontendMessage::Sync) => {}
-                Some(_) => {
-                    return self
-                        .error(ErrorResponse::error(
-                            SqlState::PROTOCOL_VIOLATION,
-                            "unexpected message type during COPY from stdin",
-                        ))
-                        .await
-                }
-                _ => {
-                    next_state = State::Done;
-                    break;
+                data
+            }
+            CopyFromTarget::Url {
+                url,
+                credentials,
+                region,
+                gzip,
+                encrypted,
+                manifest,
+            } => {
+                match mz_pgcopy::copy_fetch_url(
+                    url,
+                    credentials.as_deref(),
+                    region.as_deref(),
+                    gzip,
+                    encrypted,
+                    manifest,
+                )
+                .await
+                {
+                    Ok(data) => data.into_first(),
+                    Err(e) => {
+                        return self
+                            .error(ErrorResponse::error(SqlState::IO_ERROR, format!("{}", e)))
+                            .await
+                    }
                 }
             }
-        }
+        };
 
         let column_types = typ
             .column_types

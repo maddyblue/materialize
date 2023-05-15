@@ -23,6 +23,7 @@
 #
 # For details on the code that is generated, see keywords.rs.
 
+Acceptinvchars
 Access
 Acks
 Addresses
@@ -85,12 +86,14 @@ Create
 Createcluster
 Createdb
 Createrole
+Credentials
 Cross
 Csv
 Current
 Cursor
 Database
 Databases
+Dateformat
 Datums
 Day
 Days
@@ -118,6 +121,7 @@ Effort
 Element
 Else
 Enable
+Encrypted
 End
 Endpoint
 Enforced
@@ -151,6 +155,7 @@ Grant
 Greatest
 Group
 Groups
+Gzip
 Having
 Header
 Headers
@@ -163,6 +168,7 @@ Idempotence
 Idle
 If
 Ignore
+Ignoreheader
 Ilike
 In
 Include
@@ -203,6 +209,7 @@ Local
 Log
 Logical
 Login
+Manifest
 Map
 Marketing
 Materialize
@@ -352,6 +359,7 @@ Then
 Tick
 Ties
 Time
+Timeformat
 Timeline
 Timeout
 Timestamp
@@ -364,6 +372,7 @@ Trailing
 Transaction
 Trim
 True
+Truncatecolumns
 Tunnel
 Type
 Types

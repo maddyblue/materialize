@@ -8,10 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::io;
+use std::time::Duration;
 
+use aws_credential_types::Credentials;
+use aws_sdk_s3::config::Region;
+use aws_sdk_s3::Client;
+use aws_sdk_s3::Config;
 use bytes::BytesMut;
-use csv::{ByteRecord, ReaderBuilder};
+use csv::ByteRecord;
+use csv::ReaderBuilder;
+use serde::Deserialize;
+use url::Url;
+
+use mz_ore::retry::Retry;
 use mz_repr::{Datum, RelationType, Row, RowArena};
 
 static END_OF_COPY_MARKER: &[u8] = b"\\.";
@@ -374,6 +385,228 @@ pub enum CopyFormatParams<'a> {
     Csv(CopyCsvFormatParams<'a>),
 }
 
+#[derive(Debug)]
+pub enum CopyFromTarget {
+    Stdin,
+    Url {
+        url: Url,
+        credentials: Option<String>,
+        region: Option<String>,
+        gzip: bool,
+        encrypted: bool,
+        manifest: bool,
+    },
+}
+
+pub async fn copy_fetch_url(
+    url: Url,
+    credentials: Option<&str>,
+    region: Option<&str>,
+    gzip: bool,
+    encrypted: bool,
+    manifest: bool,
+) -> Result<Vec<Vec<u8>>, anyhow::Error> {
+    match url.scheme() {
+        "s3" => {
+            dbg!(
+                copy_fetch_s3(
+                    url,
+                    credentials.unwrap_or(""),
+                    region,
+                    gzip,
+                    encrypted,
+                    manifest,
+                )
+                .await
+            )
+        }
+        _ => anyhow::bail!("unsupported url scheme {}", url.scheme()),
+    }
+}
+
+//#[tokio::test]
+async fn test_copy_fetch_s3() {
+    const URL: &str =
+        "s3://datawriterprd-us-east-1/9135c201-7cd4-4b14-9554-634a0fb023a3/upload.manifest";
+    const CREDENTIALS: &str = "aws_access_key_id=ASIA4ESR5FO4RTNFFCFO;aws_secret_access_key=B5zU4UvHYKvV30RN/froYefOfh7HhqmjrYDAIBJG;token=IQoJb3JpZ2luX2VjEOT//////////wEaCXVzLWVhc3QtMSJIMEYCIQCPVTkypdlBjvoW0uTqrfY4a+vd0wU6w+kDeUGM8z6pSAIhAKDWhIyBKh2fLW65+pxQ+5tysvWWHj0+msAoLDlXFmtEKqAECP3//////////wEQABoMODM0NDY5MTc4Mjk3IgwJt5oo1LAa9iJaKdUq9AP1XfJFV4Bj8QLcymzBsiqrm5d7CAZDtEn/0fyDP/HVSPU2xjR68gh0ioUZdrAmEifNhQ1tr1YcngzS/bJ+CEc8t+XGZPxDvom58B02N2R0ZWuhP2zyilFi6NHMmsrDG7GZIy2yO9fGLDRZBSqFEdy7vSi94iFMYJrq0AqMbUARDwIB00bYi9olizF10oCTZYUhxSJLYjxh/iu0BY3A5Pu2YGclaDbX/kfIPqVaKpnc/oLQe7ynsrtzSr68Pwuq8G6nDPLXk0ZQjpAdSX8T91FzYhTH/nee0vKkIS48SHgB/RShgA5w8sBz4FVb9J3WF3glmDI6D+5NHZRQXQiV4UpMu8hW3u0MgSGpBo7ELmxXAAADdjJ2WjuYZ4L2K8jTYPgIdzQEFl/dyc9fB6bWF8GjWi+mtkJ/WCKs4ZBkXoKYmqhXIvh0+Zl5HPy/EVOp3uQzJ81En4iU1+RIuP6rq7OJiflOTmqpBXBlOrggeS8jIWgIoHZEaWumKmFfQW8vrCCFKlNo+JxSnA7Iux2QCfFAOhsBMKeDEkr2gI4JAd90Z/Y4pQu/w5cNVoMf+ZH3RHSE838LNDYrFmOE8y67fRNx3Wmx+OjsarghkNtoN6gm91mban7FcY7mZwmhdufuiGI5BiQ2SCKLFQ7xxlnldPnc36t85TDX2IajBjqcAfZPa3BW88kgj2g/zOmz+rIm8qV+4cT0cc3Vr7eBU0MzdS7OYUWTiNRLTeWeXuoMyNYGJSjZOaM0pMpcpLVpKbjUkq43Oj/8vu6qvPIS4iGza4ho+ThrcBbyumu7i0wHrcVMcD8ZLBUH0jrkcVdwlcLbVOXQFs8u3exh5hx0NIau6UymOpE3GGSEHi2OVQU3RpkLXGFAZlz5qXrbzA==;master_symmetric_key=UEtxMgELZfVjnCo8ejeZ6u8JetTYN/rv7RLU3n0Po6w=";
+    copy_fetch_s3(
+        url::Url::parse(URL).unwrap(),
+        CREDENTIALS,
+        Some("us-east-1"),
+        true,
+        true,
+        true,
+    )
+    .await
+    .unwrap();
+}
+
+#[test]
+fn test_decrypt_s3() {
+    let contents = std::fs::read("/home/mjibson/materialize/1").unwrap();
+    let key = "Naa8It8dafEGifJCruCrOdIAIbbdhs4CDAmV94MXFog=";
+    let aes = <aes_gcm::Aes256Gcm as aes_gcm::KeyInit>::new_from_slice(key.as_bytes());
+    println!("{contents:?}");
+}
+
+async fn copy_fetch_s3(
+    url: Url,
+    credentials: &str,
+    region: Option<&str>,
+    gzip: bool,
+    encrypted: bool,
+    manifest: bool,
+) -> Result<Vec<Vec<u8>>, anyhow::Error> {
+    dbg!("s3 here");
+    let mut creds = BTreeMap::new();
+    for s in credentials.split(';') {
+        let Some((key, val)) = s.split_once('=') else {
+            anyhow::bail!("misformatted CREDENTIALS");
+        };
+        creds.insert(key, val.to_string());
+    }
+    let Some(aws_access_key_id) = creds.remove("aws_access_key_id") else {
+        anyhow::bail!("CREDENTIALS missing aws_access_key_id");
+    };
+    let Some(aws_secret_access_key) = creds.remove("aws_secret_access_key") else {
+        anyhow::bail!("CREDENTIALS missing aws_secret_access_key");
+    };
+    let session_token = creds.remove("token");
+    let master_symmetric_key = if encrypted {
+        let Some(master_symmetric_key) = creds.remove("master_symmetric_key") else {
+            anyhow::bail!("CREDENTIALS missing master_symmetric_key");
+        };
+        Some(master_symmetric_key)
+    } else {
+        None
+    };
+
+    fn decrypt(key: &str, data: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+        todo!()
+    }
+
+    dbg!(
+        &aws_access_key_id,
+        &aws_secret_access_key,
+        &session_token,
+        &region,
+        &credentials
+    );
+
+    let creds = Credentials::from_keys(aws_access_key_id, aws_secret_access_key, session_token);
+    let config = Config::builder()
+        .credentials_provider(creds)
+        .region(region.map(|r| Region::new(r.to_owned())))
+        .build();
+    let client = Client::from_conf(config);
+
+    let manifest: CopyManifest = if manifest {
+        dbg!("FETCHING");
+        if let Ok(dur) = std::env::var("COPY_SLEEP") {
+            let dur: u64 = dur.parse().unwrap();
+            tokio::time::sleep(std::time::Duration::from_secs(dur)).await;
+        }
+        let manifest = fetch_s3_file(
+            &client,
+            url.host_str().map(|s| s.to_owned()),
+            url.path().to_string(),
+        )
+        .await?;
+        dbg!("WRITING");
+        std::fs::write("manifest", &manifest).expect("Unable to write file");
+        dbg!("JSON");
+        serde_json::from_slice(&manifest)?
+    } else {
+        CopyManifest {
+            entries: vec![CopyManifestEntry {
+                url,
+                mandatory: true,
+            }],
+        }
+    };
+
+    let mut files = Vec::new();
+    for entry in manifest.entries {
+        dbg!("FETCH FILE", &entry);
+        match fetch_s3_file(
+            &client,
+            entry.url.host_str().map(|s| s.to_owned()),
+            entry.url.path().to_string(),
+        )
+        .await
+        {
+            Ok(file) => {
+                files.push(file);
+            }
+            Err(err) => {
+                if !entry.mandatory {
+                    anyhow::bail!("non-mandatory COPY manifest files not supported");
+                }
+                // Detect errors for non-mandatory files that don't exist.
+                /*
+                if let aws_sdk_s3::error::SdkError::ServiceError(e) = &err {
+                    if !entry.mandatory
+                        && matches!(
+                            e.err(),
+                            aws_sdk_s3::operation::get_object::GetObjectError::NoSuchKey(_)
+                        )
+                    {
+                        continue;
+                    }
+                }
+                */
+                return Err(err);
+            }
+        };
+    }
+    Ok(files)
+}
+
+// Fetches a file with retries.
+async fn fetch_s3_file(
+    client: &Client,
+    bucket: Option<String>,
+    key: String,
+) -> Result<Vec<u8>, anyhow::Error> {
+    // The numbers are made up here, but appear to help fivetran when it has just written these
+    // files and they haven't propogated through aws fully yet or something?
+    Retry::default()
+        .initial_backoff(Duration::from_secs(1))
+        .max_duration(Duration::from_secs(30))
+        .retry_async_canceling(|_state| {
+            if _state.i > 0 {
+                println!("fetch s3 retry {}", _state.i);
+            }
+            let bucket = bucket.clone();
+            let key = key.clone();
+            async {
+                Ok(client
+                    .get_object()
+                    .set_bucket(bucket)
+                    .key(key)
+                    .send()
+                    .await?
+                    .body
+                    .collect()
+                    .await
+                    .map(|data| data.to_vec())?)
+            }
+        })
+        .await
+}
+
+#[derive(Deserialize, Debug)]
+struct CopyManifest {
+    entries: Vec<CopyManifestEntry>,
+}
+
+#[derive(Deserialize, Debug)]
+struct CopyManifestEntry {
+    url: url::Url,
+    #[serde(default)]
+    mandatory: bool,
+}
+
 pub fn decode_copy_format<'a>(
     data: &[u8],
     column_types: &[mz_pgrepr::Type],
@@ -434,6 +667,9 @@ pub struct CopyCsvFormatParams<'a> {
     pub escape: u8,
     pub header: bool,
     pub null: Cow<'a, str>,
+    pub ignore_header: u32,
+    pub truncate_columns: bool,
+    pub accept_inv_chars: bool,
 }
 
 pub fn decode_copy_format_csv(
@@ -445,6 +681,9 @@ pub fn decode_copy_format_csv(
         escape,
         null,
         header,
+        ignore_header,
+        truncate_columns,
+        accept_inv_chars,
     }: CopyCsvFormatParams,
 ) -> Result<Vec<Row>, io::Error> {
     let mut rows = Vec::new();

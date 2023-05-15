@@ -240,14 +240,16 @@ impl_display!(CopyDirection);
 pub enum CopyTarget {
     Stdin,
     Stdout,
+    Filename(String),
 }
 
 impl AstDisplay for CopyTarget {
     fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
-        f.write_str(match self {
-            CopyTarget::Stdin => "STDIN",
-            CopyTarget::Stdout => "STDOUT",
-        })
+        match self {
+            CopyTarget::Stdin => f.write_str("STDIN"),
+            CopyTarget::Stdout => f.write_str("STDOUT"),
+            CopyTarget::Filename(s) => f.write_node(&Value::String(s.into())),
+        }
     }
 }
 impl_display!(CopyTarget);
@@ -260,6 +262,17 @@ pub enum CopyOptionName {
     Escape,
     Quote,
     Header,
+    Credentials,
+    Region,
+    Csv,
+    Gzip,
+    Ignoreheader,
+    Timeformat,
+    Dateformat,
+    Truncatecolumns,
+    Acceptinvchars,
+    Encrypted,
+    Manifest,
 }
 
 impl AstDisplay for CopyOptionName {
@@ -271,6 +284,17 @@ impl AstDisplay for CopyOptionName {
             CopyOptionName::Escape => "ESCAPE",
             CopyOptionName::Quote => "QUOTE",
             CopyOptionName::Header => "HEADER",
+            CopyOptionName::Credentials => "CREDENTIALS",
+            CopyOptionName::Region => "REGION",
+            CopyOptionName::Csv => "CSV",
+            CopyOptionName::Gzip => "GZIP",
+            CopyOptionName::Ignoreheader => "IGNOREHEADER",
+            CopyOptionName::Timeformat => "TIMEFORMAT",
+            CopyOptionName::Dateformat => "DATEFORMAT",
+            CopyOptionName::Truncatecolumns => "TRUNCATECOLUMNS",
+            CopyOptionName::Acceptinvchars => "ACCEPTINVCHARS ",
+            CopyOptionName::Encrypted => "ENCRYPTED",
+            CopyOptionName::Manifest => "MANIFEST",
         })
     }
 }

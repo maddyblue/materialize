@@ -2905,6 +2905,13 @@ pub static PG_CATALOG_BUILTINS: Lazy<BTreeMap<&'static str, Func>> = Lazy::new(|
         },
         "decode" => Scalar {
             params!(String, String) => BinaryFunc::Decode => Bytes, 1947;
+        },
+
+        "has_database_privilege" => Scalar {
+            params!(String, String) => Operation::binary(move |_ecx, _database, _privilege| {
+                // TODO: FIX
+                Ok(HirScalarExpr::literal_true())
+            }) => Bool, 2254;
         }
     }
 });

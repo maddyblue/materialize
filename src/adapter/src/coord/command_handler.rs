@@ -26,9 +26,10 @@ use mz_sql::plan::{
     TransactionType,
 };
 use mz_sql::session::vars::{EndTransactionAction, OwnedVarInput};
+use mz_sql_parser::ast::display::AstDisplay;
 use opentelemetry::trace::TraceContextExt;
 use tokio::sync::{oneshot, watch};
-use tracing::Instrument;
+use tracing::{debug, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::client::ConnectionIdType;
@@ -318,6 +319,12 @@ impl Coordinator {
             Some(stmt) => stmt.clone(),
             None => return tx.send(Ok(ExecuteResponse::EmptyQuery), session),
         };
+
+        debug!(
+            conn = session.conn_id(),
+            stmt = stmt.to_ast_string(),
+            params = format!("{:?}", portal.parameters)
+        );
 
         let session_type = metrics::session_type_label_value(session.user());
         let stmt_type = metrics::statement_type_label_value(&stmt);

@@ -21,6 +21,7 @@ use derivative::Derivative;
 use enum_kinds::EnumKind;
 use mz_ore::str::StrExt;
 use mz_pgcopy::CopyFormatParams;
+use mz_pgcopy::CopyFromTarget;
 use mz_repr::{GlobalId, Row, ScalarType};
 use mz_sql::ast::{FetchDirection, ObjectType, Raw, Statement};
 use mz_sql::plan::{ExecuteTimeout, PlanKind};
@@ -311,6 +312,7 @@ pub enum ExecuteResponse {
         id: GlobalId,
         columns: Vec<usize>,
         params: CopyFormatParams<'static>,
+        target: CopyFromTarget,
     },
     /// The requested connection was created.
     CreatedConnection,

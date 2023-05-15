@@ -18,7 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use itertools::Itertools;
 use mz_expr::MirRelationExpr;
 use mz_ore::collections::CollectionExt;
-use mz_pgcopy::{CopyCsvFormatParams, CopyFormatParams, CopyTextFormatParams};
+use mz_pgcopy::{CopyCsvFormatParams, CopyFormatParams, CopyFromTarget, CopyTextFormatParams};
 use mz_repr::adt::numeric::NumericMaxScale;
 use mz_repr::explain::{ExplainConfig, ExplainFormat};
 use mz_repr::{RelationDesc, ScalarType};
@@ -654,6 +654,7 @@ fn plan_copy_from(
     scx: &StatementContext,
     table_name: ResolvedItemName,
     columns: Vec<Ident>,
+    target: CopyTarget,
     format: CopyFormat,
     options: CopyOptionExtracted,
 ) -> Result<Plan, PlanError> {
@@ -676,33 +677,60 @@ fn plan_copy_from(
         }
     }
 
+    let CopyOptionExtracted {
+        seen: _,
+        format: _,
+        delimiter,
+        null,
+        escape,
+        quote,
+        header,
+        credentials,
+        region,
+        csv: _,
+        gzip,
+        ignoreheader,
+        timeformat,
+        dateformat,
+        truncatecolumns,
+        acceptinvchars,
+        encrypted,
+        manifest,
+    } = options;
+
     let params = match format {
         CopyFormat::Text => {
-            only_available_with_csv(options.quote, "quote")?;
-            only_available_with_csv(options.escape, "escape")?;
-            only_available_with_csv(options.header, "HEADER")?;
-            let delimiter = match options.delimiter {
+            only_available_with_csv(quote, "quote")?;
+            only_available_with_csv(escape, "escape")?;
+            only_available_with_csv(header, "HEADER")?;
+            let delimiter = match delimiter {
                 Some(delimiter) if delimiter.len() > 1 => {
                     sql_bail!("COPY delimiter must be a single one-byte character");
                 }
                 Some(delimiter) => Cow::from(delimiter),
                 None => Cow::from("\t"),
             };
-            let null = match options.null {
+            let null = match null {
                 Some(null) => Cow::from(null),
                 None => Cow::from("\\N"),
             };
             CopyFormatParams::Text(CopyTextFormatParams { null, delimiter })
         }
         CopyFormat::Csv => {
-            let quote = extract_byte_param_value(options.quote, b'"', "quote")?;
-            let escape = extract_byte_param_value(options.escape, quote, "escape")?;
-            let header = options.header.unwrap_or(false);
-            let delimiter = extract_byte_param_value(options.delimiter, b',', "delimiter")?;
+            let quote = extract_byte_param_value(quote, b'"', "quote")?;
+            let escape = extract_byte_param_value(escape, quote, "escape")?;
+            let header = header.unwrap_or(false);
+            let delimiter = extract_byte_param_value(delimiter, b',', "delimiter")?;
             if delimiter == quote {
                 sql_bail!("COPY delimiter and quote must be different");
             }
-            let null = match options.null {
+            if timeformat != "auto" {
+                sql_bail!("COPY timeformat can only be auto");
+            }
+            if dateformat != "auto" {
+                sql_bail!("COPY dateformat can only be auto");
+            }
+            let null = match null {
                 Some(null) => Cow::from(null),
                 None => Cow::from(""),
             };
@@ -712,9 +740,30 @@ fn plan_copy_from(
                 escape,
                 null,
                 header,
+                ignore_header: ignoreheader.unwrap_or(0),
+                truncate_columns: truncatecolumns.unwrap_or(false),
+                accept_inv_chars: acceptinvchars.unwrap_or(false),
             })
         }
         CopyFormat::Binary => bail_unsupported!("FORMAT BINARY"),
+    };
+    let target = match target {
+        CopyTarget::Stdin => CopyFromTarget::Stdin,
+        CopyTarget::Stdout => sql_bail!("COPY FROM STDOUT"),
+        CopyTarget::Filename(name) => {
+            let url = match url::Url::parse(&name) {
+                Ok(url) => url,
+                Err(_) => sql_bail!("COPY FROM <filename> only supports URLs"),
+            };
+            CopyFromTarget::Url {
+                url,
+                gzip: gzip.unwrap_or(false),
+                credentials,
+                region,
+                encrypted: encrypted.unwrap_or(false),
+                manifest: manifest.unwrap_or(false),
+            }
+        }
     };
 
     let (id, _, columns) = query::plan_copy_from(scx, table_name, columns)?;
@@ -722,6 +771,7 @@ fn plan_copy_from(
         id,
         columns,
         params,
+        target,
     }))
 }
 
@@ -732,7 +782,18 @@ generate_extracted_config!(
     (Null, String),
     (Escape, String),
     (Quote, String),
-    (Header, bool)
+    (Header, bool),
+    (Credentials, String),
+    (Region, String),
+    (Csv, bool),
+    (Gzip, bool),
+    (Ignoreheader, u32),
+    (Timeformat, String, Default("auto")),
+    (Dateformat, String, Default("auto")),
+    (Truncatecolumns, bool),
+    (Acceptinvchars, bool),
+    (Encrypted, bool),
+    (Manifest, bool)
 );
 
 pub fn plan_copy(
@@ -745,12 +806,15 @@ pub fn plan_copy(
     }: CopyStatement<Aug>,
 ) -> Result<Plan, PlanError> {
     let options = CopyOptionExtracted::try_from(options)?;
-    let format = match options.format.to_lowercase().as_str() {
+    let mut format = match options.format.to_lowercase().as_str() {
         "text" => CopyFormat::Text,
         "csv" => CopyFormat::Csv,
         "binary" => CopyFormat::Binary,
         _ => sql_bail!("unknown FORMAT: {}", options.format),
     };
+    if options.csv == Some(true) {
+        format = CopyFormat::Csv;
+    }
     if let CopyDirection::To = direction {
         if options.delimiter.is_some() {
             sql_bail!("COPY TO does not support DELIMITER option yet");
@@ -767,9 +831,9 @@ pub fn plan_copy(
             }
             CopyRelation::Subscribe(stmt) => Ok(plan_subscribe(scx, stmt, Some(format))?),
         },
-        (CopyDirection::From, CopyTarget::Stdin) => match relation {
+        (CopyDirection::From, CopyTarget::Stdin | CopyTarget::Filename(_)) => match relation {
             CopyRelation::Table { name, columns } => {
-                plan_copy_from(scx, name, columns, format, options)
+                plan_copy_from(scx, name, columns, target, format, options)
             }
             _ => sql_bail!("COPY FROM {} not supported", target),
         },

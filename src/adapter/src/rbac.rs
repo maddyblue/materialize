@@ -875,6 +875,7 @@ fn generate_required_privileges(
             id,
             columns: _,
             params: _,
+            target: _,
         }) => {
             let item = catalog.get_item(id);
             vec![

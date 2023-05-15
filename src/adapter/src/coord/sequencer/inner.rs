@@ -1793,6 +1793,13 @@ impl Coordinator {
         session: &mut Session,
         plan: SetVariablePlan,
     ) -> Result<ExecuteResponse, AdapterError> {
+        if &plan.name == uncased::UncasedStr::new("wlm_query_slot_count") {
+            return Ok(ExecuteResponse::SetVariable {
+                name: plan.name,
+                reset: false,
+            });
+        }
+
         let vars = session.vars_mut();
         let (name, local) = (plan.name, plan.local);
         let values = match plan.value {

@@ -82,6 +82,7 @@
 mod copy;
 
 pub use copy::{
-    decode_copy_format, encode_copy_row_binary, encode_copy_row_text, CopyCsvFormatParams,
-    CopyFormatParams, CopyTextFormatParams, CopyTextFormatParser,
+    copy_fetch_url, decode_copy_format, encode_copy_row_binary, encode_copy_row_text,
+    CopyCsvFormatParams, CopyFormatParams, CopyFromTarget, CopyTextFormatParams,
+    CopyTextFormatParser,
 };

@@ -4061,8 +4061,12 @@ impl<'a> Parser<'a> {
                         "queries not allowed in COPY FROM"
                     );
                 }
-                self.expect_keyword(STDIN)?;
-                (CopyDirection::From, CopyTarget::Stdin)
+                if self.parse_keyword(STDIN) {
+                    (CopyDirection::From, CopyTarget::Stdin)
+                } else {
+                    let filename = self.parse_literal_string()?;
+                    (CopyDirection::From, CopyTarget::Filename(filename))
+                }
             }
             TO => {
                 self.expect_keyword(STDOUT)?;
@@ -4083,6 +4087,13 @@ impl<'a> Parser<'a> {
             let o = self.parse_comma_separated(Parser::parse_copy_option)?;
             self.expect_token(&Token::RParen)?;
             o
+        } else if matches!(self.peek_token(), Some(Token::Keyword(_))) {
+            let mut options = Vec::new();
+            while matches!(self.peek_token(), Some(Token::Keyword(_))) {
+                let o = self.parse_copy_option()?;
+                options.push(o);
+            }
+            options
         } else {
             vec![]
         };
@@ -4095,16 +4106,61 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_copy_option(&mut self) -> Result<CopyOption<Raw>, ParserError> {
-        let name =
-            match self.expect_one_of_keywords(&[FORMAT, DELIMITER, NULL, ESCAPE, QUOTE, HEADER])? {
-                FORMAT => CopyOptionName::Format,
-                DELIMITER => CopyOptionName::Delimiter,
-                NULL => CopyOptionName::Null,
-                ESCAPE => CopyOptionName::Escape,
-                QUOTE => CopyOptionName::Quote,
-                HEADER => CopyOptionName::Header,
-                _ => unreachable!(),
-            };
+        let name = match self.expect_one_of_keywords(&[
+            FORMAT,
+            DELIMITER,
+            NULL,
+            ESCAPE,
+            QUOTE,
+            HEADER,
+            CSV,
+            CREDENTIALS,
+            REGION,
+            GZIP,
+            IGNOREHEADER,
+            TIMEFORMAT,
+            DATEFORMAT,
+            TRUNCATECOLUMNS,
+            ACCEPTINVCHARS,
+            ENCRYPTED,
+            MANIFEST,
+        ])? {
+            FORMAT => CopyOptionName::Format,
+            DELIMITER => CopyOptionName::Delimiter,
+            NULL => CopyOptionName::Null,
+            ESCAPE => CopyOptionName::Escape,
+            QUOTE => CopyOptionName::Quote,
+            HEADER => CopyOptionName::Header,
+
+            CREDENTIALS => CopyOptionName::Credentials,
+            REGION => CopyOptionName::Region,
+            IGNOREHEADER => CopyOptionName::Ignoreheader,
+            TIMEFORMAT => CopyOptionName::Timeformat,
+            DATEFORMAT => CopyOptionName::Dateformat,
+
+            // The following names have an optional argument that must be preceeded by '=',
+            // otherwise "true" is implied.
+            name => {
+                let name = match name {
+                    GZIP => CopyOptionName::Gzip,
+                    CSV => CopyOptionName::Csv,
+                    TRUNCATECOLUMNS => CopyOptionName::Truncatecolumns,
+                    ACCEPTINVCHARS => CopyOptionName::Acceptinvchars,
+                    ENCRYPTED => CopyOptionName::Encrypted,
+                    MANIFEST => CopyOptionName::Manifest,
+                    _ => unreachable!(),
+                };
+                let value = if self.consume_token(&Token::Eq) {
+                    self.parse_option_value()?
+                } else {
+                    WithOptionValue::Value(Value::Boolean(true))
+                };
+                return Ok(CopyOption {
+                    name,
+                    value: Some(value),
+                });
+            }
+        };
         let value = self.parse_optional_option_value()?;
         Ok(CopyOption { name, value })
     }

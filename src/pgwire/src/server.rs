@@ -114,6 +114,7 @@ impl Server {
                     let conn_id = adapter_client.conn_id();
                     let mut conn = Conn::Unencrypted(conn);
                     loop {
+                        trace!("cid={} decode startup", conn_id);
                         let message = codec::decode_startup(&mut conn).await?;
 
                         match &message {

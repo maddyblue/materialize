@@ -266,6 +266,7 @@ impl Coordinator {
                         id: plan.id,
                         columns: plan.columns,
                         params: plan.params,
+                        target: plan.target,
                     }),
                     session,
                 );
