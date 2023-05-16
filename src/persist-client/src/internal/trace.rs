@@ -1339,7 +1339,7 @@ pub(crate) mod tests {
         Strategy::prop_map(
             (
                 any::<Option<T>>(),
-                proptest::collection::vec(any_hollow_batch::<T>(), 0..max_batches),
+                proptest::collection::vec(any_hollow_batch::<T>(), 1..=max_batches),
             ),
             |(since, mut batches)| {
                 let mut trace = Trace::<T>::default();

@@ -4408,6 +4408,7 @@ dependencies = [
  "prost-build",
  "protobuf-src",
  "serde",
+ "serde_json",
  "workspace-hack",
 ]
 
