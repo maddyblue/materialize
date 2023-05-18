@@ -10,6 +10,8 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::io;
+use std::io::prelude::*;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use aws_credential_types::Credentials;
@@ -19,9 +21,12 @@ use aws_sdk_s3::Config;
 use bytes::BytesMut;
 use csv::ByteRecord;
 use csv::ReaderBuilder;
+use openssl::symm::decrypt;
+use openssl::symm::Cipher;
 use serde::Deserialize;
 use url::Url;
 
+use mz_ore::collections::CollectionExt;
 use mz_ore::retry::Retry;
 use mz_repr::{Datum, RelationType, Row, RowArena};
 
@@ -405,31 +410,28 @@ pub async fn copy_fetch_url(
     gzip: bool,
     encrypted: bool,
     manifest: bool,
-) -> Result<Vec<Vec<u8>>, anyhow::Error> {
+) -> Result<Vec<String>, anyhow::Error> {
     match url.scheme() {
         "s3" => {
-            dbg!(
-                copy_fetch_s3(
-                    url,
-                    credentials.unwrap_or(""),
-                    region,
-                    gzip,
-                    encrypted,
-                    manifest,
-                )
-                .await
+            copy_fetch_s3(
+                url,
+                credentials.unwrap_or(""),
+                region,
+                gzip,
+                encrypted,
+                manifest,
             )
+            .await
         }
         _ => anyhow::bail!("unsupported url scheme {}", url.scheme()),
     }
 }
 
-//#[tokio::test]
+#[tokio::test]
 async fn test_copy_fetch_s3() {
-    const URL: &str =
-        "s3://datawriterprd-us-east-1/9135c201-7cd4-4b14-9554-634a0fb023a3/upload.manifest";
-    const CREDENTIALS: &str = "aws_access_key_id=ASIA4ESR5FO4RTNFFCFO;aws_secret_access_key=B5zU4UvHYKvV30RN/froYefOfh7HhqmjrYDAIBJG;token=IQoJb3JpZ2luX2VjEOT//////////wEaCXVzLWVhc3QtMSJIMEYCIQCPVTkypdlBjvoW0uTqrfY4a+vd0wU6w+kDeUGM8z6pSAIhAKDWhIyBKh2fLW65+pxQ+5tysvWWHj0+msAoLDlXFmtEKqAECP3//////////wEQABoMODM0NDY5MTc4Mjk3IgwJt5oo1LAa9iJaKdUq9AP1XfJFV4Bj8QLcymzBsiqrm5d7CAZDtEn/0fyDP/HVSPU2xjR68gh0ioUZdrAmEifNhQ1tr1YcngzS/bJ+CEc8t+XGZPxDvom58B02N2R0ZWuhP2zyilFi6NHMmsrDG7GZIy2yO9fGLDRZBSqFEdy7vSi94iFMYJrq0AqMbUARDwIB00bYi9olizF10oCTZYUhxSJLYjxh/iu0BY3A5Pu2YGclaDbX/kfIPqVaKpnc/oLQe7ynsrtzSr68Pwuq8G6nDPLXk0ZQjpAdSX8T91FzYhTH/nee0vKkIS48SHgB/RShgA5w8sBz4FVb9J3WF3glmDI6D+5NHZRQXQiV4UpMu8hW3u0MgSGpBo7ELmxXAAADdjJ2WjuYZ4L2K8jTYPgIdzQEFl/dyc9fB6bWF8GjWi+mtkJ/WCKs4ZBkXoKYmqhXIvh0+Zl5HPy/EVOp3uQzJ81En4iU1+RIuP6rq7OJiflOTmqpBXBlOrggeS8jIWgIoHZEaWumKmFfQW8vrCCFKlNo+JxSnA7Iux2QCfFAOhsBMKeDEkr2gI4JAd90Z/Y4pQu/w5cNVoMf+ZH3RHSE838LNDYrFmOE8y67fRNx3Wmx+OjsarghkNtoN6gm91mban7FcY7mZwmhdufuiGI5BiQ2SCKLFQ7xxlnldPnc36t85TDX2IajBjqcAfZPa3BW88kgj2g/zOmz+rIm8qV+4cT0cc3Vr7eBU0MzdS7OYUWTiNRLTeWeXuoMyNYGJSjZOaM0pMpcpLVpKbjUkq43Oj/8vu6qvPIS4iGza4ho+ThrcBbyumu7i0wHrcVMcD8ZLBUH0jrkcVdwlcLbVOXQFs8u3exh5hx0NIau6UymOpE3GGSEHi2OVQU3RpkLXGFAZlz5qXrbzA==;master_symmetric_key=UEtxMgELZfVjnCo8ejeZ6u8JetTYN/rv7RLU3n0Po6w=";
-    copy_fetch_s3(
+    const URL: &str = "s3://mjibson-fivetran-redshift/upload.manifest";
+    const CREDENTIALS: &str = "aws_access_key_id=AKIAV2KIV5LPZML2LK5W;aws_secret_access_key=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;master_symmetric_key=NXF8SW4gLOZpEzvkpwDc9y6m5j7JiWSyPz7L+PBgLlw=";
+    let files = copy_fetch_s3(
         url::Url::parse(URL).unwrap(),
         CREDENTIALS,
         Some("us-east-1"),
@@ -439,14 +441,42 @@ async fn test_copy_fetch_s3() {
     )
     .await
     .unwrap();
+    let file = files.into_element();
+    println!("file: {file}");
 }
 
 #[test]
 fn test_decrypt_s3() {
-    let contents = std::fs::read("/home/mjibson/materialize/1").unwrap();
-    let key = "Naa8It8dafEGifJCruCrOdIAIbbdhs4CDAmV94MXFog=";
-    let aes = <aes_gcm::Aes256Gcm as aes_gcm::KeyInit>::new_from_slice(key.as_bytes());
-    println!("{contents:?}");
+    let data = std::fs::read("/home/mjibson/materialize/s3/f0bd7c76-49e0-4499-9be8-abf40b0b75d7/1")
+        .unwrap();
+    let master_key = "NXF8SW4gLOZpEzvkpwDc9y6m5j7JiWSyPz7L+PBgLlw=";
+
+    let f = S3File {
+        raw_body: data,
+        metadata: BTreeMap::from_iter([
+            ("x-amz-iv".into(), "steLdZYfT/mtmfhGoGLhCQ==".into()),
+            ("x-amz-unencrypted-content-length".into(), "116".into()),
+            ("x-amz-matdesc".into(), "{}".into()),
+            (
+                "x-amz-key".into(),
+                "eTOQVtxMT53JZnQMZnGQJhT0VVkJXnza7iFd6s8kSYTKcSuzURELPBZIW2iLVjKU".into(),
+            ),
+        ]),
+    };
+
+    let d = f.body(Some(master_key)).unwrap();
+    dbg!(String::from_utf8(d));
+
+    /*
+    use aes_gcm::{
+        aead::{Aead, KeyInit},
+        Aes256Gcm, Nonce,
+    };
+    let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+    let output = cipher
+        .decrypt(Nonce::from_slice(b""), data.as_slice())
+        .unwrap();
+    */
 }
 
 async fn copy_fetch_s3(
@@ -456,8 +486,7 @@ async fn copy_fetch_s3(
     gzip: bool,
     encrypted: bool,
     manifest: bool,
-) -> Result<Vec<Vec<u8>>, anyhow::Error> {
-    dbg!("s3 here");
+) -> Result<Vec<String>, anyhow::Error> {
     let mut creds = BTreeMap::new();
     for s in credentials.split(';') {
         let Some((key, val)) = s.split_once('=') else {
@@ -481,10 +510,6 @@ async fn copy_fetch_s3(
         None
     };
 
-    fn decrypt(key: &str, data: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-        todo!()
-    }
-
     dbg!(
         &aws_access_key_id,
         &aws_secret_access_key,
@@ -501,21 +526,12 @@ async fn copy_fetch_s3(
     let client = Client::from_conf(config);
 
     let manifest: CopyManifest = if manifest {
-        dbg!("FETCHING");
         if let Ok(dur) = std::env::var("COPY_SLEEP") {
             let dur: u64 = dur.parse().unwrap();
             tokio::time::sleep(std::time::Duration::from_secs(dur)).await;
         }
-        let manifest = fetch_s3_file(
-            &client,
-            url.host_str().map(|s| s.to_owned()),
-            url.path().to_string(),
-        )
-        .await?;
-        dbg!("WRITING");
-        std::fs::write("manifest", &manifest).expect("Unable to write file");
-        dbg!("JSON");
-        serde_json::from_slice(&manifest)?
+        let manifest = fetch_s3_file(&client, &url).await?;
+        serde_json::from_slice(&manifest.body(master_symmetric_key.as_deref())?)?
     } else {
         CopyManifest {
             entries: vec![CopyManifestEntry {
@@ -527,16 +543,18 @@ async fn copy_fetch_s3(
 
     let mut files = Vec::new();
     for entry in manifest.entries {
-        dbg!("FETCH FILE", &entry);
-        match fetch_s3_file(
-            &client,
-            entry.url.host_str().map(|s| s.to_owned()),
-            entry.url.path().to_string(),
-        )
-        .await
-        {
+        match fetch_s3_file(&client, &entry.url).await {
             Ok(file) => {
-                files.push(file);
+                let contents = file.body(master_symmetric_key.as_deref())?;
+                dbg!(String::from_utf8(contents.clone()));
+                let contents = if gzip {
+                    let mut buf = String::new();
+                    flate2::read::GzDecoder::new(&*contents).read_to_string(&mut buf)?;
+                    buf
+                } else {
+                    String::from_utf8(contents)?
+                };
+                files.push(contents);
             }
             Err(err) => {
                 if !entry.mandatory {
@@ -562,16 +580,58 @@ async fn copy_fetch_s3(
     Ok(files)
 }
 
+#[derive(Debug)]
+struct S3File {
+    raw_body: Vec<u8>,
+    metadata: BTreeMap<String, String>,
+}
+
+impl S3File {
+    // Returns and possibly decrypts the file. master_symmetric_key can be a base64-encoded master
+    // key.
+    fn body(&self, master_symmetric_key: Option<&str>) -> Result<Vec<u8>, anyhow::Error> {
+        const IV_LEN: usize = 12;
+        if !self.metadata.contains_key("x-amz-iv") {
+            return Ok(self.raw_body.clone());
+        }
+        if self.raw_body.len() < IV_LEN {
+            anyhow::bail!("file too short to contain iv");
+        }
+        let Some(iv) = self.metadata.get("x-amz-iv") else {
+            anyhow::bail!("expected s3 iv in metadata");
+        };
+        let Some(key) = self.metadata.get("x-amz-key") else {
+            anyhow::bail!("expected s3 key in metadata");
+        };
+        let iv = aws_smithy_types::base64::decode(iv)?;
+        let key = aws_smithy_types::base64::decode(key)?;
+        let Some(master_symmetric_key) = master_symmetric_key else {
+            anyhow::bail!("expected master symmetric key when decoding encrypted s3 file");
+        };
+        let master_symmetric_key = aws_smithy_types::base64::decode(master_symmetric_key).unwrap();
+        let cipher = Cipher::aes_256_gcm();
+        let unwrapped_key = decrypt(cipher, &master_symmetric_key, Some(&iv), &key).unwrap();
+        dbg!(master_symmetric_key.len(), unwrapped_key.len());
+        let iv = &self.raw_body[0..IV_LEN];
+        Ok(decrypt(cipher, &unwrapped_key, Some(iv), &self.raw_body[IV_LEN..]).unwrap())
+    }
+}
+
 // Fetches a file with retries.
-async fn fetch_s3_file(
-    client: &Client,
-    bucket: Option<String>,
-    key: String,
-) -> Result<Vec<u8>, anyhow::Error> {
-    // The numbers are made up here, but appear to help fivetran when it has just written these
-    // files and they haven't propogated through aws fully yet or something?
+async fn fetch_s3_file(client: &Client, url: &Url) -> Result<S3File, anyhow::Error> {
+    if url.scheme() != "s3" {
+        anyhow::bail!("expected s3 url scheme");
+    }
+    let Some(bucket) = url.host_str().map(|s| s.to_owned()) else {
+        anyhow::bail!("url has no host");
+    };
+    let mut key = url.path().to_string();
+    if key.starts_with('/') {
+        key.remove(0);
+    }
+
+    // The retry numbers are made up here.
     Retry::default()
-        .initial_backoff(Duration::from_secs(1))
         .max_duration(Duration::from_secs(30))
         .retry_async_canceling(|_state| {
             if _state.i > 0 {
@@ -580,16 +640,27 @@ async fn fetch_s3_file(
             let bucket = bucket.clone();
             let key = key.clone();
             async {
-                Ok(client
+                let file = client
                     .get_object()
-                    .set_bucket(bucket)
-                    .key(key)
+                    .bucket(bucket)
+                    .key(key.clone())
                     .send()
-                    .await?
-                    .body
-                    .collect()
-                    .await
-                    .map(|data| data.to_vec())?)
+                    .await?;
+                let mut metadata = BTreeMap::new();
+                if let Some(map) = file.metadata() {
+                    metadata.extend(map.iter().map(|(k, v)| (k.clone(), v.clone())));
+                }
+                let body = file.body.collect().await.map(|data| data.to_vec())?;
+                let mut path = PathBuf::new();
+                path.set_file_name(key);
+                let path = PathBuf::from("./s3").join(path);
+                dbg!(&path);
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                std::fs::write(path, &body).unwrap();
+                Ok(S3File {
+                    metadata,
+                    raw_body: body,
+                })
             }
         })
         .await
