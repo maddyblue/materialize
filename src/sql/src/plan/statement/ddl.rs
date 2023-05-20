@@ -4067,8 +4067,10 @@ pub fn plan_alter_type(
 
             let ty = query::scalar_type_from_sql(scx, &new_type)?;
 
-            // Fivetran sometimes attempts to change the column to a type it already is (probably
-            // because our pg_catalog slightly differs). Allow that special case as a noop.
+            // Allow ALTER TYPE as a noop, but otherwise reject. This is needed because our
+            // pg_attribute.atttypmod is hard coded to -1 for all types, when it should contain
+            // things like the varchar max length instead, and so tools like fivetran attempt to
+            // correct the type.
             if column_type.scalar_type != ty {
                 bail_unsupported!("ALTER TABLE TYPE");
             }
