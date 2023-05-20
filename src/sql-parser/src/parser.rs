@@ -3664,10 +3664,10 @@ impl<'a> Parser<'a> {
             ObjectType::View | ObjectType::MaterializedView | ObjectType::Table => {
                 let if_exists = self.parse_if_exists()?;
                 let name = self.parse_item_name()?;
-                let action = self.expect_one_of_keywords(&[RENAME, OWNER])?;
-                self.expect_keyword(TO)?;
+                let action = self.expect_one_of_keywords(&[RENAME, OWNER, ALTER])?;
                 match action {
                     RENAME => {
+                        self.expect_keyword(TO)?;
                         let to_item_name = self.parse_identifier()?;
                         Ok(Statement::AlterObjectRename(AlterObjectRenameStatement {
                             object_type,
@@ -3677,12 +3677,26 @@ impl<'a> Parser<'a> {
                         }))
                     }
                     OWNER => {
+                        self.expect_keyword(TO)?;
                         let new_owner = self.parse_identifier()?;
                         Ok(Statement::AlterOwner(AlterOwnerStatement {
                             object_type,
                             if_exists,
                             name: UnresolvedObjectName::Item(name),
                             new_owner,
+                        }))
+                    }
+                    ALTER => {
+                        let _ = self.parse_keyword(COLUMN);
+                        let column_name = self.parse_identifier()?;
+                        self.expect_keyword(TYPE)?;
+                        let new_type = self.parse_data_type()?;
+                        Ok(Statement::AlterType(AlterTypeStatement {
+                            object_type,
+                            if_exists,
+                            name,
+                            column_name,
+                            new_type,
                         }))
                     }
                     _ => unreachable!(),

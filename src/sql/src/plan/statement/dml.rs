@@ -742,7 +742,7 @@ fn plan_copy_from(
                 header,
                 ignore_header: ignoreheader.unwrap_or(0),
                 truncate_columns: truncatecolumns.unwrap_or(false),
-                accept_inv_chars: acceptinvchars.unwrap_or(false),
+                accept_inv_chars: acceptinvchars.unwrap_or(false).then_some('?'),
             })
         }
         CopyFormat::Binary => bail_unsupported!("FORMAT BINARY"),

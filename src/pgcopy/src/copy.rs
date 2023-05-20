@@ -8,27 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::io;
-use std::io::prelude::*;
-use std::path::PathBuf;
-use std::time::Duration;
 
-use aws_credential_types::Credentials;
-use aws_sdk_s3::config::Region;
-use aws_sdk_s3::Client;
-use aws_sdk_s3::Config;
 use bytes::BytesMut;
 use csv::ByteRecord;
 use csv::ReaderBuilder;
-use openssl::symm::decrypt;
-use openssl::symm::Cipher;
-use serde::Deserialize;
-use url::Url;
 
-use mz_ore::collections::CollectionExt;
-use mz_ore::retry::Retry;
+use mz_pgrepr::Type;
+use mz_pgrepr::Value;
 use mz_repr::{Datum, RelationType, Row, RowArena};
+use url::Url;
 
 static END_OF_COPY_MARKER: &[u8] = b"\\.";
 
@@ -410,10 +399,10 @@ pub async fn copy_fetch_url(
     gzip: bool,
     encrypted: bool,
     manifest: bool,
-) -> Result<Vec<String>, anyhow::Error> {
+) -> Result<Vec<Vec<u8>>, anyhow::Error> {
     match url.scheme() {
         "s3" => {
-            copy_fetch_s3(
+            mz_s3util::copy_fetch_s3(
                 url,
                 credentials.unwrap_or(""),
                 region,
@@ -425,257 +414,6 @@ pub async fn copy_fetch_url(
         }
         _ => anyhow::bail!("unsupported url scheme {}", url.scheme()),
     }
-}
-
-#[tokio::test]
-async fn test_copy_fetch_s3() {
-    const URL: &str = "s3://mjibson-fivetran-redshift/upload.manifest";
-    const CREDENTIALS: &str = "aws_access_key_id=AKIAV2KIV5LPZML2LK5W;aws_secret_access_key=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;master_symmetric_key=NXF8SW4gLOZpEzvkpwDc9y6m5j7JiWSyPz7L+PBgLlw=";
-    let files = copy_fetch_s3(
-        url::Url::parse(URL).unwrap(),
-        CREDENTIALS,
-        Some("us-east-1"),
-        true,
-        true,
-        true,
-    )
-    .await
-    .unwrap();
-    let file = files.into_element();
-    println!("file: {file}");
-}
-
-#[test]
-fn test_decrypt_s3() {
-    let data = std::fs::read("/home/mjibson/materialize/s3/f0bd7c76-49e0-4499-9be8-abf40b0b75d7/1")
-        .unwrap();
-    let master_key = "NXF8SW4gLOZpEzvkpwDc9y6m5j7JiWSyPz7L+PBgLlw=";
-
-    let f = S3File {
-        raw_body: data,
-        metadata: BTreeMap::from_iter([
-            ("x-amz-iv".into(), "steLdZYfT/mtmfhGoGLhCQ==".into()),
-            ("x-amz-unencrypted-content-length".into(), "116".into()),
-            ("x-amz-matdesc".into(), "{}".into()),
-            (
-                "x-amz-key".into(),
-                "eTOQVtxMT53JZnQMZnGQJhT0VVkJXnza7iFd6s8kSYTKcSuzURELPBZIW2iLVjKU".into(),
-            ),
-        ]),
-    };
-
-    let d = f.body(Some(master_key)).unwrap();
-    dbg!(String::from_utf8(d));
-
-    /*
-    use aes_gcm::{
-        aead::{Aead, KeyInit},
-        Aes256Gcm, Nonce,
-    };
-    let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
-    let output = cipher
-        .decrypt(Nonce::from_slice(b""), data.as_slice())
-        .unwrap();
-    */
-}
-
-async fn copy_fetch_s3(
-    url: Url,
-    credentials: &str,
-    region: Option<&str>,
-    gzip: bool,
-    encrypted: bool,
-    manifest: bool,
-) -> Result<Vec<String>, anyhow::Error> {
-    let mut creds = BTreeMap::new();
-    for s in credentials.split(';') {
-        let Some((key, val)) = s.split_once('=') else {
-            anyhow::bail!("misformatted CREDENTIALS");
-        };
-        creds.insert(key, val.to_string());
-    }
-    let Some(aws_access_key_id) = creds.remove("aws_access_key_id") else {
-        anyhow::bail!("CREDENTIALS missing aws_access_key_id");
-    };
-    let Some(aws_secret_access_key) = creds.remove("aws_secret_access_key") else {
-        anyhow::bail!("CREDENTIALS missing aws_secret_access_key");
-    };
-    let session_token = creds.remove("token");
-    let master_symmetric_key = if encrypted {
-        let Some(master_symmetric_key) = creds.remove("master_symmetric_key") else {
-            anyhow::bail!("CREDENTIALS missing master_symmetric_key");
-        };
-        Some(master_symmetric_key)
-    } else {
-        None
-    };
-
-    dbg!(
-        &aws_access_key_id,
-        &aws_secret_access_key,
-        &session_token,
-        &region,
-        &credentials
-    );
-
-    let creds = Credentials::from_keys(aws_access_key_id, aws_secret_access_key, session_token);
-    let config = Config::builder()
-        .credentials_provider(creds)
-        .region(region.map(|r| Region::new(r.to_owned())))
-        .build();
-    let client = Client::from_conf(config);
-
-    let manifest: CopyManifest = if manifest {
-        if let Ok(dur) = std::env::var("COPY_SLEEP") {
-            let dur: u64 = dur.parse().unwrap();
-            tokio::time::sleep(std::time::Duration::from_secs(dur)).await;
-        }
-        let manifest = fetch_s3_file(&client, &url).await?;
-        serde_json::from_slice(&manifest.body(master_symmetric_key.as_deref())?)?
-    } else {
-        CopyManifest {
-            entries: vec![CopyManifestEntry {
-                url,
-                mandatory: true,
-            }],
-        }
-    };
-
-    let mut files = Vec::new();
-    for entry in manifest.entries {
-        match fetch_s3_file(&client, &entry.url).await {
-            Ok(file) => {
-                let contents = file.body(master_symmetric_key.as_deref())?;
-                dbg!(String::from_utf8(contents.clone()));
-                let contents = if gzip {
-                    let mut buf = String::new();
-                    flate2::read::GzDecoder::new(&*contents).read_to_string(&mut buf)?;
-                    buf
-                } else {
-                    String::from_utf8(contents)?
-                };
-                files.push(contents);
-            }
-            Err(err) => {
-                if !entry.mandatory {
-                    anyhow::bail!("non-mandatory COPY manifest files not supported");
-                }
-                // Detect errors for non-mandatory files that don't exist.
-                /*
-                if let aws_sdk_s3::error::SdkError::ServiceError(e) = &err {
-                    if !entry.mandatory
-                        && matches!(
-                            e.err(),
-                            aws_sdk_s3::operation::get_object::GetObjectError::NoSuchKey(_)
-                        )
-                    {
-                        continue;
-                    }
-                }
-                */
-                return Err(err);
-            }
-        };
-    }
-    Ok(files)
-}
-
-#[derive(Debug)]
-struct S3File {
-    raw_body: Vec<u8>,
-    metadata: BTreeMap<String, String>,
-}
-
-impl S3File {
-    // Returns and possibly decrypts the file. master_symmetric_key can be a base64-encoded master
-    // key.
-    fn body(&self, master_symmetric_key: Option<&str>) -> Result<Vec<u8>, anyhow::Error> {
-        const IV_LEN: usize = 12;
-        if !self.metadata.contains_key("x-amz-iv") {
-            return Ok(self.raw_body.clone());
-        }
-        if self.raw_body.len() < IV_LEN {
-            anyhow::bail!("file too short to contain iv");
-        }
-        let Some(iv) = self.metadata.get("x-amz-iv") else {
-            anyhow::bail!("expected s3 iv in metadata");
-        };
-        let Some(key) = self.metadata.get("x-amz-key") else {
-            anyhow::bail!("expected s3 key in metadata");
-        };
-        let iv = aws_smithy_types::base64::decode(iv)?;
-        let key = aws_smithy_types::base64::decode(key)?;
-        let Some(master_symmetric_key) = master_symmetric_key else {
-            anyhow::bail!("expected master symmetric key when decoding encrypted s3 file");
-        };
-        let master_symmetric_key = aws_smithy_types::base64::decode(master_symmetric_key).unwrap();
-        let cipher = Cipher::aes_256_gcm();
-        let unwrapped_key = decrypt(cipher, &master_symmetric_key, Some(&iv), &key).unwrap();
-        dbg!(master_symmetric_key.len(), unwrapped_key.len());
-        let iv = &self.raw_body[0..IV_LEN];
-        Ok(decrypt(cipher, &unwrapped_key, Some(iv), &self.raw_body[IV_LEN..]).unwrap())
-    }
-}
-
-// Fetches a file with retries.
-async fn fetch_s3_file(client: &Client, url: &Url) -> Result<S3File, anyhow::Error> {
-    if url.scheme() != "s3" {
-        anyhow::bail!("expected s3 url scheme");
-    }
-    let Some(bucket) = url.host_str().map(|s| s.to_owned()) else {
-        anyhow::bail!("url has no host");
-    };
-    let mut key = url.path().to_string();
-    if key.starts_with('/') {
-        key.remove(0);
-    }
-
-    // The retry numbers are made up here.
-    Retry::default()
-        .max_duration(Duration::from_secs(30))
-        .retry_async_canceling(|_state| {
-            if _state.i > 0 {
-                println!("fetch s3 retry {}", _state.i);
-            }
-            let bucket = bucket.clone();
-            let key = key.clone();
-            async {
-                let file = client
-                    .get_object()
-                    .bucket(bucket)
-                    .key(key.clone())
-                    .send()
-                    .await?;
-                let mut metadata = BTreeMap::new();
-                if let Some(map) = file.metadata() {
-                    metadata.extend(map.iter().map(|(k, v)| (k.clone(), v.clone())));
-                }
-                let body = file.body.collect().await.map(|data| data.to_vec())?;
-                let mut path = PathBuf::new();
-                path.set_file_name(key);
-                let path = PathBuf::from("./s3").join(path);
-                dbg!(&path);
-                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-                std::fs::write(path, &body).unwrap();
-                Ok(S3File {
-                    metadata,
-                    raw_body: body,
-                })
-            }
-        })
-        .await
-}
-
-#[derive(Deserialize, Debug)]
-struct CopyManifest {
-    entries: Vec<CopyManifestEntry>,
-}
-
-#[derive(Deserialize, Debug)]
-struct CopyManifestEntry {
-    url: url::Url,
-    #[serde(default)]
-    mandatory: bool,
 }
 
 pub fn decode_copy_format<'a>(
@@ -740,7 +478,7 @@ pub struct CopyCsvFormatParams<'a> {
     pub null: Cow<'a, str>,
     pub ignore_header: u32,
     pub truncate_columns: bool,
-    pub accept_inv_chars: bool,
+    pub accept_inv_chars: Option<char>,
 }
 
 pub fn decode_copy_format_csv(
@@ -752,7 +490,7 @@ pub fn decode_copy_format_csv(
         escape,
         null,
         header,
-        ignore_header,
+        mut ignore_header,
         truncate_columns,
         accept_inv_chars,
     }: CopyCsvFormatParams,
@@ -780,6 +518,11 @@ pub fn decode_copy_format_csv(
 
     let mut record = ByteRecord::new();
 
+    while ignore_header > 0 {
+        rdr.read_byte_record(&mut record)?;
+        ignore_header -= 1;
+    }
+
     while rdr.read_byte_record(&mut record)? {
         if record.len() == 1 && record.iter().next() == Some(END_OF_COPY_MARKER) {
             break;
@@ -804,8 +547,56 @@ pub fn decode_copy_format_csv(
             if raw_value == null_as_bytes {
                 row.push(Datum::Null);
             } else {
+                // From: https://docs.aws.amazon.com/redshift/latest/dg/copy-parameters-data-conversion.html#copy-acceptinvchars
+                //
+                // When ACCEPTINVCHARS is specified, COPY replaces each invalid UTF-8 character with
+                // a string of equal length consisting of the character specified by
+                // replacement_char. For example, if the replacement character is '^', an invalid
+                // three-byte character will be replaced with '^^^'.
+                if accept_inv_chars.is_some()
+                    && matches!(typ, Type::VarChar { .. })
+                    && std::str::from_utf8(raw_value).is_err()
+                {
+                    // Don't bother implementing until someone complains.
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "ACCEPTINVCHARS unsupported",
+                    ));
+                }
                 match mz_pgrepr::Value::decode_text(typ, raw_value) {
-                    Ok(value) => row.push(value.into_datum(&buf, typ)),
+                    Ok(mut value) => {
+                        // From https://docs.aws.amazon.com/redshift/latest/dg/copy-parameters-data-conversion.html#copy-truncatecolumns:
+                        //
+                        // Truncates data in columns to the appropriate number of characters so that
+                        // it fits the column specification. Applies only to columns with a VARCHAR
+                        // or CHAR data type, and rows 4 MB or less in size.
+                        if truncate_columns {
+                            match (typ, &mut value) {
+                                (
+                                    Type::VarChar {
+                                        max_length: Some(max_length),
+                                    },
+                                    Value::VarChar(v),
+                                ) => {
+                                    let max_length: usize = match max_length.into_i32().try_into() {
+                                        Ok(v) if v > 0 => v,
+                                        _ => usize::MAX,
+                                    };
+                                    let count = v.chars().count();
+                                    if count > max_length {
+                                        *v = v.chars().take(max_length).collect();
+                                    }
+                                }
+                                (Type::Char, Value::Char(_)) => {
+                                    // Although specified in the docs above, Value::decode_text
+                                    // always takes the first byte only, so there's nothing to do
+                                    // here.
+                                }
+                                _ => {}
+                            }
+                        }
+                        row.push(value.into_datum(&buf, typ))
+                    }
                     Err(err) => {
                         let msg = format!("unable to decode column: {}", err);
                         return Err(io::Error::new(io::ErrorKind::InvalidData, msg));

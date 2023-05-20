@@ -32,7 +32,7 @@ use mz_sql_parser::ast::display::comma_separated;
 use mz_sql_parser::ast::{
     AlterOwnerStatement, AlterRoleStatement, AlterSinkAction, AlterSinkStatement,
     AlterSourceAction, AlterSourceStatement, AlterSystemResetAllStatement,
-    AlterSystemResetStatement, AlterSystemSetStatement, CreateTypeListOption,
+    AlterSystemResetStatement, AlterSystemSetStatement, AlterTypeStatement, CreateTypeListOption,
     CreateTypeListOptionName, CreateTypeMapOption, CreateTypeMapOptionName, DeferredItemName,
     DropOwnedStatement, GrantPrivilegeStatement, GrantRoleStatement, Privilege,
     PrivilegeSpecification, ReassignOwnedStatement, RevokePrivilegeStatement, RevokeRoleStatement,
@@ -4025,6 +4025,57 @@ pub fn plan_alter_owner(
         (object_type, UnresolvedObjectName::Item(name)) => {
             plan_alter_item_owner(scx, object_type, if_exists, name, new_owner.id)
         }
+    }
+}
+
+pub fn describe_alter_type(
+    _: &StatementContext,
+    _: AlterTypeStatement<Aug>,
+) -> Result<StatementDesc, PlanError> {
+    Ok(StatementDesc::new(None))
+}
+
+pub fn plan_alter_type(
+    scx: &StatementContext,
+    AlterTypeStatement {
+        object_type,
+        if_exists,
+        name,
+        column_name,
+        new_type,
+    }: AlterTypeStatement<Aug>,
+) -> Result<Plan, PlanError> {
+    match resolve_item(scx, name, if_exists)? {
+        Some(entry) => {
+            let full_name = scx.catalog.resolve_full_name(entry.name());
+            let item_type = entry.item_type();
+
+            if object_type != item_type {
+                sql_bail!(
+                    "\"{}\" is a {} not a {}",
+                    full_name,
+                    entry.item_type(),
+                    format!("{object_type}").to_lowercase()
+                )
+            }
+            let desc = entry.desc(&full_name)?;
+            let col = normalize::column_name(column_name);
+            let column_type = desc
+                .get_by_name(&col)
+                .map(|(_idx, typ)| typ)
+                .ok_or_else(|| sql_err!("No such column in source key constraint: {}", col))?;
+
+            let ty = query::scalar_type_from_sql(scx, &new_type)?;
+
+            // Fivetran sometimes attempts to change the column to a type it already is (probably
+            // because our pg_catalog slightly differs). Allow that special case as a noop.
+            if column_type.scalar_type != ty {
+                bail_unsupported!("ALTER TABLE TYPE");
+            }
+
+            Ok(Plan::AlterNoop(AlterNoopPlan { object_type }))
+        }
+        None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
     }
 }
 

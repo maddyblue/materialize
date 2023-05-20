@@ -1,0 +1,28 @@
+[package]
+name = "mz-s3util"
+description = "S3 utility functions."
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+aes-gcm = "0.10.1"
+anyhow = "1.0.66"
+aws-config = { version = "0.55", default-features = false, features = ["native-tls"] }
+aws-credential-types = { version = "0.55", features = ["hardcoded-credentials"] }
+aws-sdk-s3 = { version = "0.26", default-features = false, features = ["native-tls", "rt-tokio"]  }
+aws-smithy-types = "0.55.2"
+flate2 = "1.0.24"
+mz-ore = { path = "../ore", features = ["network"] } 
+openssl = "0.10.48"
+serde = "1.0.152"
+serde_json = "1.0.89"
+url = "2.3.1"
+workspace-hack = { version = "0.0.0", path = "../workspace-hack" }
+
+# TODO: DELETE, ONLY USED FOR TEST
+tokio = { version = "1.24.2", features = ["test-util"] }
+
+[package.metadata.cargo-udeps.ignore]
+normal = ["workspace-hack"]

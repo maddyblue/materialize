@@ -461,6 +461,7 @@ impl Coordinator {
                     | Statement::AlterSystemReset(_)
                     | Statement::AlterSystemResetAll(_)
                     | Statement::AlterOwner(_)
+                    | Statement::AlterType(_)
                     | Statement::CreateConnection(_)
                     | Statement::CreateDatabase(_)
                     | Statement::CreateIndex(_)

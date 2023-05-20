@@ -1756,8 +1756,6 @@ where
         let typ = row_desc.typ();
         let mut next_state = State::Ready;
 
-        dbg!("COPYTARGET", &target);
-
         let data = match target {
             CopyFromTarget::Stdin => {
                 let column_formats = vec![mz_pgrepr::Format::Text; typ.column_types.len()];

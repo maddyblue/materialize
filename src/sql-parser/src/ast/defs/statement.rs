@@ -62,6 +62,7 @@ pub enum Statement<T: AstInfo> {
     CreateSecret(CreateSecretStatement<T>),
     AlterOwner(AlterOwnerStatement<T>),
     AlterObjectRename(AlterObjectRenameStatement),
+    AlterType(AlterTypeStatement<T>),
     AlterIndex(AlterIndexStatement<T>),
     AlterSecret(AlterSecretStatement<T>),
     AlterSink(AlterSinkStatement<T>),
@@ -122,6 +123,7 @@ impl<T: AstInfo> AstDisplay for Statement<T> {
             Statement::CreateClusterReplica(stmt) => f.write_node(stmt),
             Statement::AlterOwner(stmt) => f.write_node(stmt),
             Statement::AlterObjectRename(stmt) => f.write_node(stmt),
+            Statement::AlterType(stmt) => f.write_node(stmt),
             Statement::AlterIndex(stmt) => f.write_node(stmt),
             Statement::AlterSecret(stmt) => f.write_node(stmt),
             Statement::AlterSink(stmt) => f.write_node(stmt),
@@ -1479,6 +1481,33 @@ impl AstDisplay for AlterObjectRenameStatement {
     }
 }
 impl_display!(AlterObjectRenameStatement);
+
+/// `ALTER <OBJECT> ... TYPE`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AlterTypeStatement<T: AstInfo> {
+    pub object_type: ObjectType,
+    pub if_exists: bool,
+    pub name: UnresolvedItemName,
+    pub column_name: Ident,
+    pub new_type: T::DataType,
+}
+
+impl<T: AstInfo> AstDisplay for AlterTypeStatement<T> {
+    fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
+        f.write_str("ALTER ");
+        f.write_node(&self.object_type);
+        f.write_str(" ");
+        if self.if_exists {
+            f.write_str("IF EXISTS ");
+        }
+        f.write_node(&self.name);
+        f.write_str(" ALTER ");
+        f.write_node(&self.column_name);
+        f.write_str(" TYPE ");
+        f.write_node(&self.new_type);
+    }
+}
+impl_display_t!(AlterTypeStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AlterIndexAction<T: AstInfo> {
