@@ -465,6 +465,9 @@ impl Coordinator {
                     session,
                 );
             }
+            Plan::AlterAddColumn(plan) => {
+                tx.send(self.sequence_add_column(&mut session, plan).await, session);
+            }
         }
     }
 

@@ -1005,6 +1005,7 @@ impl Coordinator {
                 | Op::ResetSystemConfiguration { .. }
                 | Op::ResetAllSystemConfiguration { .. }
                 | Op::UpdateItem { .. }
+                | Op::AddColumn { .. }
                 | Op::UpdateRotatedKeys { .. } => {}
             }
         }

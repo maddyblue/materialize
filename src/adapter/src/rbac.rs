@@ -21,7 +21,7 @@ use mz_repr::GlobalId;
 use mz_sql::catalog::{CatalogItemType, RoleAttributes, SessionCatalog};
 use mz_sql::names::{ObjectId, QualifiedItemName, ResolvedDatabaseSpecifier};
 use mz_sql::plan::{
-    AbortTransactionPlan, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan,
+    AbortTransactionPlan, AlterAddColumnPlan, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan,
     AlterItemRenamePlan, AlterNoopPlan, AlterOwnerPlan, AlterRolePlan, AlterSecretPlan,
     AlterSinkPlan, AlterSourcePlan, AlterSystemResetAllPlan, AlterSystemResetPlan,
     AlterSystemSetPlan, ClosePlan, CommitTransactionPlan, CopyFromPlan, CopyRowsPlan,
@@ -294,6 +294,7 @@ pub fn generate_required_role_membership(plan: &Plan) -> Vec<RoleId> {
         | Plan::AlterSystemReset(_)
         | Plan::AlterSystemResetAll(_)
         | Plan::AlterRole(_)
+        | Plan::AlterAddColumn(_)
         | Plan::Declare(_)
         | Plan::Fetch(_)
         | Plan::Close(_)
@@ -390,6 +391,7 @@ fn generate_required_plan_attribute(plan: &Plan) -> Vec<Attribute> {
         | Plan::AlterSystemReset(_)
         | Plan::AlterSystemResetAll(_)
         | Plan::AlterOwner(_)
+        | Plan::AlterAddColumn(_)
         | Plan::Declare(_)
         | Plan::Fetch(_)
         | Plan::Close(_)
@@ -566,6 +568,7 @@ fn generate_required_ownership(plan: &Plan) -> Vec<ObjectId> {
         Plan::AlterSource(plan) => vec![ObjectId::Item(plan.id)],
         Plan::AlterItemRename(plan) => vec![ObjectId::Item(plan.id)],
         Plan::AlterSecret(plan) => vec![ObjectId::Item(plan.id)],
+        Plan::AlterAddColumn(plan) => vec![ObjectId::Item(plan.id)],
         Plan::RotateKeys(plan) => vec![ObjectId::Item(plan.id)],
         Plan::AlterOwner(plan) => vec![plan.id.clone()],
         Plan::GrantPrivilege(plan) => vec![plan.object_id.clone()],
@@ -1013,6 +1016,11 @@ fn generate_required_privileges(
             current_full_name: _,
             to_name: _,
             object_type: _,
+        })
+        | Plan::AlterAddColumn(AlterAddColumnPlan {
+            id,
+            name: _,
+            typ: _,
         })
         | Plan::AlterSecret(AlterSecretPlan { id, secret_as: _ })
         | Plan::RotateKeys(RotateKeysPlan { id }) => {

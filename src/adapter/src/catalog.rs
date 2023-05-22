@@ -48,7 +48,7 @@ use mz_repr::namespaces::{
     INFORMATION_SCHEMA, MZ_CATALOG_SCHEMA, MZ_INTERNAL_SCHEMA, MZ_TEMP_SCHEMA, PG_CATALOG_SCHEMA,
 };
 use mz_repr::role_id::RoleId;
-use mz_repr::{Diff, GlobalId, RelationDesc, ScalarType};
+use mz_repr::{ColumnName, ColumnType, Diff, GlobalId, RelationDesc, ScalarType};
 use mz_secrets::InMemorySecretsController;
 use mz_sql::ast::display::AstDisplay;
 use mz_sql::ast::Expr;
@@ -4928,6 +4928,9 @@ impl Catalog {
 
         for op in ops {
             match op {
+                Op::AddColumn { id, name, typ } => {
+                    todo!()
+                }
                 Op::AlterRole {
                     id,
                     name,
@@ -7004,6 +7007,11 @@ impl From<UpdatePrivilegeVariant> for ExecuteResponse {
 
 #[derive(Debug, Clone)]
 pub enum Op {
+    AddColumn {
+        id: GlobalId,
+        name: ColumnName,
+        typ: ColumnType,
+    },
     AlterSink {
         id: GlobalId,
         cluster_config: plan::SourceSinkClusterConfig,

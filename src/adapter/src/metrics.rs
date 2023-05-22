@@ -143,6 +143,7 @@ where
         StatementKind::GrantPrivilege => "grant_privilege",
         StatementKind::RevokePrivilege => "revoke_privilege",
         StatementKind::ReassignOwned => "reassign_owned",
+        StatementKind::AlterAddColumn => "alter_add_column",
     }
 }
 

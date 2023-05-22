@@ -46,7 +46,7 @@ use mz_sql::catalog::{
 };
 use mz_sql::names::{ObjectId, QualifiedItemName};
 use mz_sql::plan::{
-    AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan, AlterItemRenamePlan,
+    AlterAddColumnPlan, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan, AlterItemRenamePlan,
     AlterOptionParameter, AlterOwnerPlan, AlterRolePlan, AlterSecretPlan, AlterSinkPlan,
     AlterSourcePlan, AlterSystemResetAllPlan, AlterSystemResetPlan, AlterSystemSetPlan,
     CreateClusterPlan, CreateClusterReplicaPlan, CreateConnectionPlan, CreateDatabasePlan,
@@ -4262,6 +4262,17 @@ impl Coordinator {
         self.catalog_transact(Some(session), ops)
             .await
             .map(|_| ExecuteResponse::ReassignOwned)
+    }
+
+    pub(super) async fn sequence_add_column(
+        &mut self,
+        session: &mut Session,
+        AlterAddColumnPlan { id, name, typ }: AlterAddColumnPlan,
+    ) -> Result<ExecuteResponse, AdapterError> {
+        let ops = vec![Op::AddColumn { id, name, typ }];
+        self.catalog_transact(Some(session), ops)
+            .await
+            .map(|_| ExecuteResponse::AddedColumn)
     }
 
     /// Generates the catalog operations to create a linked cluster for the

@@ -30,13 +30,14 @@ use mz_repr::role_id::RoleId;
 use mz_repr::{strconv, ColumnName, ColumnType, GlobalId, RelationDesc, RelationType, ScalarType};
 use mz_sql_parser::ast::display::comma_separated;
 use mz_sql_parser::ast::{
-    AlterAddPrimaryKeyStatement, AlterOwnerStatement, AlterRoleStatement, AlterSinkAction,
-    AlterSinkStatement, AlterSourceAction, AlterSourceStatement, AlterSystemResetAllStatement,
-    AlterSystemResetStatement, AlterSystemSetStatement, AlterTypeStatement, CreateTypeListOption,
-    CreateTypeListOptionName, CreateTypeMapOption, CreateTypeMapOptionName, DeferredItemName,
-    DropOwnedStatement, GrantPrivilegeStatement, GrantRoleStatement, Privilege,
-    PrivilegeSpecification, ReassignOwnedStatement, RevokePrivilegeStatement, RevokeRoleStatement,
-    SshConnectionOption, UnresolvedItemName, UnresolvedObjectName, UnresolvedSchemaName, Value,
+    AlterAddColumnStatement, AlterAddPrimaryKeyStatement, AlterOwnerStatement, AlterRoleStatement,
+    AlterSinkAction, AlterSinkStatement, AlterSourceAction, AlterSourceStatement,
+    AlterSystemResetAllStatement, AlterSystemResetStatement, AlterSystemSetStatement,
+    AlterTypeStatement, CreateTypeListOption, CreateTypeListOptionName, CreateTypeMapOption,
+    CreateTypeMapOptionName, DeferredItemName, DropOwnedStatement, GrantPrivilegeStatement,
+    GrantRoleStatement, Privilege, PrivilegeSpecification, ReassignOwnedStatement,
+    RevokePrivilegeStatement, RevokeRoleStatement, SshConnectionOption, UnresolvedItemName,
+    UnresolvedObjectName, UnresolvedSchemaName, Value,
 };
 use mz_storage_client::types::connections::aws::{AwsAssumeRole, AwsConfig, AwsCredentials};
 use mz_storage_client::types::connections::{
@@ -103,16 +104,17 @@ use crate::plan::statement::{scl, StatementContext, StatementDesc};
 use crate::plan::typeconv::{plan_cast, CastContext};
 use crate::plan::with_options::{self, OptionalInterval, TryFromValue};
 use crate::plan::{
-    plan_utils, query, transform_ast, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan,
-    AlterItemRenamePlan, AlterNoopPlan, AlterOptionParameter, AlterOwnerPlan, AlterRolePlan,
-    AlterSecretPlan, AlterSinkPlan, AlterSourcePlan, AlterSystemResetAllPlan, AlterSystemResetPlan,
-    AlterSystemSetPlan, ComputeReplicaConfig, ComputeReplicaIntrospectionConfig, CreateClusterPlan,
-    CreateClusterReplicaPlan, CreateConnectionPlan, CreateDatabasePlan, CreateIndexPlan,
-    CreateMaterializedViewPlan, CreateRolePlan, CreateSchemaPlan, CreateSecretPlan, CreateSinkPlan,
-    CreateSourcePlan, CreateTablePlan, CreateTypePlan, CreateViewPlan, DataSourceDesc,
-    DropObjectsPlan, DropOwnedPlan, FullItemName, GrantPrivilegePlan, GrantRolePlan, HirScalarExpr,
-    Index, Ingestion, MaterializedView, Params, Plan, QueryContext, ReassignOwnedPlan,
-    ReplicaConfig, RevokePrivilegePlan, RevokeRolePlan, RotateKeysPlan, Secret, Sink, Source,
+    plan_utils, query, transform_ast, AlterAddColumnPlan, AlterIndexResetOptionsPlan,
+    AlterIndexSetOptionsPlan, AlterItemRenamePlan, AlterNoopPlan, AlterOptionParameter,
+    AlterOwnerPlan, AlterRolePlan, AlterSecretPlan, AlterSinkPlan, AlterSourcePlan,
+    AlterSystemResetAllPlan, AlterSystemResetPlan, AlterSystemSetPlan, ComputeReplicaConfig,
+    ComputeReplicaIntrospectionConfig, CreateClusterPlan, CreateClusterReplicaPlan,
+    CreateConnectionPlan, CreateDatabasePlan, CreateIndexPlan, CreateMaterializedViewPlan,
+    CreateRolePlan, CreateSchemaPlan, CreateSecretPlan, CreateSinkPlan, CreateSourcePlan,
+    CreateTablePlan, CreateTypePlan, CreateViewPlan, DataSourceDesc, DropObjectsPlan,
+    DropOwnedPlan, FullItemName, GrantPrivilegePlan, GrantRolePlan, HirScalarExpr, Index,
+    Ingestion, MaterializedView, Params, Plan, QueryContext, ReassignOwnedPlan, ReplicaConfig,
+    RevokePrivilegePlan, RevokeRolePlan, RotateKeysPlan, Secret, Sink, Source,
     SourceSinkClusterConfig, Table, Type, View,
 };
 use crate::session::user::SYSTEM_USER;
@@ -4103,6 +4105,62 @@ pub fn plan_alter_add_primary_key(
             // Pretend we did this if the feature is enabled.
             scx.require_feature_flag(&vars::ENABLE_TABLE_KEYS)?;
             Ok(Plan::AlterNoop(AlterNoopPlan { object_type }))
+        }
+        None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
+    }
+}
+
+pub fn describe_alter_add_column(
+    _: &StatementContext,
+    _: AlterAddColumnStatement<Aug>,
+) -> Result<StatementDesc, PlanError> {
+    Ok(StatementDesc::new(None))
+}
+
+pub fn plan_alter_add_column(
+    scx: &StatementContext,
+    AlterAddColumnStatement {
+        object_type,
+        if_exists,
+        name,
+        column_if_not_exists,
+        column_name,
+        data_type,
+    }: AlterAddColumnStatement<Aug>,
+) -> Result<Plan, PlanError> {
+    match resolve_item(scx, name, if_exists)? {
+        Some(entry) => {
+            let full_name = scx.catalog.resolve_full_name(entry.name());
+            let item_type = entry.item_type();
+
+            if object_type != item_type {
+                sql_bail!(
+                    "\"{}\" is a {} not a {}",
+                    full_name,
+                    entry.item_type(),
+                    format!("{object_type}").to_lowercase()
+                )
+            }
+            if item_type != CatalogItemType::Table {
+                sql_bail!("can only add columns to tables")
+            }
+
+            let desc = entry.desc(&full_name)?;
+            let col = normalize::column_name(column_name);
+            if desc.get_by_name(&col).is_some() {
+                if column_if_not_exists {
+                    return Ok(Plan::AlterNoop(AlterNoopPlan { object_type }));
+                }
+                sql_bail!("{full_name} already has a column named {col}");
+            };
+
+            let typ = query::scalar_type_from_sql(scx, &data_type)?.nullable(true);
+
+            Ok(Plan::AlterAddColumn(AlterAddColumnPlan {
+                id: entry.id(),
+                name: col,
+                typ,
+            }))
         }
         None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
     }

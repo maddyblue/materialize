@@ -1408,6 +1408,7 @@ where
             ExecuteResponse::AlteredIndexLogicalCompaction
             | ExecuteResponse::AlteredObject(..)
             | ExecuteResponse::AlteredRole
+            | ExecuteResponse::AddedColumn
             | ExecuteResponse::AlteredSystemConfiguration
             | ExecuteResponse::CreatedCluster { .. }
             | ExecuteResponse::CreatedClusterReplica { .. }

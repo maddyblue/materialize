@@ -292,6 +292,8 @@ impl IntoIterator for GetVariablesResponse {
 #[derivative(Debug)]
 #[enum_kind(ExecuteResponseKind)]
 pub enum ExecuteResponse {
+    /// The requested column was added.
+    AddedColumn,
     /// The requested object was altered.
     AlteredObject(ObjectType),
     /// The index was altered.
@@ -417,6 +419,7 @@ impl ExecuteResponse {
     pub fn tag(&self) -> Option<String> {
         use ExecuteResponse::*;
         match self {
+            AddedColumn => Some("ADD COLUMN".into()),
             AlteredObject(o) => Some(format!("ALTER {}", o)),
             AlteredIndexLogicalCompaction => Some("ALTER INDEX".into()),
             AlteredRole => Some("ALTER ROLE".into()),
@@ -538,6 +541,9 @@ impl ExecuteResponse {
             PlanKind::SetVariable | ResetVariable => vec![ExecuteResponseKind::SetVariable],
             PlanKind::Subscribe => vec![Subscribing, CopyTo],
             StartTransaction => vec![StartedTransaction],
+            Subscribe => todo!(),
+            AlterAddColumn => vec![AddedColumn],
+            Raise => todo!(),
         }
     }
 }

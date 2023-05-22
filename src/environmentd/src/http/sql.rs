@@ -871,6 +871,7 @@ async fn execute_stmt<S: ResultSender>(
         | ExecuteResponse::AlteredObject(_)
         | ExecuteResponse::AlteredIndexLogicalCompaction
         | ExecuteResponse::AlteredRole
+        | ExecuteResponse::AddedColumn
         | ExecuteResponse::AlteredSystemConfiguration
         | ExecuteResponse::Deallocate { .. }
         | ExecuteResponse::Prepare => SqlResult::ok(client, tag.expect("ok only called on tag-generating results")).into(),

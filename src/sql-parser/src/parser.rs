@@ -3700,15 +3700,33 @@ impl<'a> Parser<'a> {
                         }))
                     }
                     ADD => {
-                        self.expect_keywords(&[PRIMARY, KEY])?;
-                        self.expect_token(&Token::LParen)?;
-                        let columns = self.parse_comma_separated(Parser::parse_identifier)?;
-                        self.expect_token(&Token::RParen)?;
-                        Ok(Statement::AlterAddPrimaryKey(AlterAddPrimaryKeyStatement {
+                        if self.parse_keyword(PRIMARY) {
+                            self.expect_keyword(KEY)?;
+                            self.expect_token(&Token::LParen)?;
+                            let columns = self.parse_comma_separated(Parser::parse_identifier)?;
+                            self.expect_token(&Token::RParen)?;
+                            return Ok(Statement::AlterAddPrimaryKey(
+                                AlterAddPrimaryKeyStatement {
+                                    object_type,
+                                    if_exists,
+                                    name,
+                                    columns,
+                                },
+                            ));
+                        }
+
+                        // Add column.
+                        let _ = self.parse_keyword(COLUMN);
+                        let column_if_not_exists = self.parse_if_not_exists()?;
+                        let column_name = self.parse_identifier()?;
+                        let data_type = self.parse_data_type()?;
+                        Ok(Statement::AlterAddColumn(AlterAddColumnStatement {
                             object_type,
                             if_exists,
                             name,
-                            columns,
+                            column_if_not_exists,
+                            column_name,
+                            data_type,
                         }))
                     }
                     _ => unreachable!(),
