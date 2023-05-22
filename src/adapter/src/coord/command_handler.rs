@@ -321,7 +321,7 @@ impl Coordinator {
         };
 
         debug!(
-            conn = session.conn_id(),
+            conn = format!("{:?}", session.conn_id()),
             stmt = stmt.to_ast_string(),
             params = format!("{:?}", portal.parameters)
         );

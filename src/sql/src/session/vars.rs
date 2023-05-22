@@ -312,6 +312,13 @@ pub static INTERVAL_STYLE: ServerVar<IntervalStyle> = ServerVar {
     internal: false,
 };
 
+const SSL_RENEGOTIATION_LIMIT: ServerVar<i32> = ServerVar {
+    name: UncasedStr::new("ssl_renegotiation_limit"),
+    value: &0,
+    description: "Specifies how much data can flow over an SSL encrypted connection before renegotiation of the session will take place (PostgreSQL).",
+    internal: false,
+};
+
 const MZ_VERSION_NAME: &UncasedStr = UncasedStr::new("mz_version");
 const IS_SUPERUSER_NAME: &UncasedStr = UncasedStr::new("is_superuser");
 
@@ -1162,6 +1169,7 @@ impl SessionVars {
             .with_var(&EMIT_TRACE_ID_NOTICE)
             .with_var(&AUTO_ROUTE_INTROSPECTION_QUERIES)
             .with_var(&ENABLE_SESSION_RBAC_CHECKS)
+            .with_value_constrained_var(&SSL_RENEGOTIATION_LIMIT, ValueConstraint::Fixed)
     }
 
     fn with_var<V>(mut self, var: &'static ServerVar<V>) -> Self
