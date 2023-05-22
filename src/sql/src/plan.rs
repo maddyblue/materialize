@@ -171,6 +171,7 @@ impl Plan {
             StatementKind::AlterSystemSet => vec![PlanKind::AlterNoop, PlanKind::AlterSystemSet],
             StatementKind::AlterOwner => vec![PlanKind::AlterNoop, PlanKind::AlterOwner],
             StatementKind::AlterType => vec![PlanKind::AlterNoop],
+            StatementKind::AlterAddPrimaryKey => vec![PlanKind::AlterNoop],
             StatementKind::Close => vec![PlanKind::Close],
             StatementKind::Commit => vec![PlanKind::CommitTransaction],
             StatementKind::Copy => vec![PlanKind::CopyFrom, PlanKind::Peek, PlanKind::Subscribe],

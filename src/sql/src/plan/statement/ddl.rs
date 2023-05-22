@@ -30,8 +30,8 @@ use mz_repr::role_id::RoleId;
 use mz_repr::{strconv, ColumnName, ColumnType, GlobalId, RelationDesc, RelationType, ScalarType};
 use mz_sql_parser::ast::display::comma_separated;
 use mz_sql_parser::ast::{
-    AlterOwnerStatement, AlterRoleStatement, AlterSinkAction, AlterSinkStatement,
-    AlterSourceAction, AlterSourceStatement, AlterSystemResetAllStatement,
+    AlterAddPrimaryKeyStatement, AlterOwnerStatement, AlterRoleStatement, AlterSinkAction,
+    AlterSinkStatement, AlterSourceAction, AlterSourceStatement, AlterSystemResetAllStatement,
     AlterSystemResetStatement, AlterSystemSetStatement, AlterTypeStatement, CreateTypeListOption,
     CreateTypeListOptionName, CreateTypeMapOption, CreateTypeMapOptionName, DeferredItemName,
     DropOwnedStatement, GrantPrivilegeStatement, GrantRoleStatement, Privilege,
@@ -4050,6 +4050,7 @@ pub fn plan_alter_type(
             let full_name = scx.catalog.resolve_full_name(entry.name());
             let item_type = entry.item_type();
 
+            // TODO: Should this statement also restrict itself to only tables?
             if object_type != item_type {
                 sql_bail!(
                     "\"{}\" is a {} not a {}",
@@ -4075,6 +4076,32 @@ pub fn plan_alter_type(
                 bail_unsupported!("ALTER TABLE TYPE");
             }
 
+            Ok(Plan::AlterNoop(AlterNoopPlan { object_type }))
+        }
+        None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
+    }
+}
+
+pub fn describe_alter_add_primary_key(
+    _: &StatementContext,
+    _: AlterAddPrimaryKeyStatement,
+) -> Result<StatementDesc, PlanError> {
+    Ok(StatementDesc::new(None))
+}
+
+pub fn plan_alter_add_primary_key(
+    scx: &StatementContext,
+    AlterAddPrimaryKeyStatement {
+        object_type,
+        if_exists,
+        name,
+        columns: _,
+    }: AlterAddPrimaryKeyStatement,
+) -> Result<Plan, PlanError> {
+    match resolve_item(scx, name, if_exists)? {
+        Some(_entry) => {
+            // Pretend we did this if the feature is enabled.
+            scx.require_feature_flag(&vars::ENABLE_TABLE_KEYS)?;
             Ok(Plan::AlterNoop(AlterNoopPlan { object_type }))
         }
         None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),

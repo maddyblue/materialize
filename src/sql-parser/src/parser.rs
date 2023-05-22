@@ -3664,7 +3664,7 @@ impl<'a> Parser<'a> {
             ObjectType::View | ObjectType::MaterializedView | ObjectType::Table => {
                 let if_exists = self.parse_if_exists()?;
                 let name = self.parse_item_name()?;
-                let action = self.expect_one_of_keywords(&[RENAME, OWNER, ALTER])?;
+                let action = self.expect_one_of_keywords(&[RENAME, OWNER, ALTER, ADD])?;
                 match action {
                     RENAME => {
                         self.expect_keyword(TO)?;
@@ -3697,6 +3697,18 @@ impl<'a> Parser<'a> {
                             name,
                             column_name,
                             new_type,
+                        }))
+                    }
+                    ADD => {
+                        self.expect_keywords(&[PRIMARY, KEY])?;
+                        self.expect_token(&Token::LParen)?;
+                        let columns = self.parse_comma_separated(Parser::parse_identifier)?;
+                        self.expect_token(&Token::RParen)?;
+                        Ok(Statement::AlterAddPrimaryKey(AlterAddPrimaryKeyStatement {
+                            object_type,
+                            if_exists,
+                            name,
+                            columns,
                         }))
                     }
                     _ => unreachable!(),

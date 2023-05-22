@@ -117,6 +117,7 @@ where
         StatementKind::AlterSystemResetAll => "alter_system_reset_all",
         StatementKind::AlterOwner => "alter_owner",
         StatementKind::AlterType => "alter_type",
+        StatementKind::AlterAddPrimaryKey => "alter_add_primary_key",
         StatementKind::AlterConnection => "alter_connection",
         StatementKind::Discard => "discard",
         StatementKind::DropObjects => "drop_objects",
