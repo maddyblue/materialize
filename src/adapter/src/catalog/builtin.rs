@@ -3110,6 +3110,20 @@ LEFT JOIN mz_catalog.mz_databases d ON d.id = s.database_id
 WHERE s.database_id IS NULL OR d.name = current_database()",
 };
 
+// TODO: Don't like about the DBMS VERSION (18); hard coded here for fivetran-redshift).
+pub const INFORMATION_SCHEMA_SQL_IMPLEMENTATION_INFO: BuiltinView = BuiltinView {
+    name: "sql_implementation_info",
+    schema: INFORMATION_SCHEMA,
+    sql: "CREATE VIEW information_schema.sql_implementation_info AS SELECT
+    * FROM (VALUES
+        (17, 'PostgreSQL'),
+        (18, '08.00.0002')
+    ) AS t (
+        implementation_info_id,
+        character_value
+    )",
+};
+
 // MZ doesn't support COLLATE so the table is filled with NULLs and made empty. pg_database hard
 // codes a collation of 'C' for every database, so we could copy that here.
 pub const PG_COLLATION: BuiltinView = BuiltinView {
@@ -3833,6 +3847,7 @@ pub static BUILTINS_STATIC: Lazy<Vec<Builtin<NameReference>>> = Lazy::new(|| {
         Builtin::View(&PG_TRIGGER),
         Builtin::View(&INFORMATION_SCHEMA_COLUMNS),
         Builtin::View(&INFORMATION_SCHEMA_TABLES),
+        Builtin::View(&INFORMATION_SCHEMA_SQL_IMPLEMENTATION_INFO),
         Builtin::Source(&MZ_SINK_STATUS_HISTORY),
         Builtin::View(&MZ_SINK_STATUSES),
         Builtin::Source(&MZ_SOURCE_STATUS_HISTORY),
