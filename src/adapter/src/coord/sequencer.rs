@@ -209,6 +209,9 @@ impl Coordinator {
             Plan::ShowVariable(plan) => {
                 tx.send(self.sequence_show_variable(&session, plan), session);
             }
+            Plan::InspectShard(plan) => {
+                tx.send(self.sequence_inspect_shard(&session, plan).await, session);
+            }
             Plan::SetVariable(plan) => {
                 tx.send(self.sequence_set_variable(&mut session, plan), session);
             }

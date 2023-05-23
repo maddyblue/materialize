@@ -30,9 +30,9 @@ use mz_sql::plan::{
     CreateSecretPlan, CreateSinkPlan, CreateSourcePlan, CreateSourcePlans, CreateTablePlan,
     CreateTypePlan, CreateViewPlan, DeallocatePlan, DeclarePlan, DropObjectsPlan, DropOwnedPlan,
     ExecutePlan, ExplainPlan, FetchPlan, GrantPrivilegePlan, GrantRolePlan, InsertPlan,
-    MutationKind, PeekPlan, Plan, PlannedRoleAttributes, PreparePlan, RaisePlan, ReadThenWritePlan,
-    ReassignOwnedPlan, ResetVariablePlan, RevokePrivilegePlan, RevokeRolePlan, RotateKeysPlan,
-    SetVariablePlan, ShowCreatePlan, ShowVariablePlan, SourceSinkClusterConfig,
+    InspectShardPlan, MutationKind, PeekPlan, Plan, PlannedRoleAttributes, PreparePlan, RaisePlan,
+    ReadThenWritePlan, ReassignOwnedPlan, ResetVariablePlan, RevokePrivilegePlan, RevokeRolePlan,
+    RotateKeysPlan, SetVariablePlan, ShowCreatePlan, ShowVariablePlan, SourceSinkClusterConfig,
     StartTransactionPlan, SubscribePlan,
 };
 use mz_sql::session::user::{INTROSPECTION_USER, SYSTEM_USER};
@@ -272,6 +272,7 @@ pub fn generate_required_role_membership(plan: &Plan) -> Vec<RoleId> {
         | Plan::ShowAllVariables
         | Plan::ShowCreate(_)
         | Plan::ShowVariable(_)
+        | Plan::InspectShard(_)
         | Plan::SetVariable(_)
         | Plan::ResetVariable(_)
         | Plan::StartTransaction(_)
@@ -368,6 +369,7 @@ fn generate_required_plan_attribute(plan: &Plan) -> Vec<Attribute> {
         | Plan::ShowAllVariables
         | Plan::ShowCreate(_)
         | Plan::ShowVariable(_)
+        | Plan::InspectShard(_)
         | Plan::SetVariable(_)
         | Plan::ResetVariable(_)
         | Plan::StartTransaction(_)
@@ -525,6 +527,7 @@ fn generate_required_ownership(plan: &Plan) -> Vec<ObjectId> {
         | Plan::ShowAllVariables
         | Plan::ShowVariable(_)
         | Plan::SetVariable(_)
+        | Plan::InspectShard(_)
         | Plan::ResetVariable(_)
         | Plan::StartTransaction(_)
         | Plan::CommitTransaction(_)
@@ -1094,6 +1097,7 @@ fn generate_required_privileges(
         | Plan::EmptyQuery
         | Plan::ShowAllVariables
         | Plan::ShowVariable(ShowVariablePlan { name: _ })
+        | Plan::InspectShard(InspectShardPlan { id: _ })
         | Plan::SetVariable(SetVariablePlan {
             name: _,
             value: _,

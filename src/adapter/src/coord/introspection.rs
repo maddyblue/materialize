@@ -64,6 +64,7 @@ pub fn auto_run_on_introspection<'a, 's, 'p>(
         | Plan::ShowAllVariables
         | Plan::ShowCreate(_)
         | Plan::ShowVariable(_)
+        | Plan::InspectShard(_)
         | Plan::SetVariable(_)
         | Plan::ResetVariable(_)
         | Plan::StartTransaction(_)
@@ -275,6 +276,7 @@ pub fn user_privilege_hack(
         | Plan::AlterSystemReset(_)
         | Plan::AlterSystemResetAll(_)
         | Plan::AlterOwner(_)
+        | Plan::InspectShard(_)
         | Plan::ReadThenWrite(_)
         | Plan::Raise(_)
         | Plan::RotateKeys(_)

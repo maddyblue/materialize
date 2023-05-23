@@ -173,6 +173,7 @@ Inherit
 Inline
 Inner
 Insert
+Inspect
 Int
 Integer
 Intersect
@@ -317,6 +318,7 @@ Serializable
 Service
 Session
 Set
+Shard
 Show
 Sink
 Sinks

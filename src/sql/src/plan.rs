@@ -105,6 +105,7 @@ pub enum Plan {
     ShowAllVariables,
     ShowCreate(ShowCreatePlan),
     ShowVariable(ShowVariablePlan),
+    InspectShard(InspectShardPlan),
     SetVariable(SetVariablePlan),
     ResetVariable(ResetVariablePlan),
     StartTransaction(StartTransactionPlan),
@@ -216,6 +217,7 @@ impl Plan {
                 PlanKind::ShowVariable,
                 PlanKind::ShowCreate,
                 PlanKind::ShowAllVariables,
+                PlanKind::InspectShard,
             ],
             StatementKind::StartTransaction => vec![PlanKind::StartTransaction],
             StatementKind::Subscribe => vec![PlanKind::Subscribe],
@@ -265,6 +267,7 @@ impl Plan {
             Plan::ShowAllVariables => "show all variables",
             Plan::ShowCreate(_) => "show create",
             Plan::ShowVariable(_) => "show variable",
+            Plan::InspectShard(_) => "inspect shard",
             Plan::SetVariable(_) => "set variable",
             Plan::ResetVariable(_) => "reset variable",
             Plan::StartTransaction(_) => "start transaction",
@@ -597,6 +600,11 @@ pub struct DropOwnedPlan {
 #[derive(Debug)]
 pub struct ShowVariablePlan {
     pub name: String,
+}
+
+#[derive(Debug)]
+pub struct InspectShardPlan {
+    pub id: GlobalId,
 }
 
 #[derive(Debug)]

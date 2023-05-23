@@ -1487,6 +1487,7 @@ fn plan_set_expr(
                     show::show_objects(qcx.scx, stmt)?.plan_hir(qcx)
                 }
                 ShowStatement::ShowVariable(_) => sql_bail!("unsupported SHOW statement"),
+                ShowStatement::InspectShard(_) => sql_bail!("unsupported INSPECT statement"),
             }
         }
     }
