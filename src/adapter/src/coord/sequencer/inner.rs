@@ -33,7 +33,7 @@ use mz_expr::{
 };
 use mz_ore::collections::CollectionExt;
 use mz_ore::result::ResultExt as OreResultExt;
-use mz_ore::task;
+use mz_ore::task::{self, spawn};
 use mz_ore::vec::VecExt;
 use mz_repr::adt::mz_acl_item::{AclMode, MzAclItem, PrivilegeMap};
 use mz_repr::explain::{ExplainFormat, Explainee};
@@ -44,7 +44,9 @@ use mz_sql::catalog::{
     CatalogCluster, CatalogDatabase, CatalogError, CatalogItem as SqlCatalogItem, CatalogItemType,
     CatalogRole, CatalogSchema, CatalogTypeDetails, SessionCatalog,
 };
-use mz_sql::names::{ObjectId, QualifiedItemName};
+use mz_sql::names::{
+    ItemQualifiers, ObjectId, QualifiedItemName, ResolvedDatabaseSpecifier, SchemaSpecifier,
+};
 use mz_sql::plan::{
     AlterAddColumnPlan, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan, AlterItemRenamePlan,
     AlterOptionParameter, AlterOwnerPlan, AlterRolePlan, AlterSecretPlan, AlterSinkPlan,
@@ -56,12 +58,13 @@ use mz_sql::plan::{
     GrantRolePlan, IndexOption, InsertPlan, MaterializedView, MutationKind, OptimizerConfig,
     PeekPlan, Plan, QueryWhen, ReadThenWritePlan, ReassignOwnedPlan, ResetVariablePlan,
     RevokePrivilegePlan, RevokeRolePlan, SendDiffsPlan, SetVariablePlan, ShowVariablePlan,
-    SourceSinkClusterConfig, SubscribeFrom, SubscribePlan, VariableValue, View,
+    SourceSinkClusterConfig, SubscribeFrom, SubscribePlan, Table, VariableValue, View,
 };
 use mz_sql::session::vars::{
     IsolationLevel, OwnedVarInput, Var, VarInput, CLUSTER_VAR_NAME, DATABASE_VAR_NAME,
     ENABLE_RBAC_CHECKS, SCHEMA_ALIAS, TRANSACTION_ISOLATION_VAR_NAME,
 };
+use mz_sql_parser::ast::Expr;
 use mz_ssh_util::keys::SshKeyPairSet;
 use mz_storage_client::controller::{CollectionDescription, DataSource, ReadPolicy, StorageError};
 use mz_storage_client::types::sinks::StorageSinkConnectionBuilder;
@@ -3386,6 +3389,8 @@ impl Coordinator {
     ) {
         guard_write_critical_section!(self, tx, session, Plan::ReadThenWrite(plan));
 
+        dbg!(&plan);
+
         let ReadThenWritePlan {
             id,
             kind,
@@ -4266,13 +4271,72 @@ impl Coordinator {
 
     pub(super) async fn sequence_add_column(
         &mut self,
-        session: &mut Session,
+        tx: ClientTransmitter<ExecuteResponse>,
+        mut session: Session,
         AlterAddColumnPlan { id, name, typ }: AlterAddColumnPlan,
-    ) -> Result<ExecuteResponse, AdapterError> {
-        let ops = vec![Op::AddColumn { id, name, typ }];
-        self.catalog_transact(Some(session), ops)
-            .await
-            .map(|_| ExecuteResponse::AddedColumn)
+    ) {
+        // TODO: If anything goes wrong here the db is left in a borked state.
+        let entry = self.catalog().get_entry(&id);
+        let CatalogItem::Table(table) = entry.item() else {
+            panic!("expected table");
+        };
+        let tmp_name = format!("add_{}_col_{}", entry.name(), name);
+        let orig_desc = table.desc.clone();
+        let desc = table.desc.clone().with_column(name, typ.clone());
+        let desc_arity = desc.arity();
+        let mut defaults = table.defaults.clone();
+        defaults.push(Expr::null());
+
+        self.sequence_create_table(
+            &mut session,
+            CreateTablePlan {
+                name: QualifiedItemName {
+                    qualifiers: ItemQualifiers {
+                        database_spec: ResolvedDatabaseSpecifier::Ambient,
+                        schema_spec: SchemaSpecifier::Temporary,
+                    },
+                    item: tmp_name,
+                },
+                table: Table {
+                    create_sql: "TODO".into(),
+                    desc,
+                    defaults,
+                    temporary: true,
+                },
+                if_not_exists: false,
+            },
+            vec![],
+        )
+        .await
+        .expect("must succeed");
+
+        let (inner_tx, inner_rx) = oneshot::channel();
+        let tx2 = ClientTransmitter::new(inner_tx, self.internal_cmd_tx.clone());
+
+        let finishing = RowSetFinishing {
+            order_by: vec![],
+            limit: None,
+            offset: 0,
+            project: (0..desc_arity).collect(),
+        };
+        let selection = MirRelationExpr::global_get(id, orig_desc.typ().clone())
+            .map_one(MirScalarExpr::literal_null(typ.scalar_type));
+        let plan = ReadThenWritePlan {
+            id,
+            selection,
+            finishing,
+            assignments: BTreeMap::new(),
+            kind: MutationKind::Insert,
+            returning: Vec::new(),
+        };
+        self.sequence_read_then_write(tx2, session, plan).await;
+
+        let internal_cmd_tx = self.internal_cmd_tx.clone();
+        spawn(|| "sequence_add_column", async {
+            let session = inner_rx.await.expect("must succeed").session;
+
+            tx.send(result, session);
+        });
     }
 
     /// Generates the catalog operations to create a linked cluster for the

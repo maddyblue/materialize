@@ -541,9 +541,7 @@ impl ExecuteResponse {
             PlanKind::SetVariable | ResetVariable => vec![ExecuteResponseKind::SetVariable],
             PlanKind::Subscribe => vec![Subscribing, CopyTo],
             StartTransaction => vec![StartedTransaction],
-            Subscribe => todo!(),
             AlterAddColumn => vec![AddedColumn],
-            Raise => todo!(),
         }
     }
 }
