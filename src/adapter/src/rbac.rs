@@ -21,7 +21,7 @@ use mz_repr::GlobalId;
 use mz_sql::catalog::{CatalogItemType, RoleAttributes, SessionCatalog};
 use mz_sql::names::{ObjectId, QualifiedItemName, ResolvedDatabaseSpecifier};
 use mz_sql::plan::{
-    AbortTransactionPlan, AlterAddColumnPlan, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan,
+    AbortTransactionPlan, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan,
     AlterItemRenamePlan, AlterNoopPlan, AlterOwnerPlan, AlterRolePlan, AlterSecretPlan,
     AlterSinkPlan, AlterSourcePlan, AlterSystemResetAllPlan, AlterSystemResetPlan,
     AlterSystemSetPlan, ClosePlan, CommitTransactionPlan, CopyFromPlan, CopyRowsPlan,
@@ -30,10 +30,10 @@ use mz_sql::plan::{
     CreateSecretPlan, CreateSinkPlan, CreateSourcePlan, CreateSourcePlans, CreateTablePlan,
     CreateTypePlan, CreateViewPlan, DeallocatePlan, DeclarePlan, DropObjectsPlan, DropOwnedPlan,
     ExecutePlan, ExplainPlan, FetchPlan, GrantPrivilegePlan, GrantRolePlan, InsertPlan,
-    MutationKind, PeekPlan, Plan, PlannedRoleAttributes, PreparePlan, RaisePlan, ReadThenWritePlan,
-    ReassignOwnedPlan, ResetVariablePlan, RevokePrivilegePlan, RevokeRolePlan, RotateKeysPlan,
-    SetVariablePlan, ShowCreatePlan, ShowVariablePlan, SourceSinkClusterConfig,
-    StartTransactionPlan, SubscribePlan,
+    MultiStatementPlan, MutationKind, PeekPlan, Plan, PlannedRoleAttributes, PreparePlan,
+    RaisePlan, ReadThenWritePlan, ReassignOwnedPlan, ResetVariablePlan, RevokePrivilegePlan,
+    RevokeRolePlan, RotateKeysPlan, SetVariablePlan, ShowCreatePlan, ShowVariablePlan,
+    SourceSinkClusterConfig, StartTransactionPlan, SubscribePlan,
 };
 use mz_sql::session::user::{INTROSPECTION_USER, SYSTEM_USER};
 use mz_sql::session::vars::SystemVars;
@@ -294,7 +294,7 @@ pub fn generate_required_role_membership(plan: &Plan) -> Vec<RoleId> {
         | Plan::AlterSystemReset(_)
         | Plan::AlterSystemResetAll(_)
         | Plan::AlterRole(_)
-        | Plan::AlterAddColumn(_)
+        | Plan::MultiStatement(_)
         | Plan::Declare(_)
         | Plan::Fetch(_)
         | Plan::Close(_)
@@ -391,7 +391,7 @@ fn generate_required_plan_attribute(plan: &Plan) -> Vec<Attribute> {
         | Plan::AlterSystemReset(_)
         | Plan::AlterSystemResetAll(_)
         | Plan::AlterOwner(_)
-        | Plan::AlterAddColumn(_)
+        | Plan::MultiStatement(_)
         | Plan::Declare(_)
         | Plan::Fetch(_)
         | Plan::Close(_)
@@ -543,6 +543,7 @@ fn generate_required_ownership(plan: &Plan) -> Vec<ObjectId> {
         | Plan::AlterSystemReset(_)
         | Plan::AlterSystemResetAll(_)
         | Plan::AlterRole(_)
+        | Plan::MultiStatement(_)
         | Plan::Declare(_)
         | Plan::Fetch(_)
         | Plan::Close(_)
@@ -568,7 +569,6 @@ fn generate_required_ownership(plan: &Plan) -> Vec<ObjectId> {
         Plan::AlterSource(plan) => vec![ObjectId::Item(plan.id)],
         Plan::AlterItemRename(plan) => vec![ObjectId::Item(plan.id)],
         Plan::AlterSecret(plan) => vec![ObjectId::Item(plan.id)],
-        Plan::AlterAddColumn(plan) => vec![ObjectId::Item(plan.id)],
         Plan::RotateKeys(plan) => vec![ObjectId::Item(plan.id)],
         Plan::AlterOwner(plan) => vec![plan.id.clone()],
         Plan::GrantPrivilege(plan) => vec![plan.object_id.clone()],
@@ -1017,11 +1017,6 @@ fn generate_required_privileges(
             to_name: _,
             object_type: _,
         })
-        | Plan::AlterAddColumn(AlterAddColumnPlan {
-            id,
-            name: _,
-            typ: _,
-        })
         | Plan::AlterSecret(AlterSecretPlan { id, secret_as: _ })
         | Plan::RotateKeys(RotateKeysPlan { id }) => {
             let item = catalog.get_item(id);
@@ -1133,6 +1128,7 @@ fn generate_required_privileges(
             name: _,
             attributes: _,
         })
+        | Plan::MultiStatement(MultiStatementPlan { stmts: _ })
         | Plan::Declare(DeclarePlan { name: _, stmt: _ })
         | Plan::Fetch(FetchPlan {
             name: _,

@@ -44,27 +44,25 @@ use mz_sql::catalog::{
     CatalogCluster, CatalogDatabase, CatalogError, CatalogItem as SqlCatalogItem, CatalogItemType,
     CatalogRole, CatalogSchema, CatalogTypeDetails, SessionCatalog,
 };
-use mz_sql::names::{
-    ItemQualifiers, ObjectId, QualifiedItemName, ResolvedDatabaseSpecifier, SchemaSpecifier,
-};
+use mz_sql::names::{ObjectId, QualifiedItemName};
 use mz_sql::plan::{
-    AlterAddColumnPlan, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan, AlterItemRenamePlan,
+    AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan, AlterItemRenamePlan,
     AlterOptionParameter, AlterOwnerPlan, AlterRolePlan, AlterSecretPlan, AlterSinkPlan,
     AlterSourcePlan, AlterSystemResetAllPlan, AlterSystemResetPlan, AlterSystemSetPlan,
     CreateClusterPlan, CreateClusterReplicaPlan, CreateConnectionPlan, CreateDatabasePlan,
     CreateIndexPlan, CreateMaterializedViewPlan, CreateRolePlan, CreateSchemaPlan,
     CreateSecretPlan, CreateSinkPlan, CreateSourcePlan, CreateTablePlan, CreateTypePlan,
     CreateViewPlan, DropObjectsPlan, DropOwnedPlan, ExecutePlan, ExplainPlan, GrantPrivilegePlan,
-    GrantRolePlan, IndexOption, InsertPlan, MaterializedView, MutationKind, OptimizerConfig,
-    PeekPlan, Plan, QueryWhen, ReadThenWritePlan, ReassignOwnedPlan, ResetVariablePlan,
-    RevokePrivilegePlan, RevokeRolePlan, SendDiffsPlan, SetVariablePlan, ShowVariablePlan,
-    SourceSinkClusterConfig, SubscribeFrom, SubscribePlan, Table, VariableValue, View,
+    GrantRolePlan, IndexOption, InsertPlan, MaterializedView, MultiStatementPlan, MutationKind,
+    OptimizerConfig, PeekPlan, Plan, QueryWhen, ReadThenWritePlan, ReassignOwnedPlan,
+    ResetVariablePlan, RevokePrivilegePlan, RevokeRolePlan, SendDiffsPlan, SetVariablePlan,
+    ShowVariablePlan, SourceSinkClusterConfig, SubscribeFrom, SubscribePlan, VariableValue, View,
 };
 use mz_sql::session::vars::{
     IsolationLevel, OwnedVarInput, Var, VarInput, CLUSTER_VAR_NAME, DATABASE_VAR_NAME,
     ENABLE_RBAC_CHECKS, SCHEMA_ALIAS, TRANSACTION_ISOLATION_VAR_NAME,
 };
-use mz_sql_parser::ast::Expr;
+use mz_sql_parser::parser;
 use mz_ssh_util::keys::SshKeyPairSet;
 use mz_storage_client::controller::{CollectionDescription, DataSource, ReadPolicy, StorageError};
 use mz_storage_client::types::sinks::StorageSinkConnectionBuilder;
@@ -79,7 +77,7 @@ use crate::catalog::{
     self, Catalog, CatalogItem, Cluster, Connection, DataSourceDesc, Op, SerializedReplicaLocation,
     StorageSinkConnectionState, UpdatePrivilegeVariant, LINKED_CLUSTER_REPLICA_NAME,
 };
-use crate::command::{ExecuteResponse, Response};
+use crate::command::{Command, ExecuteResponse, Response};
 use crate::coord::appends::{Deferred, DeferredPlan, PendingWriteTxn};
 use crate::coord::dataflows::{prep_relation_expr, prep_scalar_expr, EvalTime, ExprPrepStyle};
 use crate::coord::id_bundle::CollectionIdBundle;
@@ -3389,8 +3387,6 @@ impl Coordinator {
     ) {
         guard_write_critical_section!(self, tx, session, Plan::ReadThenWrite(plan));
 
-        dbg!(&plan);
-
         let ReadThenWritePlan {
             id,
             kind,
@@ -4243,6 +4239,55 @@ impl Coordinator {
             .map(|_| ExecuteResponse::AlteredObject(object_type))
     }
 
+    pub(super) fn sequence_multi_statement(
+        &mut self,
+        outer_tx: ClientTransmitter<ExecuteResponse>,
+        outer_session: Session,
+        MultiStatementPlan { stmts }: MultiStatementPlan,
+    ) {
+        let internal_cmd_tx = self.internal_cmd_tx.clone();
+        let mut outer_session = Some(outer_session);
+        spawn(|| "sequence_multi_statement", async move {
+            for stmt in stmts {
+                println!("STMTEXEC: {stmt}");
+                let stmt = parser::parse_statements(&stmt)
+                    .expect("must parse")
+                    .into_element();
+
+                let (tx, rx) = oneshot::channel();
+                internal_cmd_tx
+                    .send(Message::Command(Command::Declare {
+                        name: "".into(),
+                        stmt,
+                        param_types: Vec::new(),
+                        session: outer_session.take().expect("must exist"),
+                        tx,
+                    }))
+                    .expect("must send");
+                let Response { result, session } = rx.await.expect("must succeed");
+                result.expect("must succeed");
+                let (tx, rx) = oneshot::channel();
+                internal_cmd_tx
+                    .send(Message::Command(Command::Execute {
+                        portal_name: "".into(),
+                        tx,
+                        session,
+                        span: tracing::Span::current(),
+                    }))
+                    .expect("must send");
+                let Response { result, session } = rx.await.expect("must succeed");
+                result.expect("must succeed");
+                outer_session = Some(session);
+            }
+
+            // TODO: Don't hard code response type.
+            outer_tx.send(
+                Ok(ExecuteResponse::AddedColumn),
+                outer_session.take().expect("must exist"),
+            );
+        });
+    }
+
     pub(super) async fn sequence_reassign_owned(
         &mut self,
         session: &mut Session,
@@ -4267,76 +4312,6 @@ impl Coordinator {
         self.catalog_transact(Some(session), ops)
             .await
             .map(|_| ExecuteResponse::ReassignOwned)
-    }
-
-    pub(super) async fn sequence_add_column(
-        &mut self,
-        tx: ClientTransmitter<ExecuteResponse>,
-        mut session: Session,
-        AlterAddColumnPlan { id, name, typ }: AlterAddColumnPlan,
-    ) {
-        // TODO: If anything goes wrong here the db is left in a borked state.
-        let entry = self.catalog().get_entry(&id);
-        let CatalogItem::Table(table) = entry.item() else {
-            panic!("expected table");
-        };
-        let tmp_name = format!("add_{}_col_{}", entry.name(), name);
-        let orig_desc = table.desc.clone();
-        let desc = table.desc.clone().with_column(name, typ.clone());
-        let desc_arity = desc.arity();
-        let mut defaults = table.defaults.clone();
-        defaults.push(Expr::null());
-
-        self.sequence_create_table(
-            &mut session,
-            CreateTablePlan {
-                name: QualifiedItemName {
-                    qualifiers: ItemQualifiers {
-                        database_spec: ResolvedDatabaseSpecifier::Ambient,
-                        schema_spec: SchemaSpecifier::Temporary,
-                    },
-                    item: tmp_name,
-                },
-                table: Table {
-                    create_sql: "TODO".into(),
-                    desc,
-                    defaults,
-                    temporary: true,
-                },
-                if_not_exists: false,
-            },
-            vec![],
-        )
-        .await
-        .expect("must succeed");
-
-        let (inner_tx, inner_rx) = oneshot::channel();
-        let tx2 = ClientTransmitter::new(inner_tx, self.internal_cmd_tx.clone());
-
-        let finishing = RowSetFinishing {
-            order_by: vec![],
-            limit: None,
-            offset: 0,
-            project: (0..desc_arity).collect(),
-        };
-        let selection = MirRelationExpr::global_get(id, orig_desc.typ().clone())
-            .map_one(MirScalarExpr::literal_null(typ.scalar_type));
-        let plan = ReadThenWritePlan {
-            id,
-            selection,
-            finishing,
-            assignments: BTreeMap::new(),
-            kind: MutationKind::Insert,
-            returning: Vec::new(),
-        };
-        self.sequence_read_then_write(tx2, session, plan).await;
-
-        let internal_cmd_tx = self.internal_cmd_tx.clone();
-        spawn(|| "sequence_add_column", async {
-            let session = inner_rx.await.expect("must succeed").session;
-
-            tx.send(result, session);
-        });
     }
 
     /// Generates the catalog operations to create a linked cluster for the

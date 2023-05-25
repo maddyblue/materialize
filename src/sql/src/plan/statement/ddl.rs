@@ -30,14 +30,14 @@ use mz_repr::role_id::RoleId;
 use mz_repr::{strconv, ColumnName, ColumnType, GlobalId, RelationDesc, RelationType, ScalarType};
 use mz_sql_parser::ast::display::comma_separated;
 use mz_sql_parser::ast::{
-    AlterAddColumnStatement, AlterAddPrimaryKeyStatement, AlterOwnerStatement, AlterRoleStatement,
-    AlterSinkAction, AlterSinkStatement, AlterSourceAction, AlterSourceStatement,
-    AlterSystemResetAllStatement, AlterSystemResetStatement, AlterSystemSetStatement,
-    AlterTypeStatement, CreateTypeListOption, CreateTypeListOptionName, CreateTypeMapOption,
-    CreateTypeMapOptionName, DeferredItemName, DropOwnedStatement, GrantPrivilegeStatement,
-    GrantRoleStatement, Privilege, PrivilegeSpecification, ReassignOwnedStatement,
-    RevokePrivilegeStatement, RevokeRoleStatement, SshConnectionOption, UnresolvedItemName,
-    UnresolvedObjectName, UnresolvedSchemaName, Value,
+    AlterAddColumnStatement, AlterAddPrimaryKeyStatement, AlterColumnRenameStatement,
+    AlterDropColumnStatement, AlterOwnerStatement, AlterRoleStatement, AlterSinkAction,
+    AlterSinkStatement, AlterSourceAction, AlterSourceStatement, AlterSystemResetAllStatement,
+    AlterSystemResetStatement, AlterSystemSetStatement, AlterTypeStatement, CreateTypeListOption,
+    CreateTypeListOptionName, CreateTypeMapOption, CreateTypeMapOptionName, DeferredItemName,
+    DropOwnedStatement, GrantPrivilegeStatement, GrantRoleStatement, Privilege,
+    PrivilegeSpecification, ReassignOwnedStatement, RevokePrivilegeStatement, RevokeRoleStatement,
+    SshConnectionOption, UnresolvedItemName, UnresolvedObjectName, UnresolvedSchemaName, Value,
 };
 use mz_storage_client::types::connections::aws::{AwsAssumeRole, AwsConfig, AwsCredentials};
 use mz_storage_client::types::connections::{
@@ -104,18 +104,17 @@ use crate::plan::statement::{scl, StatementContext, StatementDesc};
 use crate::plan::typeconv::{plan_cast, CastContext};
 use crate::plan::with_options::{self, OptionalInterval, TryFromValue};
 use crate::plan::{
-    plan_utils, query, transform_ast, AlterAddColumnPlan, AlterIndexResetOptionsPlan,
-    AlterIndexSetOptionsPlan, AlterItemRenamePlan, AlterNoopPlan, AlterOptionParameter,
-    AlterOwnerPlan, AlterRolePlan, AlterSecretPlan, AlterSinkPlan, AlterSourcePlan,
-    AlterSystemResetAllPlan, AlterSystemResetPlan, AlterSystemSetPlan, ComputeReplicaConfig,
-    ComputeReplicaIntrospectionConfig, CreateClusterPlan, CreateClusterReplicaPlan,
-    CreateConnectionPlan, CreateDatabasePlan, CreateIndexPlan, CreateMaterializedViewPlan,
-    CreateRolePlan, CreateSchemaPlan, CreateSecretPlan, CreateSinkPlan, CreateSourcePlan,
-    CreateTablePlan, CreateTypePlan, CreateViewPlan, DataSourceDesc, DropObjectsPlan,
-    DropOwnedPlan, FullItemName, GrantPrivilegePlan, GrantRolePlan, HirScalarExpr, Index,
-    Ingestion, MaterializedView, Params, Plan, QueryContext, ReassignOwnedPlan, ReplicaConfig,
-    RevokePrivilegePlan, RevokeRolePlan, RotateKeysPlan, Secret, Sink, Source,
-    SourceSinkClusterConfig, Table, Type, View,
+    plan_utils, query, transform_ast, AlterIndexResetOptionsPlan, AlterIndexSetOptionsPlan,
+    AlterItemRenamePlan, AlterNoopPlan, AlterOptionParameter, AlterOwnerPlan, AlterRolePlan,
+    AlterSecretPlan, AlterSinkPlan, AlterSourcePlan, AlterSystemResetAllPlan, AlterSystemResetPlan,
+    AlterSystemSetPlan, ComputeReplicaConfig, ComputeReplicaIntrospectionConfig, CreateClusterPlan,
+    CreateClusterReplicaPlan, CreateConnectionPlan, CreateDatabasePlan, CreateIndexPlan,
+    CreateMaterializedViewPlan, CreateRolePlan, CreateSchemaPlan, CreateSecretPlan, CreateSinkPlan,
+    CreateSourcePlan, CreateTablePlan, CreateTypePlan, CreateViewPlan, DataSourceDesc,
+    DropObjectsPlan, DropOwnedPlan, FullItemName, GrantPrivilegePlan, GrantRolePlan, HirScalarExpr,
+    Index, Ingestion, MaterializedView, MultiStatementPlan, Params, Plan, QueryContext,
+    ReassignOwnedPlan, ReplicaConfig, RevokePrivilegePlan, RevokeRolePlan, RotateKeysPlan, Secret,
+    Sink, Source, SourceSinkClusterConfig, Table, Type, View,
 };
 use crate::session::user::SYSTEM_USER;
 use crate::session::vars;
@@ -4128,8 +4127,14 @@ pub fn plan_alter_add_column(
         data_type,
     }: AlterAddColumnStatement<Aug>,
 ) -> Result<Plan, PlanError> {
-    match resolve_item(scx, name, if_exists)? {
+    match resolve_item(scx, name.clone(), if_exists)? {
         Some(entry) => {
+            let mut new_name = name.clone();
+            let n = new_name.0.last_mut().unwrap();
+            let mut new_table_name: String = n.as_str().to_string();
+            new_table_name.push_str("_tmp");
+            *n = Ident::from(new_table_name.clone());
+
             let full_name = scx.catalog.resolve_full_name(entry.name());
             let item_type = entry.item_type();
 
@@ -4146,7 +4151,7 @@ pub fn plan_alter_add_column(
             }
 
             let desc = entry.desc(&full_name)?;
-            let col = normalize::column_name(column_name);
+            let col = normalize::column_name(column_name.clone());
             if desc.get_by_name(&col).is_some() {
                 if column_if_not_exists {
                     return Ok(Plan::AlterNoop(AlterNoopPlan { object_type }));
@@ -4154,13 +4159,113 @@ pub fn plan_alter_add_column(
                 sql_bail!("{full_name} already has a column named {col}");
             };
 
-            let typ = query::scalar_type_from_sql(scx, &data_type)?.nullable(true);
+            let old_desc = desc
+                .iter()
+                .map(|(name, typ)| format!("{} {}", name, humanize_type(scx, &typ.scalar_type)))
+                .join(", ");
 
-            Ok(Plan::AlterAddColumn(AlterAddColumnPlan {
-                id: entry.id(),
-                name: col,
-                typ,
-            }))
+            let stmts = vec![
+                format!("ALTER TABLE {} RENAME TO {}", name, new_table_name),
+                format!(
+                    "CREATE TABLE {} ({}, {} {})",
+                    name, old_desc, column_name, data_type
+                ),
+                format!("INSERT INTO {} SELECT * FROM {}", name, new_name),
+                format!("DROP TABLE {}", new_name),
+            ];
+
+            Ok(Plan::MultiStatement(MultiStatementPlan { stmts }))
+        }
+        None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
+    }
+}
+
+pub fn describe_alter_drop_column(
+    _: &StatementContext,
+    _: AlterDropColumnStatement,
+) -> Result<StatementDesc, PlanError> {
+    Ok(StatementDesc::new(None))
+}
+
+/// Like scx.humanize_scalar_type but also adds constraints.
+fn humanize_type(scx: &StatementContext, typ: &ScalarType) -> String {
+    format!(
+        "{}{}",
+        scx.humanize_scalar_type(typ),
+        mz_pgrepr::Type::from(typ)
+            .constraint()
+            .map(|c| c.to_string())
+            .unwrap_or_default(),
+    )
+}
+
+pub fn plan_alter_drop_column(
+    scx: &StatementContext,
+    AlterDropColumnStatement {
+        object_type,
+        if_exists,
+        name,
+        column_name,
+    }: AlterDropColumnStatement,
+) -> Result<Plan, PlanError> {
+    match resolve_item(scx, name, if_exists)? {
+        Some(entry) => {
+            let full_name = scx.catalog.resolve_full_name(entry.name());
+            let item_type = entry.item_type();
+
+            // Return a more helpful error on `ALTER VIEW <materialized-view>`.
+            if object_type == ObjectType::View && item_type == CatalogItemType::MaterializedView {
+                return Err(PlanError::AlterViewOnMaterializedView(
+                    full_name.to_string(),
+                ));
+            } else if object_type != item_type {
+                sql_bail!(
+                    "\"{}\" is a {} not a {}",
+                    full_name,
+                    entry.item_type(),
+                    format!("{object_type}").to_lowercase()
+                )
+            }
+            if item_type != CatalogItemType::Table {
+                sql_bail!("can only rename table columns")
+            }
+
+            let desc = entry.desc(&full_name)?;
+            let col = normalize::column_name(column_name);
+            if desc.get_by_name(&col).is_none() {
+                sql_bail!("{full_name} has no column named {col}");
+            };
+
+            let mut tmp_table_name = full_name.clone();
+            tmp_table_name.item.push_str("_tmp");
+
+            let mut new_columns = Vec::new();
+            let mut select_columns = Vec::new();
+            for (name, typ) in desc.iter() {
+                if name == &col {
+                    continue;
+                }
+                let name = Ident::from(name.as_str()).to_ast_string();
+                new_columns.push(format!("{} {}", name, humanize_type(scx, &typ.scalar_type)));
+                select_columns.push(name);
+            }
+
+            let stmts = vec![
+                format!(
+                    "ALTER TABLE {} RENAME TO {}",
+                    full_name, tmp_table_name.item
+                ),
+                format!("CREATE TABLE {} ({})", full_name, new_columns.join(", ")),
+                format!(
+                    "INSERT INTO {} SELECT {} FROM {}",
+                    full_name,
+                    select_columns.join(", "),
+                    tmp_table_name
+                ),
+                format!("DROP TABLE {}", tmp_table_name),
+            ];
+
+            Ok(Plan::MultiStatement(MultiStatementPlan { stmts }))
         }
         None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
     }
@@ -4337,6 +4442,92 @@ pub fn plan_alter_object_rename(
                 to_name: normalize::ident(to_item_name),
                 object_type,
             }))
+        }
+        None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
+    }
+}
+
+pub fn describe_alter_column_rename(
+    _: &StatementContext,
+    _: AlterColumnRenameStatement,
+) -> Result<StatementDesc, PlanError> {
+    Ok(StatementDesc::new(None))
+}
+
+pub fn plan_alter_column_rename(
+    scx: &StatementContext,
+    AlterColumnRenameStatement {
+        name,
+        object_type,
+        if_exists,
+        from_name,
+        to_name,
+    }: AlterColumnRenameStatement,
+) -> Result<Plan, PlanError> {
+    match resolve_item(scx, name, if_exists)? {
+        Some(entry) => {
+            let full_name = scx.catalog.resolve_full_name(entry.name());
+            let item_type = entry.item_type();
+
+            // Return a more helpful error on `ALTER VIEW <materialized-view>`.
+            if object_type == ObjectType::View && item_type == CatalogItemType::MaterializedView {
+                return Err(PlanError::AlterViewOnMaterializedView(
+                    full_name.to_string(),
+                ));
+            } else if object_type != item_type {
+                sql_bail!(
+                    "\"{}\" is a {} not a {}",
+                    full_name,
+                    entry.item_type(),
+                    format!("{object_type}").to_lowercase()
+                )
+            }
+            if item_type != CatalogItemType::Table {
+                sql_bail!("can only rename table columns")
+            }
+            let desc = entry.desc(&full_name)?;
+            let to_col = normalize::column_name(to_name.clone());
+            if desc.get_by_name(&to_col).is_some() {
+                sql_bail!("{full_name} already has a column named {to_col}");
+            };
+
+            let mut tmp_table_name = full_name.clone();
+            tmp_table_name.item.push_str("_tmp");
+
+            let mut new_columns = Vec::new();
+            let mut select_columns = Vec::new();
+            let from_col = normalize::column_name(from_name.clone());
+            for (name, typ) in desc.iter() {
+                if name == &from_col {
+                    new_columns.push(format!(
+                        "{} {}",
+                        to_name,
+                        humanize_type(scx, &typ.scalar_type)
+                    ));
+                    select_columns.push(format!("{} AS {}", from_name, to_name));
+                } else {
+                    let name = Ident::from(name.as_str()).to_ast_string();
+                    new_columns.push(format!("{} {}", name, humanize_type(scx, &typ.scalar_type)));
+                    select_columns.push(name);
+                }
+            }
+
+            let stmts = vec![
+                format!(
+                    "ALTER TABLE {} RENAME TO {}",
+                    full_name, tmp_table_name.item
+                ),
+                format!("CREATE TABLE {} ({})", full_name, new_columns.join(", ")),
+                format!(
+                    "INSERT INTO {} SELECT {} FROM {}",
+                    full_name,
+                    select_columns.join(", "),
+                    tmp_table_name
+                ),
+                format!("DROP TABLE {}", tmp_table_name),
+            ];
+
+            Ok(Plan::MultiStatement(MultiStatementPlan { stmts }))
         }
         None => Ok(Plan::AlterNoop(AlterNoopPlan { object_type })),
     }

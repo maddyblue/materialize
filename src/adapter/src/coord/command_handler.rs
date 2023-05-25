@@ -464,6 +464,8 @@ impl Coordinator {
                     | Statement::AlterType(_)
                     | Statement::AlterAddPrimaryKey(_)
                     | Statement::AlterAddColumn(_)
+                    | Statement::AlterDropColumn(_)
+                    | Statement::AlterColumnRename(_)
                     | Statement::CreateConnection(_)
                     | Statement::CreateDatabase(_)
                     | Statement::CreateIndex(_)

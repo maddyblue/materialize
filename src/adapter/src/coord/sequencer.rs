@@ -465,8 +465,8 @@ impl Coordinator {
                     session,
                 );
             }
-            Plan::AlterAddColumn(plan) => {
-                self.sequence_add_column(tx, session, plan).await;
+            Plan::MultiStatement(plan) => {
+                self.sequence_multi_statement(tx, session, plan);
             }
         }
     }

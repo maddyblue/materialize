@@ -3664,17 +3664,30 @@ impl<'a> Parser<'a> {
             ObjectType::View | ObjectType::MaterializedView | ObjectType::Table => {
                 let if_exists = self.parse_if_exists()?;
                 let name = self.parse_item_name()?;
-                let action = self.expect_one_of_keywords(&[RENAME, OWNER, ALTER, ADD])?;
+                let action = self.expect_one_of_keywords(&[RENAME, OWNER, ALTER, ADD, DROP])?;
                 match action {
                     RENAME => {
-                        self.expect_keyword(TO)?;
-                        let to_item_name = self.parse_identifier()?;
-                        Ok(Statement::AlterObjectRename(AlterObjectRenameStatement {
-                            object_type,
-                            if_exists,
-                            name,
-                            to_item_name,
-                        }))
+                        if self.parse_keyword(TO) {
+                            let to_item_name = self.parse_identifier()?;
+                            Ok(Statement::AlterObjectRename(AlterObjectRenameStatement {
+                                object_type,
+                                if_exists,
+                                name,
+                                to_item_name,
+                            }))
+                        } else {
+                            let _ = self.parse_keyword(COLUMN);
+                            let from_name = self.parse_identifier()?;
+                            self.expect_keyword(TO)?;
+                            let to_name = self.parse_identifier()?;
+                            Ok(Statement::AlterColumnRename(AlterColumnRenameStatement {
+                                object_type,
+                                if_exists,
+                                name,
+                                from_name,
+                                to_name,
+                            }))
+                        }
                     }
                     OWNER => {
                         self.expect_keyword(TO)?;
@@ -3727,6 +3740,16 @@ impl<'a> Parser<'a> {
                             column_if_not_exists,
                             column_name,
                             data_type,
+                        }))
+                    }
+                    DROP => {
+                        let _ = self.parse_keyword(COLUMN);
+                        let column_name = self.parse_identifier()?;
+                        Ok(Statement::AlterDropColumn(AlterDropColumnStatement {
+                            object_type,
+                            if_exists,
+                            name,
+                            column_name,
                         }))
                     }
                     _ => unreachable!(),

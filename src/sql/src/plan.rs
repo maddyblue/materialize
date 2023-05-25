@@ -43,7 +43,7 @@ use mz_pgcopy::{CopyFormatParams, CopyFromTarget};
 use mz_repr::adt::mz_acl_item::{AclMode, MzAclItem};
 use mz_repr::explain::{ExplainConfig, ExplainFormat};
 use mz_repr::role_id::RoleId;
-use mz_repr::{ColumnName, ColumnType, Diff, GlobalId, RelationDesc, Row, ScalarType};
+use mz_repr::{ColumnName, Diff, GlobalId, RelationDesc, Row, ScalarType};
 use mz_sql_parser::ast::TransactionIsolationLevel;
 use mz_storage_client::types::sinks::{SinkEnvelope, StorageSinkConnectionBuilder};
 use mz_storage_client::types::sources::{SourceDesc, Timeline};
@@ -128,7 +128,7 @@ pub enum Plan {
     AlterSystemResetAll(AlterSystemResetAllPlan),
     AlterRole(AlterRolePlan),
     AlterOwner(AlterOwnerPlan),
-    AlterAddColumn(AlterAddColumnPlan),
+    MultiStatement(MultiStatementPlan),
     Declare(DeclarePlan),
     Fetch(FetchPlan),
     Close(ClosePlan),
@@ -159,6 +159,7 @@ impl Plan {
             StatementKind::AlterObjectRename => {
                 vec![PlanKind::AlterItemRename, PlanKind::AlterNoop]
             }
+            StatementKind::AlterColumnRename => vec![PlanKind::MultiStatement],
             StatementKind::AlterRole => vec![PlanKind::AlterRole],
             StatementKind::AlterSecret => vec![PlanKind::AlterNoop, PlanKind::AlterSecret],
             StatementKind::AlterSink => vec![PlanKind::AlterNoop, PlanKind::AlterSink],
@@ -173,7 +174,8 @@ impl Plan {
             StatementKind::AlterOwner => vec![PlanKind::AlterNoop, PlanKind::AlterOwner],
             StatementKind::AlterType => vec![PlanKind::AlterNoop],
             StatementKind::AlterAddPrimaryKey => vec![PlanKind::AlterNoop],
-            StatementKind::AlterAddColumn => vec![PlanKind::AlterAddColumn],
+            StatementKind::AlterAddColumn => vec![PlanKind::MultiStatement],
+            StatementKind::AlterDropColumn => vec![PlanKind::MultiStatement],
             StatementKind::Close => vec![PlanKind::Close],
             StatementKind::Commit => vec![PlanKind::CommitTransaction],
             StatementKind::Copy => vec![PlanKind::CopyFrom, PlanKind::Peek, PlanKind::Subscribe],
@@ -324,7 +326,7 @@ impl Plan {
                 ObjectType::Schema => "alter schema owner",
                 ObjectType::Func => "alter function owner",
             },
-            Plan::AlterAddColumn(_) => "add column",
+            Plan::MultiStatement(_) => "multi statement",
             Plan::Declare(_) => "declare",
             Plan::Fetch(_) => "fetch",
             Plan::Close(_) => "close",
@@ -815,10 +817,8 @@ pub struct AlterOwnerPlan {
 }
 
 #[derive(Debug)]
-pub struct AlterAddColumnPlan {
-    pub id: GlobalId,
-    pub name: ColumnName,
-    pub typ: ColumnType,
+pub struct MultiStatementPlan {
+    pub stmts: Vec<String>,
 }
 
 #[derive(Debug)]

@@ -107,6 +107,7 @@ where
         StatementKind::CreateClusterReplica => "create_cluster_replica",
         StatementKind::CreateSecret => "create_secret",
         StatementKind::AlterObjectRename => "alter_object_rename",
+        StatementKind::AlterColumnRename => "alter_column_rename",
         StatementKind::AlterIndex => "alter_index",
         StatementKind::AlterRole => "alter_role",
         StatementKind::AlterSecret => "alter_secret",
@@ -144,6 +145,7 @@ where
         StatementKind::RevokePrivilege => "revoke_privilege",
         StatementKind::ReassignOwned => "reassign_owned",
         StatementKind::AlterAddColumn => "alter_add_column",
+        StatementKind::AlterDropColumn => "alter_drop_column",
     }
 }
 

@@ -62,9 +62,11 @@ pub enum Statement<T: AstInfo> {
     CreateSecret(CreateSecretStatement<T>),
     AlterOwner(AlterOwnerStatement<T>),
     AlterObjectRename(AlterObjectRenameStatement),
+    AlterColumnRename(AlterColumnRenameStatement),
     AlterType(AlterTypeStatement<T>),
     AlterAddPrimaryKey(AlterAddPrimaryKeyStatement),
     AlterAddColumn(AlterAddColumnStatement<T>),
+    AlterDropColumn(AlterDropColumnStatement),
     AlterIndex(AlterIndexStatement<T>),
     AlterSecret(AlterSecretStatement<T>),
     AlterSink(AlterSinkStatement<T>),
@@ -125,9 +127,11 @@ impl<T: AstInfo> AstDisplay for Statement<T> {
             Statement::CreateClusterReplica(stmt) => f.write_node(stmt),
             Statement::AlterOwner(stmt) => f.write_node(stmt),
             Statement::AlterObjectRename(stmt) => f.write_node(stmt),
+            Statement::AlterColumnRename(stmt) => f.write_node(stmt),
             Statement::AlterType(stmt) => f.write_node(stmt),
             Statement::AlterAddPrimaryKey(stmt) => f.write_node(stmt),
             Statement::AlterAddColumn(stmt) => f.write_node(stmt),
+            Statement::AlterDropColumn(stmt) => f.write_node(stmt),
             Statement::AlterIndex(stmt) => f.write_node(stmt),
             Statement::AlterSecret(stmt) => f.write_node(stmt),
             Statement::AlterSink(stmt) => f.write_node(stmt),
@@ -1486,6 +1490,33 @@ impl AstDisplay for AlterObjectRenameStatement {
 }
 impl_display!(AlterObjectRenameStatement);
 
+/// `ALTER <OBJECT> ... RENAME COLUMN`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AlterColumnRenameStatement {
+    pub object_type: ObjectType,
+    pub if_exists: bool,
+    pub name: UnresolvedItemName,
+    pub from_name: Ident,
+    pub to_name: Ident,
+}
+
+impl AstDisplay for AlterColumnRenameStatement {
+    fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
+        f.write_str("ALTER ");
+        f.write_node(&self.object_type);
+        f.write_str(" ");
+        if self.if_exists {
+            f.write_str("IF EXISTS ");
+        }
+        f.write_node(&self.name);
+        f.write_str(" RENAME ");
+        f.write_node(&self.from_name);
+        f.write_str(" TO ");
+        f.write_node(&self.to_name);
+    }
+}
+impl_display!(AlterColumnRenameStatement);
+
 /// `ALTER <OBJECT> ... TYPE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AlterTypeStatement<T: AstInfo> {
@@ -1563,9 +1594,35 @@ impl<T: AstInfo> AstDisplay for AlterAddColumnStatement<T> {
             f.write_str("IF NOT EXISTS ");
         }
         f.write_node(&self.column_name);
+        f.write_str(" ");
+        f.write_node(&self.data_type);
     }
 }
 impl_display_t!(AlterAddColumnStatement);
+
+/// `ALTER <OBJECT> ... DROP COLUMN`
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AlterDropColumnStatement {
+    pub object_type: ObjectType,
+    pub if_exists: bool,
+    pub name: UnresolvedItemName,
+    pub column_name: Ident,
+}
+
+impl AstDisplay for AlterDropColumnStatement {
+    fn fmt<W: fmt::Write>(&self, f: &mut AstFormatter<W>) {
+        f.write_str("ALTER ");
+        f.write_node(&self.object_type);
+        f.write_str(" ");
+        if self.if_exists {
+            f.write_str("IF EXISTS ");
+        }
+        f.write_node(&self.name);
+        f.write_str(" DROP ");
+        f.write_node(&self.column_name);
+    }
+}
+impl_display!(AlterDropColumnStatement);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AlterIndexAction<T: AstInfo> {
