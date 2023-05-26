@@ -45,7 +45,7 @@ use crate::coord::ddl::CatalogTxn;
 use crate::coord::id_bundle::CollectionIdBundle;
 use crate::coord::timestamp_selection::TimestampProvider;
 use crate::coord::{Coordinator, DEFAULT_LOGICAL_COMPACTION_WINDOW_TS};
-use crate::session::{Session, SERVER_MAJOR_VERSION, SERVER_MINOR_VERSION};
+use crate::session::Session;
 use crate::util::{viewable_variables, ResultExt};
 use crate::{rbac, AdapterError};
 
@@ -805,13 +805,8 @@ fn eval_unmaterializable_func(
             pack(t)
         }
         UnmaterializableFunc::Version => {
-            let build_info = state.config().build_info;
             let version = format!(
-                "PostgreSQL {}.{} on {} (Materialize {})",
-                SERVER_MAJOR_VERSION,
-                SERVER_MINOR_VERSION,
-                mz_build_info::TARGET_TRIPLE,
-                build_info.version,
+                "PostgreSQL 8.0.2 on i686-pc-linux-gnu, compiled by GCC gcc (GCC) 3.4.2 20041017 (Red Hat 3.4.2-6.fc3), Redshift 1.0.50708"
             );
             pack(Datum::from(&*version))
         }
