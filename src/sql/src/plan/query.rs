@@ -1028,10 +1028,42 @@ fn plan_query(
     qcx.checked_recur_mut(|qcx| plan_query_inner(qcx, q))
 }
 
+fn force_redshift_order(q: &mut Query<Aug>) {
+    if !q.order_by.is_empty() {
+        return;
+    }
+    let SetExpr::Select(sel) = &q.body else {
+        return;
+    };
+    if sel.from.len() != 1 {
+        return;
+    }
+    let TableFactor::Table{name, ..} = &sel.from.get(0).unwrap().relation else {
+        return;
+    };
+    if name.full_name_str() != "information_schema.sql_implementation_info" {
+        return;
+    }
+    q.order_by.push(OrderByExpr {
+        expr: Expr::Identifier(vec![Ident::from("implementation_info_id")]),
+        asc: None,
+        nulls_last: None,
+    });
+    println!("REWRITTEN: {q}");
+}
+
 fn plan_query_inner(
     qcx: &mut QueryContext,
     q: &Query<Aug>,
 ) -> Result<(HirRelationExpr, Scope, RowSetFinishing, Option<u64>), PlanError> {
+    // Special Fivetran Redshift requirement to enforce an order on certain results even
+    // without a user-specified ORDER BY.
+    //
+    // TODO: Remove this, and remove the clone.
+    let mut q = q.clone();
+    force_redshift_order(&mut q);
+    let q = &q;
+
     // Plan CTEs and introduce bindings to `qcx.ctes`. Returns shadowed bindings
     // for the identifiers, so that they can be re-installed before returning.
     let cte_bindings = plan_ctes(qcx, q)?;
