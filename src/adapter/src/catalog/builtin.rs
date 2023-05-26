@@ -3111,7 +3111,7 @@ LEFT JOIN mz_catalog.mz_databases d ON d.id = s.database_id
 WHERE s.database_id IS NULL OR d.name = current_database()",
 };
 
-// TODO: Don't like about the DBMS VERSION (18); hard coded here for fivetran-redshift).
+// TODO: For redshift. Don't like about the DBMS VERSION (18); hard coded here for fivetran-redshift).
 pub const INFORMATION_SCHEMA_SQL_IMPLEMENTATION_INFO: BuiltinView = BuiltinView {
     name: "sql_implementation_info",
     schema: INFORMATION_SCHEMA,
@@ -3122,6 +3122,29 @@ pub const INFORMATION_SCHEMA_SQL_IMPLEMENTATION_INFO: BuiltinView = BuiltinView 
     ) AS t (
         implementation_info_id,
         character_value
+    )",
+};
+
+// TODO: For redshift. Actually implement.
+pub const INFORMATION_SCHEMA_SQL_SIZING: BuiltinView = BuiltinView {
+    name: "sql_sizing",
+    schema: INFORMATION_SCHEMA,
+    sql: "CREATE VIEW information_schema.sql_sizing AS SELECT
+    * FROM (VALUES
+        (97, 0),
+        (99, 0),
+        (100, 1664),
+        (101, 1600),
+        (34, 127),
+        (30, 127),
+        (31, 127),
+        (10005, 127),
+        (32, 127),
+        (35, 127),
+        (107, 127)
+    ) AS t (
+        sizing_id,
+        supported_value
     )",
 };
 
@@ -3849,6 +3872,7 @@ pub static BUILTINS_STATIC: Lazy<Vec<Builtin<NameReference>>> = Lazy::new(|| {
         Builtin::View(&INFORMATION_SCHEMA_COLUMNS),
         Builtin::View(&INFORMATION_SCHEMA_TABLES),
         Builtin::View(&INFORMATION_SCHEMA_SQL_IMPLEMENTATION_INFO),
+        Builtin::View(&INFORMATION_SCHEMA_SQL_SIZING),
         Builtin::Source(&MZ_SINK_STATUS_HISTORY),
         Builtin::View(&MZ_SINK_STATUSES),
         Builtin::Source(&MZ_SOURCE_STATUS_HISTORY),
