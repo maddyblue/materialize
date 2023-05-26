@@ -4123,8 +4123,7 @@ pub fn plan_alter_add_column(
         if_exists,
         name,
         column_if_not_exists,
-        column_name,
-        data_type,
+        column,
     }: AlterAddColumnStatement<Aug>,
 ) -> Result<Plan, PlanError> {
     match resolve_item(scx, name.clone(), if_exists)? {
@@ -4151,7 +4150,7 @@ pub fn plan_alter_add_column(
             }
 
             let desc = entry.desc(&full_name)?;
-            let col = normalize::column_name(column_name.clone());
+            let col = normalize::column_name(column.name.clone());
             if desc.get_by_name(&col).is_some() {
                 if column_if_not_exists {
                     return Ok(Plan::AlterNoop(AlterNoopPlan { object_type }));
@@ -4166,10 +4165,7 @@ pub fn plan_alter_add_column(
 
             let stmts = vec![
                 format!("ALTER TABLE {} RENAME TO {}", name, new_table_name),
-                format!(
-                    "CREATE TABLE {} ({}, {} {})",
-                    name, old_desc, column_name, data_type
-                ),
+                format!("CREATE TABLE {} ({}, {})", name, old_desc, column),
                 format!("INSERT INTO {} SELECT * FROM {}", name, new_name),
                 format!("DROP TABLE {}", new_name),
             ];

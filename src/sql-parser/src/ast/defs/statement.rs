@@ -1576,8 +1576,7 @@ pub struct AlterAddColumnStatement<T: AstInfo> {
     pub if_exists: bool,
     pub name: UnresolvedItemName,
     pub column_if_not_exists: bool,
-    pub column_name: Ident,
-    pub data_type: T::DataType,
+    pub column: ColumnDef<T>,
 }
 
 impl<T: AstInfo> AstDisplay for AlterAddColumnStatement<T> {
@@ -1593,9 +1592,7 @@ impl<T: AstInfo> AstDisplay for AlterAddColumnStatement<T> {
         if self.column_if_not_exists {
             f.write_str("IF NOT EXISTS ");
         }
-        f.write_node(&self.column_name);
-        f.write_str(" ");
-        f.write_node(&self.data_type);
+        f.write_node(&self.column);
     }
 }
 impl_display_t!(AlterAddColumnStatement);

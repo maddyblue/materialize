@@ -3427,26 +3427,7 @@ impl<'a> Parser<'a> {
             if let Some(constraint) = self.parse_optional_table_constraint()? {
                 constraints.push(constraint);
             } else if let Some(column_name) = self.consume_identifier() {
-                let data_type = self.parse_data_type()?;
-                let collation = if self.parse_keyword(COLLATE) {
-                    Some(self.parse_item_name()?)
-                } else {
-                    None
-                };
-                let mut options = vec![];
-                loop {
-                    match self.peek_token() {
-                        None | Some(Token::Comma) | Some(Token::RParen) => break,
-                        _ => options.push(self.parse_column_option_def()?),
-                    }
-                }
-
-                columns.push(ColumnDef {
-                    name: column_name,
-                    data_type,
-                    collation,
-                    options,
-                });
+                columns.push(self.parse_column(column_name)?);
             } else {
                 return self.expected(
                     self.peek_pos(),
@@ -3468,6 +3449,34 @@ impl<'a> Parser<'a> {
         }
 
         Ok((columns, constraints))
+    }
+
+    fn parse_column(&mut self, name: Ident) -> Result<ColumnDef<Raw>, ParserError> {
+        let data_type = self.parse_data_type()?;
+        // Ignore this. It's a redshift option that specifies on disk encoding.
+        let _encode = if self.parse_keyword(ENCODE) {
+            Some(self.parse_identifier()?)
+        } else {
+            None
+        };
+        let collation = if self.parse_keyword(COLLATE) {
+            Some(self.parse_item_name()?)
+        } else {
+            None
+        };
+        let mut options = vec![];
+        loop {
+            match self.peek_token() {
+                None | Some(Token::Comma) | Some(Token::RParen) => break,
+                _ => options.push(self.parse_column_option_def()?),
+            }
+        }
+        Ok(ColumnDef {
+            name,
+            data_type,
+            collation,
+            options,
+        })
     }
 
     fn parse_column_option_def(&mut self) -> Result<ColumnOptionDef<Raw>, ParserError> {
@@ -3732,14 +3741,13 @@ impl<'a> Parser<'a> {
                         let _ = self.parse_keyword(COLUMN);
                         let column_if_not_exists = self.parse_if_not_exists()?;
                         let column_name = self.parse_identifier()?;
-                        let data_type = self.parse_data_type()?;
+                        let column = self.parse_column(column_name)?;
                         Ok(Statement::AlterAddColumn(AlterAddColumnStatement {
                             object_type,
                             if_exists,
                             name,
                             column_if_not_exists,
-                            column_name,
-                            data_type,
+                            column,
                         }))
                     }
                     DROP => {
