@@ -805,10 +805,8 @@ fn eval_unmaterializable_func(
             pack(t)
         }
         UnmaterializableFunc::Version => {
-            let version = format!(
-                "PostgreSQL 8.0.2 on i686-pc-linux-gnu, compiled by GCC gcc (GCC) 3.4.2 20041017 (Red Hat 3.4.2-6.fc3), Redshift 1.0.50708"
-            );
-            pack(Datum::from(&*version))
+            let version = "PostgreSQL 8.0.2 on i686-pc-linux-gnu, compiled by GCC gcc (GCC) 3.4.2 20041017 (Red Hat 3.4.2-6.fc3), Redshift 1.0.50708";
+            pack(Datum::from(version))
         }
     }
 }
