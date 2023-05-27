@@ -219,12 +219,16 @@ impl Coordinator {
                 if matches!(session.transaction(), TransactionStatus::InTransaction(_)) {
                     session.add_notice(AdapterNotice::ExistingTransactionInProgress);
                 }
+                // Disable starting explicit transactions for redshift.
+                /*
                 let (session, result) = session.start_transaction(
                     self.now_datetime(),
                     plan.access,
                     plan.isolation_level,
                 );
                 tx.send(result.map(|_| ExecuteResponse::StartedTransaction), session)
+                */
+                tx.send(Ok(ExecuteResponse::StartedTransaction), session)
             }
             Plan::CommitTransaction(CommitTransactionPlan {
                 ref transaction_type,
