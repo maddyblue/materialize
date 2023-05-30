@@ -4472,22 +4472,12 @@ dependencies = [
 name = "mz-pgcopy"
 version = "0.0.0"
 dependencies = [
- "aes-gcm",
  "anyhow",
- "aws-config",
- "aws-credential-types",
- "aws-sdk-s3",
- "aws-smithy-types",
  "bytes",
  "csv",
- "flate2",
- "mz-ore",
  "mz-pgrepr",
  "mz-repr",
- "openssl",
- "serde",
- "serde_json",
- "tokio",
+ "mz-s3util",
  "url",
  "workspace-hack",
 ]
@@ -4755,6 +4745,26 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "workspace-hack",
+]
+
+[[package]]
+name = "mz-s3util"
+version = "0.0.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-s3",
+ "aws-smithy-types",
+ "flate2",
+ "mz-ore",
+ "openssl",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
  "workspace-hack",
 ]
 
