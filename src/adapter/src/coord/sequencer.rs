@@ -215,7 +215,7 @@ impl Coordinator {
             Plan::ResetVariable(plan) => {
                 tx.send(self.sequence_reset_variable(&mut session, plan), session);
             }
-            Plan::StartTransaction(plan) => {
+            Plan::StartTransaction(_plan) => {
                 if matches!(session.transaction(), TransactionStatus::InTransaction(_)) {
                     session.add_notice(AdapterNotice::ExistingTransactionInProgress);
                 }

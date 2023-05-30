@@ -349,7 +349,7 @@ impl Coordinator {
         (self.catalog().config().now)()
     }
 
-    pub(crate) fn now_datetime(&self) -> DateTime<Utc> {
+    pub(crate) fn _now_datetime(&self) -> DateTime<Utc> {
         to_datetime(self.now())
     }
 
