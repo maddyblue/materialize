@@ -379,6 +379,7 @@ impl_display_t!(CopyStatement);
 pub struct UpdateStatement<T: AstInfo> {
     /// `FROM`
     pub table_name: T::ItemName,
+    pub alias: Option<TableAlias>,
     /// Column assignments
     pub assignments: Vec<Assignment<T>>,
     /// WHERE
