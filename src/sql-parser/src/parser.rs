@@ -5644,6 +5644,11 @@ impl<'a> Parser<'a> {
 
         self.expect_keyword(SET)?;
         let assignments = self.parse_comma_separated(Parser::parse_assignment)?;
+        let from = if self.parse_keyword(FROM) {
+            self.parse_comma_separated(Parser::parse_table_and_joins)?
+        } else {
+            Vec::new()
+        };
         let selection = if self.parse_keyword(WHERE) {
             Some(self.parse_expr()?)
         } else {
@@ -5654,6 +5659,7 @@ impl<'a> Parser<'a> {
             table_name,
             alias,
             assignments,
+            from,
             selection,
         }))
     }

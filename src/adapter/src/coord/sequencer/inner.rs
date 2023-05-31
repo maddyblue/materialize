@@ -3416,6 +3416,7 @@ impl Coordinator {
                 return;
             }
         };
+        let desc_arity = desc.arity();
 
         // Ensure all objects `selection` depends on are valid for
         // `ReadThenWrite` operations, i.e. they do not refer to any objects
@@ -3530,17 +3531,26 @@ impl Coordinator {
                                             for (idx, new_value) in updates {
                                                 datums[idx] = new_value;
                                             }
-                                            let updated = Row::pack_slice(&datums);
+                                            // Rows can be a join and have expressions used during
+                                            // assingment eval, so only take the target table
+                                            // columns.
+                                            let updated = Row::pack_slice(&datums[..desc_arity]);
                                             diffs.push((updated, 1));
                                         }
+                                        // Rows can be a join and have expressions used during
+                                        // assingment eval, so only take the target table
+                                        // columns.
+                                        // TODO: Fast path for rows that don't need to do this.
+                                        let mut table_row = Row::with_capacity(desc_arity);
+                                        table_row.packer().extend(row.iter().take(desc_arity));
                                         match kind {
                                             // Updates and deletes always remove the
                                             // current row. Updates will also add an
                                             // updated value.
                                             MutationKind::Update | MutationKind::Delete => {
-                                                diffs.push((row, -1))
+                                                diffs.push((table_row, -1))
                                             }
-                                            MutationKind::Insert => diffs.push((row, 1)),
+                                            MutationKind::Insert => diffs.push((table_row, 1)),
                                         }
                                     }
                                     for (row, diff) in &diffs {

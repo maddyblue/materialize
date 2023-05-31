@@ -531,14 +531,15 @@ pub fn plan_delete_query(
     transform_ast::transform(scx, &mut delete_stmt)?;
 
     let qcx = QueryContext::root(scx, QueryLifetime::OneShot(scx.pcx()?));
-    plan_mutation_query_inner(
+    plan_mutation_query_inner(MutationQueryArgs {
         qcx,
-        delete_stmt.table_name,
-        delete_stmt.alias,
-        delete_stmt.using,
-        vec![],
-        delete_stmt.selection,
-    )
+        table_name: delete_stmt.table_name,
+        alias: delete_stmt.alias,
+        using: delete_stmt.using,
+        from: Vec::new(),
+        assignments: Vec::new(),
+        selection: delete_stmt.selection,
+    })
 }
 
 pub fn plan_update_query(
@@ -548,24 +549,37 @@ pub fn plan_update_query(
     transform_ast::transform(scx, &mut update_stmt)?;
 
     let qcx = QueryContext::root(scx, QueryLifetime::OneShot(scx.pcx()?));
-
-    plan_mutation_query_inner(
+    plan_mutation_query_inner(MutationQueryArgs {
         qcx,
-        update_stmt.table_name,
-        update_stmt.alias,
-        vec![],
-        update_stmt.assignments,
-        update_stmt.selection,
-    )
+        table_name: update_stmt.table_name,
+        alias: update_stmt.alias,
+        using: vec![],
+        from: update_stmt.from,
+        assignments: update_stmt.assignments,
+        selection: update_stmt.selection,
+    })
 }
 
-pub fn plan_mutation_query_inner(
-    qcx: QueryContext,
+pub struct MutationQueryArgs<'a> {
+    qcx: QueryContext<'a>,
     table_name: ResolvedItemName,
     alias: Option<TableAlias>,
     using: Vec<TableWithJoins<Aug>>,
+    from: Vec<TableWithJoins<Aug>>,
     assignments: Vec<Assignment<Aug>>,
     selection: Option<Expr<Aug>>,
+}
+
+pub fn plan_mutation_query_inner(
+    MutationQueryArgs {
+        qcx,
+        table_name,
+        alias,
+        using,
+        from,
+        assignments,
+        selection,
+    }: MutationQueryArgs,
 ) -> Result<ReadThenWritePlan, PlanError> {
     // Get global ID.
     let id = match table_name {
@@ -593,15 +607,20 @@ pub fn plan_mutation_query_inner(
     let (mut get, scope) = qcx.resolve_table_name(table_name)?;
     let scope = plan_table_alias(scope, alias.as_ref())?;
     let desc = item.desc(&qcx.scx.catalog.resolve_full_name(item.name()))?;
-    let relation_type = qcx.relation_type(&get);
 
-    if using.is_empty() {
+    assert!(using.is_empty() || from.is_empty());
+    let (get, scope) = if !using.is_empty() {
+        let get = handle_mutation_using_clause(&qcx, selection, using, get, scope.clone())?;
+        (get, scope)
+    } else if !from.is_empty() {
+        handle_mutation_from_clause(&qcx, selection, from, get, scope)?
+    } else {
         if let Some(expr) = selection {
             let ecx = &ExprContext {
                 qcx: &qcx,
                 name: "WHERE clause",
                 scope: &scope,
-                relation_type: &relation_type,
+                relation_type: &qcx.relation_type(&get),
                 allow_aggregates: false,
                 allow_subqueries: true,
                 allow_windows: false,
@@ -609,10 +628,10 @@ pub fn plan_mutation_query_inner(
             let expr = plan_expr(ecx, &expr)?.type_as(ecx, &ScalarType::Bool)?;
             get = get.filter(vec![expr]);
         }
-    } else {
-        get = handle_mutation_using_clause(&qcx, selection, using, get, scope.clone())?;
-    }
+        (get, scope)
+    };
 
+    let relation_type = qcx.relation_type(&get);
     let mut sets = BTreeMap::new();
     for Assignment { id, value } in assignments {
         // Get the index and type of the column.
@@ -646,7 +665,7 @@ pub fn plan_mutation_query_inner(
         order_by: vec![],
         limit: None,
         offset: 0,
-        project: (0..desc.arity()).collect(),
+        project: (0..relation_type.arity()).collect(),
     };
 
     Ok(ReadThenWritePlan {
@@ -755,6 +774,72 @@ fn handle_mutation_using_clause(
 
     // Filter `get` like `...WHERE EXISTS (<using_rel_expr>)`.
     Ok(get.filter(vec![using_rel_expr.exists()]))
+}
+
+// Similar to the using variant above, but with some differences.
+//
+// TODO: Document the innards. This function is copied and modified from the above using fn, and I'm
+// not sure which comments still apply.
+fn handle_mutation_from_clause(
+    qcx: &QueryContext,
+    selection: Option<Expr<Aug>>,
+    from: Vec<TableWithJoins<Aug>>,
+    get: HirRelationExpr,
+    outer_scope: Scope,
+) -> Result<(HirRelationExpr, Scope), PlanError> {
+    let (mut from_rel_expr, from_scope) =
+        from.into_iter().fold(Ok((get, outer_scope)), |l, twj| {
+            let (left, left_scope) = l?;
+            plan_join(
+                qcx,
+                left,
+                left_scope,
+                &Join {
+                    relation: TableFactor::NestedJoin {
+                        join: Box::new(twj),
+                        alias: None,
+                    },
+                    join_operator: JoinOperator::CrossJoin,
+                },
+            )
+        })?;
+
+    if let Some(expr) = selection {
+        let from_relation_type = qcx.relation_type(&from_rel_expr);
+        let ecx = &ExprContext {
+            qcx,
+            name: "WHERE clause",
+            scope: &from_scope,
+            relation_type: &from_relation_type,
+            allow_aggregates: false,
+            allow_subqueries: true,
+            allow_windows: false,
+        };
+
+        // Plan the filter expression.
+        let expr = plan_expr(ecx, &expr)?.type_as(ecx, &ScalarType::Bool)?;
+
+        // TODO: Does UPDATE FROM need this?
+        /*
+        // Rewrite all column referring to the `FROM` section of `joined` (i.e.
+        // those to the right of `using_rel_expr`) to instead be correlated to
+        // the outer relation, i.e. `get`.
+        let from_rel_arity = from_relation_type.arity();
+        #[allow(deprecated)]
+        expr.visit_mut(&mut |e| {
+            if let HirScalarExpr::Column(c) = e {
+                if c.column >= using_rel_arity {
+                    c.level += 1;
+                    c.column -= using_rel_arity;
+                };
+            }
+        });
+        */
+
+        from_rel_expr = from_rel_expr.filter(vec![expr]);
+    }
+
+    Ok((from_rel_expr, from_scope))
 }
 
 struct CastRelationError {

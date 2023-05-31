@@ -377,11 +377,12 @@ impl_display_t!(CopyStatement);
 /// `UPDATE`
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UpdateStatement<T: AstInfo> {
-    /// `FROM`
     pub table_name: T::ItemName,
     pub alias: Option<TableAlias>,
     /// Column assignments
     pub assignments: Vec<Assignment<T>>,
+    /// FROM
+    pub from: Vec<TableWithJoins<T>>,
     /// WHERE
     pub selection: Option<Expr<T>>,
 }
@@ -393,6 +394,10 @@ impl<T: AstInfo> AstDisplay for UpdateStatement<T> {
         if !self.assignments.is_empty() {
             f.write_str(" SET ");
             f.write_node(&display::comma_separated(&self.assignments));
+        }
+        if !self.from.is_empty() {
+            f.write_str(" FROM ");
+            f.write_node(&display::comma_separated(&self.from));
         }
         if let Some(selection) = &self.selection {
             f.write_str(" WHERE ");
