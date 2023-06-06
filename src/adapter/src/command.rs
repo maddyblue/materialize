@@ -314,6 +314,7 @@ pub enum ExecuteResponse {
         id: GlobalId,
         columns: Vec<usize>,
         params: CopyFormatParams<'static>,
+        gzip: bool,
     },
     /// The requested connection was created.
     CreatedConnection,

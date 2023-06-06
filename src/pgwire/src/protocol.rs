@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::future::Future;
+use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::{cmp, iter, mem};
 
@@ -1397,10 +1398,11 @@ where
                 id,
                 columns,
                 params,
+                gzip,
             } => {
                 let row_desc =
                     row_desc.expect("missing row description for ExecuteResponse::CopyFrom");
-                self.copy_from(id, columns, params, row_desc).await
+                self.copy_from(id, columns, params, row_desc, gzip).await
             }
             ExecuteResponse::TransactionCommitted { params }
             | ExecuteResponse::TransactionRolledBack { params } => {
@@ -1767,6 +1769,7 @@ where
         columns: Vec<usize>,
         params: CopyFormatParams<'_>,
         row_desc: RelationDesc,
+        gzip: bool,
     ) -> Result<State, io::Error> {
         let typ = row_desc.typ();
         let column_formats = vec![mz_pgrepr::Format::Text; typ.column_types.len()];
@@ -1806,6 +1809,12 @@ where
                     break;
                 }
             }
+        }
+
+        if gzip {
+            let mut buf = Vec::new();
+            flate2::read::GzDecoder::new(&*data).read_to_end(&mut buf)?;
+            data = buf;
         }
 
         let column_types = typ

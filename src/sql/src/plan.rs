@@ -700,6 +700,7 @@ pub struct CopyFromPlan {
     pub id: GlobalId,
     pub columns: Vec<usize>,
     pub params: CopyFormatParams<'static>,
+    pub gzip: bool,
 }
 
 #[derive(Debug)]

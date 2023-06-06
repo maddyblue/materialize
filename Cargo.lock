@@ -4489,6 +4489,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "bytesize",
+ "flate2",
  "futures",
  "itertools",
  "mz-adapter",

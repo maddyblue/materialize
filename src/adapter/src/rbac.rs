@@ -910,6 +910,7 @@ fn generate_required_privileges(
             id,
             columns: _,
             params: _,
+            gzip: _,
         }) => {
             let item = catalog.get_item(id);
             vec![
