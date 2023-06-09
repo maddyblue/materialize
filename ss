@@ -1,0 +1,23 @@
+
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &
+cat gh19743.sql |  psql -h 127.0.0.1 -p 6875 -U materialize &

@@ -599,8 +599,11 @@ impl Coordinator {
             ))),
 
             // All other statements are handled immediately.
-            _ => match self.plan_statement(ctx.session_mut(), stmt, &params) {
-                Ok(plan) => self.sequence_plan(ctx, plan, depends_on).await,
+            _ => match self.plan_statement(ctx.session_mut(), stmt.clone(), &params) {
+                Ok(plan) => {
+                    println!("EXXEC: conn={} stmt={stmt}", ctx.session().conn_id());
+                    self.sequence_plan(ctx, plan, depends_on).await
+                }
                 Err(e) => ctx.retire(Err(e)),
             },
         }

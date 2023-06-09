@@ -247,14 +247,16 @@ impl Coordinator {
             .copied()
             .collect::<BTreeSet<_>>();
 
-        let compute_ids = vec![(compute_instance, compute_ids)].into_iter().collect();
+        let compute_ids: BTreeMap<_, _> =
+            vec![(compute_instance, compute_ids)].into_iter().collect();
         let since = self.least_valid_read(&CollectionIdBundle {
-            storage_ids,
-            compute_ids,
+            storage_ids: storage_ids.clone(),
+            compute_ids: compute_ids.clone(),
         });
 
         // Ensure that the dataflow's `as_of` is at least `since`.
         if let Some(as_of) = &mut dataflow.as_of {
+            dbg!(&since, storage_ids, compute_ids);
             // It should not be possible to request an invalid time. SINK doesn't support
             // AS OF. Subscribe and Peek check that their AS OF is >= since.
             assert!(

@@ -479,6 +479,7 @@ impl Coordinator {
                 &compute_instance.to_string(),
             ])
             .inc();
+        dbg!(&det);
         Ok(det)
     }
 
@@ -539,7 +540,7 @@ impl Coordinator {
 }
 
 /// Information used when determining the timestamp for a query.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TimestampDetermination<T> {
     /// The chosen timestamp context from `determine_timestamp`.
     pub timestamp_context: TimestampContext<T>,

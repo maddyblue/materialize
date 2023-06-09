@@ -157,7 +157,12 @@ pub(super) struct Instance<T> {
 impl<T> Instance<T> {
     /// Acquire a handle to the collection state associated with `id`.
     pub fn collection(&self, id: GlobalId) -> Result<&CollectionState<T>, CollectionMissing> {
-        self.collections.get(&id).ok_or(CollectionMissing(id))
+        let res = self.collections.get(&id);
+        if res.is_none() {
+            println!("MISSING {id}");
+            dbg!(self.collections.keys().collect::<Vec<_>>());
+        }
+        res.ok_or(CollectionMissing(id))
     }
 
     /// Acquire a mutable handle to the collection state associated with `id`.
@@ -589,6 +594,7 @@ where
                 .iter()
                 .map(|id| (*id, changes.clone()))
                 .collect();
+            println!("CREATEDATAFLOWS");
             self.storage_controller
                 .update_read_capabilities(&mut storage_read_updates);
             // Update compute read capabilities for inputs.
@@ -716,14 +722,19 @@ where
         map_filter_project: mz_expr::SafeMfpPlan,
         target_replica: Option<ReplicaId>,
     ) -> Result<(), PeekError> {
-        let since = self.compute.collection(id)?.read_capabilities.frontier();
+        let since = self
+            .compute
+            .collection(id)
+            .unwrap()
+            .read_capabilities
+            .frontier();
         if !since.less_equal(&timestamp) {
-            Err(PeekError::SinceViolation(id))?;
+            return Err(PeekError::SinceViolation(id))?;
         }
 
         if let Some(target) = target_replica {
             if !self.compute.replica_exists(target) {
-                return Err(PeekError::ReplicaMissing(target));
+                return Err(PeekError::ReplicaMissing(target))?;
             }
         }
 
@@ -911,6 +922,7 @@ where
             self.update_read_capabilities(&mut compute_read_capability_changes);
         }
         if !storage_read_capability_changes.is_empty() {
+            println!("UPDATEWRITEFRONTIERS-COMPUTE");
             self.storage_controller
                 .update_read_capabilities(&mut storage_read_capability_changes);
         }
@@ -957,6 +969,7 @@ where
             }
         }
         if !storage_read_capability_changes.is_empty() {
+            println!("REMOVEWRITEFRONTIERS");
             self.storage_controller
                 .update_read_capabilities(&mut storage_read_capability_changes);
         }
@@ -1034,6 +1047,7 @@ where
 
         // We may have storage consequences to process.
         if !storage_todo.is_empty() {
+            println!("COMPUTEUPDATEREADCAPS");
             self.storage_controller
                 .update_read_capabilities(&mut storage_todo);
         }

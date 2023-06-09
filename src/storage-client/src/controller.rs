@@ -2045,6 +2045,7 @@ where
         }
 
         if !read_capability_changes.is_empty() {
+            println!("SETREADPOLICY");
             self.update_read_capabilities(&mut read_capability_changes);
         }
     }
@@ -2104,6 +2105,7 @@ where
         }
 
         if !read_capability_changes.is_empty() {
+            println!("UPDATEWRITEFRONTIERS-STORAGE");
             self.update_read_capabilities(&mut read_capability_changes);
         }
     }
@@ -2208,6 +2210,13 @@ where
             if !changes.is_empty() {
                 worker_compaction_commands.insert(key, (frontier, cluster_id));
             }
+        }
+
+        for (id, frontier) in persist_compaction_commands.iter() {
+            if id.is_system() {
+                continue;
+            }
+            println!("UPDATEREADD: id={id}, frontier={frontier:?}");
         }
 
         self.state
@@ -2576,6 +2585,7 @@ where
             .map(|id| (*id, changes.clone()))
             .collect();
 
+        println!("INSTALLREADCAPS");
         self.update_read_capabilities(&mut storage_read_updates);
 
         Ok(())
@@ -2604,6 +2614,7 @@ where
             .map(|id| (*id, changes.clone()))
             .collect();
 
+        println!("REMOVEREADCAPS");
         self.update_read_capabilities(&mut storage_read_updates);
     }
 

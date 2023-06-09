@@ -2262,6 +2262,8 @@ impl Coordinator {
                 // schema than the first query. An index could be caused by a CREATE INDEX
                 // after the transaction started.
                 let outside = incoming_id_bundle.difference(&allowed_id_bundle);
+                println!("TIMEDOMAINN: conn={}", session.conn_id(),);
+                dbg!(&allowed_id_bundle, &incoming_id_bundle, &outside);
                 if !outside.is_empty() {
                     let mut valid_names =
                         self.resolve_collection_id_bundle_names(session, &allowed_id_bundle);

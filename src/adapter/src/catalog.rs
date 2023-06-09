@@ -5811,6 +5811,7 @@ impl Catalog {
                     item,
                     owner_id,
                 } => {
+                    println!("CREATTE: id={id} name={name}");
                     state.check_unstable_dependencies(&item)?;
 
                     if let Some(id @ ClusterId::System(_)) = item.cluster_id() {
@@ -6165,6 +6166,7 @@ impl Catalog {
                     }
                     ObjectId::Item(id) => {
                         let entry = state.get_entry(&id);
+                        println!("DROPP: id={id} name={}", entry.name());
                         if id.is_system() {
                             let name = entry.name();
                             let full_name = state
