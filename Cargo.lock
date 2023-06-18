@@ -57,6 +57,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "android-tzdata"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e999941b234f3131b00bc13c22d06e8c5ff726d1b6318ac7eb276997bbb4fef0"
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -112,7 +118,7 @@ dependencies = [
  "arrow-format",
  "base64 0.13.1",
  "bytemuck",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "dyn-clone",
  "either",
  "ethnum",
@@ -976,11 +982,24 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chrono"
-version = "0.4.24"
-source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#4e2c2b4ad23d6822445718ee536b45d5d649040f"
+version = "0.4.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec837a71355b28f6556dbd569b37b3f363091c0bd4b2e735674521b4c5fd9bc5"
 dependencies = [
+ "android-tzdata",
  "iana-time-zone",
- "num-integer",
+ "num-traits",
+ "serde",
+ "winapi",
+]
+
+[[package]]
+name = "chrono"
+version = "0.4.26"
+source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#fb220c8ab9f0a627fd3230700ac2fbc50538d2d7"
+dependencies = [
+ "android-tzdata",
+ "iana-time-zone",
  "num-traits",
  "serde",
  "winapi",
@@ -992,7 +1011,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa48fa079165080f11d7753fd0bc175b7d391f276b965fe4b55bfad67856e463"
 dependencies = [
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono-tz-build",
  "phf",
  "serde",
@@ -2096,9 +2115,9 @@ dependencies = [
 
 [[package]]
 name = "frunk_core"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1246cf43ec80bf8b2505b5c360b8fb999c97dabd17dbb604d85558d5cbc25482"
+checksum = "af2469fab0bd07e64ccf0ad57a1438f63160c69b2e57f04a439653d68eb558d6"
 
 [[package]]
 name = "frunk_derives"
@@ -2731,7 +2750,7 @@ checksum = "6d9455388f4977de4d0934efa9f7d36296295537d774574113a20f6082de03da"
 dependencies = [
  "base64 0.13.1",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "http",
  "percent-encoding",
  "serde",
@@ -2761,7 +2780,7 @@ checksum = "e80db3ca107e89da5f7eae37ea5274e06cefdcf9689d0ebd5ec3575a6f983e4e"
 dependencies = [
  "base64 0.13.1",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "dirs-next",
  "either",
  "futures",
@@ -2796,7 +2815,7 @@ version = "0.77.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fce686d2fbdaf6cb18d19cdb0692e9485dd9945f79f944b8772bdb2a07e8d39d"
 dependencies = [
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "form_urlencoded",
  "http",
  "json-patch",
@@ -2851,7 +2870,7 @@ version = "1.0.0"
 source = "git+https://github.com/MaterializeInc/rust-server-sdk#dcda26dad12a871795a6958ef238536c27c67164"
 dependencies = [
  "built",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-channel",
  "data-encoding",
  "eventsource-client",
@@ -2880,7 +2899,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c27dd31ce69c55fca526d1c22c2dcca96fd0c98e496529d37eeef6c41652173"
 dependencies = [
  "base16ct",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools",
  "lazy_static",
  "log",
@@ -3324,7 +3343,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "bytesize",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "const_format",
  "criterion",
  "datadriven",
@@ -3415,7 +3434,7 @@ version = "0.7.0"
 dependencies = [
  "anyhow",
  "byteorder",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "crc32fast",
  "digest",
  "enum-kinds",
@@ -3550,7 +3569,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "http",
  "itertools",
@@ -3654,7 +3673,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytesize",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "columnation",
  "differential-dataflow",
  "futures",
@@ -3699,7 +3718,7 @@ name = "mz-controller"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "differential-dataflow",
  "futures",
  "mz-build-info",
@@ -3737,7 +3756,7 @@ dependencies = [
  "bytes",
  "bytesize",
  "cc",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "datadriven",
  "fail",
@@ -3832,7 +3851,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "bytesize",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "criterion",
  "csv",
  "datadriven",
@@ -3938,7 +3957,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "byteorder",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "criterion",
  "differential-dataflow",
@@ -3968,7 +3987,7 @@ name = "mz-kafka-util"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "crossbeam",
  "mz-avro",
@@ -4058,7 +4077,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytesize",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "derivative",
  "futures-core",
  "mz-ore",
@@ -4075,7 +4094,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "fail",
  "futures",
@@ -4100,7 +4119,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "hex",
  "itertools",
@@ -4151,7 +4170,7 @@ dependencies = [
  "async-trait",
  "atty",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "console-subscriber",
  "ctor",
@@ -4306,7 +4325,7 @@ version = "0.0.0"
 dependencies = [
  "byteorder",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "dec",
  "mz-ore",
  "mz-repr",
@@ -4453,7 +4472,7 @@ dependencies = [
  "anyhow",
  "bitflags",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono-tz",
  "columnation",
  "criterion",
@@ -4500,7 +4519,7 @@ dependencies = [
 name = "mz-repr-test-util"
 version = "0.0.0"
 dependencies = [
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "datadriven",
  "mz-lowertest",
  "mz-ore",
@@ -4591,7 +4610,7 @@ dependencies = [
  "anyhow",
  "aws-sdk-sts",
  "bitflags",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "const_format",
  "datadriven",
  "enum-kinds",
@@ -4664,7 +4683,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "fallible-iterator",
  "futures",
@@ -4771,7 +4790,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytesize",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "crossbeam-channel",
  "csv-core",
@@ -4841,7 +4860,7 @@ dependencies = [
  "aws-credential-types",
  "aws-types",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "dec",
  "derivative",
  "differential-dataflow",
@@ -4898,7 +4917,7 @@ name = "mz-test-util"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "mz-kafka-util",
  "mz-ore",
  "rand",
@@ -4923,7 +4942,7 @@ dependencies = [
  "aws-types",
  "byteorder",
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap",
  "flate2",
  "futures",
@@ -5725,7 +5744,7 @@ dependencies = [
 [[package]]
 name = "postgres-protocol"
 version = "0.6.5"
-source = "git+https://github.com/MaterializeInc/rust-postgres#dd70a8b9caec1bb056ff66782a8e8b72d446ffa5"
+source = "git+https://github.com/MaterializeInc/rust-postgres#7bdd17b5acf4d7dbc53b08a9038793ab7e49da6c"
 dependencies = [
  "base64 0.21.0",
  "byteorder",
@@ -5742,10 +5761,10 @@ dependencies = [
 [[package]]
 name = "postgres-types"
 version = "0.2.5"
-source = "git+https://github.com/MaterializeInc/rust-postgres#dd70a8b9caec1bb056ff66782a8e8b72d446ffa5"
+source = "git+https://github.com/MaterializeInc/rust-postgres#7bdd17b5acf4d7dbc53b08a9038793ab7e49da6c"
 dependencies = [
  "bytes",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "fallible-iterator",
  "postgres-protocol",
  "serde",
@@ -6756,7 +6775,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25bf4a5a814902cd1014dbccfa4d4560fb8432c779471e96e035602519f82eef"
 dependencies = [
  "base64 0.13.1",
- "chrono",
+ "chrono 0.4.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex",
  "indexmap",
  "serde",
@@ -7507,7 +7526,7 @@ dependencies = [
 [[package]]
 name = "tokio-postgres"
 version = "0.7.8"
-source = "git+https://github.com/MaterializeInc/rust-postgres#dd70a8b9caec1bb056ff66782a8e8b72d446ffa5"
+source = "git+https://github.com/MaterializeInc/rust-postgres#7bdd17b5acf4d7dbc53b08a9038793ab7e49da6c"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -8275,7 +8294,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "cc",
- "chrono",
+ "chrono 0.4.26 (git+https://github.com/chronotope/chrono.git?branch=0.4.x)",
  "clap",
  "criterion",
  "crossbeam-channel",
@@ -8428,3 +8447,8 @@ dependencies = [
  "cc",
  "libc",
 ]
+
+[[patch.unused]]
+name = "chrono"
+version = "0.4.24"
+source = "git+https://github.com/chronotope/chrono.git?branch=0.4.x#4e2c2b4ad23d6822445718ee536b45d5d649040f"
