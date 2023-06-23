@@ -2126,6 +2126,8 @@ impl Coordinator {
             real_time_recency_ts,
         )?;
 
+        dbg!(self.explain_timestamp(determination.clone(), id_bundle, cluster_id, session));
+
         // We only track the peeks in the session if the query doesn't use AS
         // OF or we're inside an explicit transaction. The latter case is
         // necessary to support PG's `BEGIN` semantics, whose behavior can
@@ -2262,8 +2264,7 @@ impl Coordinator {
                 // schema than the first query. An index could be caused by a CREATE INDEX
                 // after the transaction started.
                 let outside = incoming_id_bundle.difference(&allowed_id_bundle);
-                println!("TIMEDOMAINN: conn={}", session.conn_id(),);
-                dbg!(&allowed_id_bundle, &incoming_id_bundle, &outside);
+                println!("TIMEDOMAINN: conn={}", session.conn_id());
                 if !outside.is_empty() {
                     let mut valid_names =
                         self.resolve_collection_id_bundle_names(session, &allowed_id_bundle);
@@ -2854,7 +2855,23 @@ impl Coordinator {
             &source_ids,
             real_time_recency_ts,
         )?;
+        let explanation = self.explain_timestamp(determination, &id_bundle, cluster_id, session);
+        let s = if is_json {
+            serde_json::to_string_pretty(&explanation).expect("failed to serialize explanation")
+        } else {
+            explanation.to_string()
+        };
+        let rows = vec![Row::pack_slice(&[Datum::from(s.as_str())])];
+        Ok(send_immediate_rows(rows))
+    }
 
+    fn explain_timestamp(
+        &self,
+        determination: TimestampDetermination<mz_repr::Timestamp>,
+        id_bundle: &CollectionIdBundle,
+        cluster_id: ClusterId,
+        session: &Session,
+    ) -> TimestampExplanation<mz_repr::Timestamp> {
         let mut sources = Vec::new();
         {
             for id in id_bundle.storage_ids.iter() {
@@ -2906,17 +2923,10 @@ impl Coordinator {
                 }
             }
         }
-        let explanation = TimestampExplanation {
+        TimestampExplanation {
             determination,
             sources,
-        };
-        let s = if is_json {
-            serde_json::to_string_pretty(&explanation).expect("failed to serialize explanation")
-        } else {
-            explanation.to_string()
-        };
-        let rows = vec![Row::pack_slice(&[Datum::from(s.as_str())])];
-        Ok(send_immediate_rows(rows))
+        }
     }
 
     #[tracing::instrument(level = "debug", skip_all)]

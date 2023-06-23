@@ -157,12 +157,7 @@ pub(super) struct Instance<T> {
 impl<T> Instance<T> {
     /// Acquire a handle to the collection state associated with `id`.
     pub fn collection(&self, id: GlobalId) -> Result<&CollectionState<T>, CollectionMissing> {
-        let res = self.collections.get(&id);
-        if res.is_none() {
-            println!("MISSING {id}");
-            dbg!(self.collections.keys().collect::<Vec<_>>());
-        }
-        res.ok_or(CollectionMissing(id))
+        self.collections.get(&id).ok_or(CollectionMissing(id))
     }
 
     /// Acquire a mutable handle to the collection state associated with `id`.
@@ -594,7 +589,6 @@ where
                 .iter()
                 .map(|id| (*id, changes.clone()))
                 .collect();
-            println!("CREATEDATAFLOWS");
             self.storage_controller
                 .update_read_capabilities(&mut storage_read_updates);
             // Update compute read capabilities for inputs.
@@ -607,6 +601,7 @@ where
             // Install collection state for each of the exports.
             let mut updates = Vec::new();
             for export_id in dataflow.export_ids() {
+                println!("createdataflows: INSERTID {export_id}");
                 self.compute.collections.insert(
                     export_id,
                     CollectionState::new(
@@ -922,7 +917,6 @@ where
             self.update_read_capabilities(&mut compute_read_capability_changes);
         }
         if !storage_read_capability_changes.is_empty() {
-            println!("UPDATEWRITEFRONTIERS-COMPUTE");
             self.storage_controller
                 .update_read_capabilities(&mut storage_read_capability_changes);
         }
@@ -1047,7 +1041,6 @@ where
 
         // We may have storage consequences to process.
         if !storage_todo.is_empty() {
-            println!("COMPUTEUPDATEREADCAPS");
             self.storage_controller
                 .update_read_capabilities(&mut storage_todo);
         }
@@ -1099,6 +1092,7 @@ where
                         .values()
                         .all(|frontier| frontier.is_empty())
                 {
+                    println!("update_dropped_collections: REMOVEID {id}");
                     self.compute.collections.remove(&id);
                 }
             }

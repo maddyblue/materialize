@@ -479,7 +479,6 @@ impl Coordinator {
                 &compute_instance.to_string(),
             ])
             .inc();
-        dbg!(&det);
         Ok(det)
     }
 
@@ -540,7 +539,7 @@ impl Coordinator {
 }
 
 /// Information used when determining the timestamp for a query.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TimestampDetermination<T> {
     /// The chosen timestamp context from `determine_timestamp`.
     pub timestamp_context: TimestampContext<T>,
@@ -564,7 +563,7 @@ impl<T: TimestampManipulation> TimestampDetermination<T> {
 }
 
 /// Information used when determining the timestamp for a query.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TimestampExplanation<T> {
     /// The chosen timestamp from `determine_timestamp`.
     pub determination: TimestampDetermination<T>,
@@ -572,7 +571,7 @@ pub struct TimestampExplanation<T> {
     pub sources: Vec<TimestampSource<T>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TimestampSource<T> {
     pub name: String,
     pub read_frontier: Vec<T>,

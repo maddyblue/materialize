@@ -375,10 +375,13 @@ impl crate::coord::Coordinator {
                 let output_ids = dataflow.export_ids().collect();
 
                 // Very important: actually create the dataflow (here, so we can destructure).
+
+                println!("PEEK-CREATEDATAFLOWS");
                 self.controller
                     .active_compute()
                     .create_dataflows(compute_instance, vec![dataflow])
                     .unwrap_or_terminate("cannot fail to create dataflows");
+                println!("PEEK-CREATEDATAFLOWS-DONE");
                 self.initialize_compute_read_policies(
                     output_ids,
                     compute_instance,

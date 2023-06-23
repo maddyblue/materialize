@@ -2105,7 +2105,7 @@ where
         }
 
         if !read_capability_changes.is_empty() {
-            println!("UPDATEWRITEFRONTIERS-STORAGE");
+            dbg!(&read_capability_changes);
             self.update_read_capabilities(&mut read_capability_changes);
         }
     }
