@@ -449,6 +449,7 @@ impl crate::coord::Coordinator {
             read_needs.holds.update_iter(time.iter().map(|t| (*t, 1)));
             policy_changes.push((*id, read_needs.policy()));
         }
+        dbg!(&policy_changes);
         self.controller.storage.set_read_policy(policy_changes);
         // Update COMPUTE read policies
         for (compute_instance, compute_ids) in read_holds.compute_ids() {

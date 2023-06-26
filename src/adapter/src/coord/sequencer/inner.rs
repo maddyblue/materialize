@@ -2126,7 +2126,10 @@ impl Coordinator {
             real_time_recency_ts,
         )?;
 
-        dbg!(self.explain_timestamp(determination.clone(), id_bundle, cluster_id, session));
+        dbg!(
+            self.explain_timestamp(determination.clone(), id_bundle, cluster_id, session),
+            id_bundle
+        );
 
         // We only track the peeks in the session if the query doesn't use AS
         // OF or we're inside an explicit transaction. The latter case is
@@ -2153,6 +2156,8 @@ impl Coordinator {
         // already been acquired. If the query does use `AS OF`, it is not necessary to
         // acquire read holds.
         if in_immediate_multi_stmt_txn {
+            println!("CHECKING TIMEDOMAIN CONFLICTS");
+
             self.check_txn_timedomain_conflicts(
                 session,
                 &determination.timestamp_context,
@@ -2168,6 +2173,7 @@ impl Coordinator {
                         session.conn_id(),
                         cluster_id,
                     )?;
+                    dbg!(&timedomain_id_bundle);
 
                     let read_holds =
                         self.acquire_read_holds(timestamp.clone(), &timedomain_id_bundle);
@@ -2265,6 +2271,7 @@ impl Coordinator {
                 // after the transaction started.
                 let outside = incoming_id_bundle.difference(&allowed_id_bundle);
                 println!("TIMEDOMAINN: conn={}", session.conn_id());
+                dbg!(&allowed_id_bundle, incoming_id_bundle, &outside);
                 if !outside.is_empty() {
                     let mut valid_names =
                         self.resolve_collection_id_bundle_names(session, &allowed_id_bundle);

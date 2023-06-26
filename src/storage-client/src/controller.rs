@@ -2044,6 +2044,7 @@ where
             collection.read_policy = policy;
         }
 
+        dbg!(&read_capability_changes);
         if !read_capability_changes.is_empty() {
             println!("SETREADPOLICY");
             self.update_read_capabilities(&mut read_capability_changes);
