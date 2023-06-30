@@ -1108,6 +1108,7 @@ pub enum LoadGenerator {
     Auction,
     Datums,
     Tpch,
+    Ldbc,
 }
 
 impl AstDisplay for LoadGenerator {
@@ -1118,6 +1119,7 @@ impl AstDisplay for LoadGenerator {
             Self::Auction => f.write_str("AUCTION"),
             Self::Datums => f.write_str("DATUMS"),
             Self::Tpch => f.write_str("TPCH"),
+            Self::Ldbc => f.write_str("LDBC"),
         }
     }
 }

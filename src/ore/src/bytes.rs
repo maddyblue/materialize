@@ -20,11 +20,15 @@
 //! that type, nor anything else, implement std::io::Read and std::io::Seek, which
 //! we need. We have an open issue with the `bytes-utils` crate, <https://github.com/vorner/bytes-utils/issues/16>
 //! to add these trait impls.
-//!
+
+use std::collections::BTreeMap;
+use std::io;
+use std::ops::Bound;
 
 use bytes::{Buf, Bytes};
-use internal::SegmentedReader;
 use smallvec::SmallVec;
+
+use crate::cast::CastFrom;
 
 /// A cheaply clonable collection of possibly non-contiguous bytes.
 ///
@@ -193,119 +197,110 @@ impl<const N: usize> FromIterator<Vec<u8>> for SegmentedBytes<N> {
     }
 }
 
-mod internal {
-    use std::collections::BTreeMap;
-    use std::io;
-    use std::ops::Bound;
+/// Provides efficient reading and seeking across a collection of segmented bytes.
+#[derive(Debug)]
+pub struct SegmentedReader {
+    segments: BTreeMap<usize, Bytes>,
+    len: usize,
+    pointer: u64,
+}
 
-    use bytes::Bytes;
+impl SegmentedReader {
+    /// Returns SegmentedReader from the owned bytes
+    pub fn new(segments: impl IntoIterator<Item = Bytes>) -> Self {
+        let mut map = BTreeMap::new();
+        let mut total_len = 0;
 
-    use crate::cast::CastFrom;
-
-    /// Provides efficient reading and seeking across a collection of segmented bytes.
-    #[derive(Debug)]
-    pub struct SegmentedReader {
-        segments: BTreeMap<usize, Bytes>,
-        len: usize,
-        pointer: u64,
-    }
-
-    impl SegmentedReader {
-        pub fn new(segments: impl IntoIterator<Item = Bytes>) -> Self {
-            let mut map = BTreeMap::new();
-            let mut total_len = 0;
-
-            let non_empty_segments = segments.into_iter().filter(|s| !s.is_empty());
-            for segment in non_empty_segments {
-                total_len += segment.len();
-                map.insert(total_len, segment);
-            }
-
-            SegmentedReader {
-                segments: map,
-                len: total_len,
-                pointer: 0,
-            }
+        let non_empty_segments = segments.into_iter().filter(|s| !s.is_empty());
+        for segment in non_empty_segments {
+            total_len += segment.len();
+            map.insert(total_len, segment);
         }
 
-        /// The total number of bytes this [`SegmentedReader`] is mapped over.
-        pub fn len(&self) -> usize {
-            self.len
-        }
-
-        /// The current position of the internal cursor for this [`SegmentedReader`].
-        ///
-        /// Note: It's possible for the current position to be greater than the length,
-        /// as [`std::io::Seek`] allows you to seek past the end of the stream.
-        pub fn position(&self) -> u64 {
-            self.pointer
+        SegmentedReader {
+            segments: map,
+            len: total_len,
+            pointer: 0,
         }
     }
 
-    impl io::Read for SegmentedReader {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            let pointer = usize::cast_from(self.pointer);
-
-            // We've seeked past the end, return nothing.
-            if pointer > self.len {
-                return Ok(0);
-            }
-
-            if let Some((accum_len, segment)) = self
-                .segments
-                .range((Bound::Excluded(&pointer), Bound::Included(&self.len)))
-                .next()
-            {
-                // How many bytes we have left in this segment.
-                let remaining_len = accum_len - pointer;
-                // Position within the segment to being reading.
-                let segment_pos = segment.len() - remaining_len;
-
-                // How many bytes we'll read.
-                let len = core::cmp::min(remaining_len, buf.len());
-                // Copy bytes from the current segment into the buffer.
-                buf[..len].copy_from_slice(&segment[segment_pos..segment_pos + len]);
-                // Advance our pointer.
-                self.pointer += u64::cast_from(len);
-
-                Ok(len)
-            } else {
-                Ok(0)
-            }
-        }
+    /// The total number of bytes this [`SegmentedReader`] is mapped over.
+    pub fn len(&self) -> usize {
+        self.len
     }
 
-    impl io::Seek for SegmentedReader {
-        fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-            use io::SeekFrom;
+    /// The current position of the internal cursor for this [`SegmentedReader`].
+    ///
+    /// Note: It's possible for the current position to be greater than the length,
+    /// as [`std::io::Seek`] allows you to seek past the end of the stream.
+    pub fn position(&self) -> u64 {
+        self.pointer
+    }
+}
 
-            // Get a base to seek from, and an offset to seek to.
-            let (base, offset) = match pos {
-                SeekFrom::Start(n) => {
-                    self.pointer = n;
-                    return Ok(n);
-                }
-                SeekFrom::End(n) => (u64::cast_from(self.len), n),
-                SeekFrom::Current(n) => (self.pointer, n),
-            };
+impl io::Read for SegmentedReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let pointer = usize::cast_from(self.pointer);
 
-            // Check for integer overflow, but we don't check our bounds!
-            //
-            // The contract for io::Seek denotes that seeking beyond the end
-            // of the stream is allowed. If we're beyond the end of the stream
-            // then we won't read back any bytes, but it won't be an error.
-            match base.checked_add_signed(offset) {
-                Some(n) => {
-                    self.pointer = n;
-                    Ok(self.pointer)
-                }
-                None => {
-                    let err = io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "Invalid seek to an overflowing position",
-                    );
-                    Err(err)
-                }
+        // We've seeked past the end, return nothing.
+        if pointer > self.len {
+            return Ok(0);
+        }
+
+        if let Some((accum_len, segment)) = self
+            .segments
+            .range((Bound::Excluded(&pointer), Bound::Included(&self.len)))
+            .next()
+        {
+            // How many bytes we have left in this segment.
+            let remaining_len = accum_len - pointer;
+            // Position within the segment to being reading.
+            let segment_pos = segment.len() - remaining_len;
+
+            // How many bytes we'll read.
+            let len = core::cmp::min(remaining_len, buf.len());
+            // Copy bytes from the current segment into the buffer.
+            buf[..len].copy_from_slice(&segment[segment_pos..segment_pos + len]);
+            // Advance our pointer.
+            self.pointer += u64::cast_from(len);
+
+            Ok(len)
+        } else {
+            Ok(0)
+        }
+    }
+}
+
+impl io::Seek for SegmentedReader {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        use io::SeekFrom;
+
+        // Get a base to seek from, and an offset to seek to.
+        let (base, offset) = match pos {
+            SeekFrom::Start(n) => {
+                self.pointer = n;
+                return Ok(n);
+            }
+            SeekFrom::End(n) => (u64::cast_from(self.len), n),
+            SeekFrom::Current(n) => (self.pointer, n),
+        };
+
+        // Check for integer overflow, but we don't check our bounds!
+        //
+        // The contract for io::Seek denotes that seeking beyond the end
+        // of the stream is allowed. If we're beyond the end of the stream
+        // then we won't read back any bytes, but it won't be an error.
+        match base.checked_add_signed(offset) {
+            Some(n) => {
+                self.pointer = n;
+                Ok(self.pointer)
+            }
+            None => {
+                let err = io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Invalid seek to an overflowing position",
+                );
+                Err(err)
             }
         }
     }
