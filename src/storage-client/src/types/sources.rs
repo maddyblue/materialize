@@ -2170,6 +2170,9 @@ pub enum LoadGenerator {
         count_orders: i64,
         count_clerk: i64,
     },
+    Ldbc {
+        urls: Vec<String>,
+    },
 }
 
 impl LoadGenerator {
@@ -2203,6 +2206,7 @@ impl LoadGenerator {
             ),
             LoadGenerator::Marketing => DataEncodingInner::RowCodec(RelationDesc::empty()),
             LoadGenerator::Tpch { .. } => DataEncodingInner::RowCodec(RelationDesc::empty()),
+            LoadGenerator::Ldbc { .. } => DataEncodingInner::RowCodec(RelationDesc::empty()),
         }
     }
 
@@ -2425,6 +2429,15 @@ impl LoadGenerator {
                     ),
                 ]
             }
+            LoadGenerator::Ldbc { .. } => {
+                let mut descs = LDBC_DESCS.iter().collect::<Vec<_>>();
+                // Sort by output id.
+                descs.sort_by_key(|x| x.1 .0);
+                descs
+                    .into_iter()
+                    .map(|(name, (_output, desc))| (*name, desc.clone()))
+                    .collect()
+            }
         }
     }
 
@@ -2438,6 +2451,7 @@ impl LoadGenerator {
             LoadGenerator::Marketing => false,
             LoadGenerator::Datums => true,
             LoadGenerator::Tpch { .. } => false,
+            LoadGenerator::Ldbc { .. } => false,
         }
     }
 }
@@ -2481,6 +2495,9 @@ impl RustType<ProtoLoadGeneratorSourceConnection> for LoadGeneratorSourceConnect
                     count_orders: *count_orders,
                     count_clerk: *count_clerk,
                 }),
+                LoadGenerator::Ldbc { urls } => {
+                    ProtoGenerator::Ldbc(ProtoLdbcLoadGenerator { urls: urls.clone() })
+                }
                 LoadGenerator::Datums => ProtoGenerator::Datums(()),
             }),
             tick_micros: self.tick_micros,
@@ -2511,6 +2528,9 @@ impl RustType<ProtoLoadGeneratorSourceConnection> for LoadGeneratorSourceConnect
                     count_orders,
                     count_clerk,
                 },
+                ProtoGenerator::Ldbc(ProtoLdbcLoadGenerator { urls }) => {
+                    LoadGenerator::Ldbc { urls }
+                }
                 ProtoGenerator::Datums(()) => LoadGenerator::Datums,
             },
             tick_micros: proto.tick_micros,
@@ -2770,6 +2790,99 @@ impl Schema<SourceData> for RelationDesc {
         })
     }
 }
+
+const LDBC_CITY_OUTPUT: usize = 1;
+const LDBC_COMMENT_OUTPUT: usize = 2;
+const LDBC_COMPANY_OUTPUT: usize = 3;
+const LDBC_CONTINENT_OUTPUT: usize = 4;
+const LDBC_COUNTRY_OUTPUT: usize = 5;
+const LDBC_FORUM_OUTPUT: usize = 6;
+const LDBC_PERSON_OUTPUT: usize = 7;
+const LDBC_POST_OUTPUT: usize = 8;
+const LDBC_TAG_OUTPUT: usize = 9;
+const LDBC_TAGCLASS_OUTPUT: usize = 10;
+const LDBC_UNIVERSITY_OUTPUT: usize = 11;
+const LDBC_RELATIONS_OUTPUT: usize = 12;
+
+pub static LDBC_DESCS: Lazy<BTreeMap<&'static str, (usize, RelationDesc)>> = Lazy::new(|| {
+    let identifier = ScalarType::Int64.nullable(false);
+    let name_url = RelationDesc::empty()
+        .with_column("id", identifier.clone())
+        .with_column("name", ScalarType::String.nullable(false))
+        .with_column("url", ScalarType::String.nullable(false))
+        .with_key(vec![0]);
+    let place = name_url.clone();
+    let message = RelationDesc::empty()
+        .with_column("id", identifier.clone())
+        .with_column("browserUsed", ScalarType::String.nullable(false))
+        .with_column("creationDate", ScalarType::TimestampTz.nullable(false))
+        .with_column("locationIP", ScalarType::String.nullable(false))
+        .with_column("content", ScalarType::String.nullable(true))
+        .with_column("length", ScalarType::Int32.nullable(false))
+        .with_key(vec![0]);
+    let organisation = RelationDesc::empty()
+        .with_column("id", identifier.clone())
+        .with_column("name", ScalarType::String.nullable(false))
+        .with_column("url", ScalarType::String.nullable(false))
+        .with_key(vec![0]);
+
+    BTreeMap::from([
+        ("city", (LDBC_CITY_OUTPUT, place.clone())),
+        ("comment", (LDBC_COMMENT_OUTPUT, message.clone())),
+        ("company", (LDBC_COMPANY_OUTPUT, organisation.clone())),
+        ("continent", (LDBC_CONTINENT_OUTPUT, place.clone())),
+        ("country", (LDBC_COUNTRY_OUTPUT, place)),
+        (
+            "forum",
+            (
+                LDBC_FORUM_OUTPUT,
+                RelationDesc::empty()
+                    .with_column("id", identifier.clone())
+                    .with_column("title", ScalarType::String.nullable(false))
+                    .with_column("creationDate", ScalarType::TimestampTz.nullable(false))
+                    .with_key(vec![0]),
+            ),
+        ),
+        (
+            "person",
+            (
+                LDBC_PERSON_OUTPUT,
+                RelationDesc::empty()
+                    .with_column("id", identifier.clone())
+                    .with_column("firstName", ScalarType::String.nullable(false))
+                    .with_column("lastName", ScalarType::String.nullable(false))
+                    .with_column("gender", ScalarType::String.nullable(false))
+                    .with_column("birthday", ScalarType::Date.nullable(false))
+                    .with_column(
+                        "email",
+                        ScalarType::Array(Box::new(ScalarType::String)).nullable(false),
+                    )
+                    .with_column(
+                        "speaks",
+                        ScalarType::Array(Box::new(ScalarType::String)).nullable(false),
+                    )
+                    .with_column("browserUsed", ScalarType::String.nullable(false))
+                    .with_column("locationIP", ScalarType::String.nullable(false))
+                    .with_column("creationDate", ScalarType::TimestampTz.nullable(false))
+                    .with_key(vec![0]),
+            ),
+        ),
+        ("post", (LDBC_POST_OUTPUT, message)),
+        ("tag", (LDBC_TAG_OUTPUT, name_url.clone())),
+        ("tagclass", (LDBC_TAGCLASS_OUTPUT, name_url)),
+        ("university", (LDBC_UNIVERSITY_OUTPUT, organisation)),
+        (
+            "relations",
+            (
+                LDBC_RELATIONS_OUTPUT,
+                RelationDesc::empty()
+                    .with_column("name", ScalarType::String.nullable(false))
+                    .with_column("source", identifier.clone())
+                    .with_column("destination", identifier),
+            ),
+        ),
+    ])
+});
 
 #[cfg(test)]
 mod tests {
