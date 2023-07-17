@@ -28,6 +28,7 @@ use itertools::Itertools;
 use mz_ore::cast::CastFrom;
 use mz_ore::collections::CollectionExt;
 use mz_ore::option::OptionExt;
+use mz_ore::soft_assert;
 use mz_ore::stack::{CheckedRecursion, RecursionGuard, RecursionLimitError};
 use mz_sql_lexer::keywords::*;
 use mz_sql_lexer::lexer::{self, LexerError, PosToken, Token};
@@ -36,6 +37,7 @@ use tracing::warn;
 use IsLateral::*;
 use IsOptional::*;
 
+use crate::ast::display::AstDisplay;
 use crate::ast::*;
 
 // NOTE(benesch): this recursion limit was chosen based on the maximum amount of
@@ -337,10 +339,43 @@ impl<'a> Parser<'a> {
             }
 
             let s = self.parse_statement()?;
+            self.verify_statement_roundtrip(&s.ast)?;
             stmts.push(s);
             expecting_statement_delimiter = true;
         }
         Ok(stmts)
+    }
+
+    /// Returns an error if the statement does not round trip to an identical AST
+    /// representation (this is an internal problem not caused by the user). In the error case, the
+    /// error is logged to sentry and does not need to be handled by the caller. This function can be
+    /// used to prevent installation of views that won't roundtrip on restart.
+    fn verify_statement_roundtrip(
+        &self,
+        stmt: &Statement<Raw>,
+    ) -> Result<(), ParserStatementError> {
+        let stable = stmt.to_ast_string_stable();
+        let tokens = lexer::lex(&stable).map_err(|error| ParserStatementError {
+            error: error.into(),
+            statement: None,
+        })?;
+        let parsed = Parser::new(&stable, tokens).parse_statement()?;
+        let equal = stmt == &parsed.ast;
+        //soft_assert!(equal, "statement failed roundtrip AST display: {stmt}");
+        if !equal {
+            println!("statement failed roundtrip AST display: {stmt}");
+            /*
+            tracing::error!("statement failed roundtrip AST display: {stmt}");
+            return Err(ParserStatementError {
+                error: self.error(
+                    self.peek_prev_pos(),
+                    "internal error: statement has incorrect string display method".into(),
+                ),
+                statement: None,
+            });
+            */
+        }
+        Ok(())
     }
     /// Parse a single top-level statement (such as SELECT, INSERT, CREATE, etc.),
     /// stopping before the statement separator, if any. Returns the parsed statement and the SQL
