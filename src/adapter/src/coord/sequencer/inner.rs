@@ -43,7 +43,7 @@ use mz_sql::ast::{ExplainStage, IndexOptionName};
 use mz_sql::catalog::{
     CatalogCluster, CatalogClusterReplica, CatalogDatabase, CatalogError,
     CatalogItem as SqlCatalogItem, CatalogItemType, CatalogRole, CatalogSchema, CatalogTypeDetails,
-    ErrorMessageObjectDescription, ObjectType, SessionCatalog,
+    ErrorMessageObjectDescription, SessionCatalog,
 };
 use mz_sql::names::{
     ObjectId, QualifiedItemName, ResolvedDatabaseSpecifier, ResolvedIds, ResolvedItemName,
@@ -429,7 +429,7 @@ impl Coordinator {
         }];
 
         match self.catalog_transact(Some(session), ops).await {
-            Ok(_) => Ok(ExecuteResponse::AlteredObject(ObjectType::Connection)),
+            Ok(_) => Ok(ExecuteResponse::AlteredObjectConnection),
             Err(err) => Err(err),
         }
     }
@@ -1182,7 +1182,7 @@ impl Coordinator {
                 name: session.vars().cluster().to_string(),
             });
         }
-        Ok(ExecuteResponse::DroppedObject(object_type))
+        Ok(ExecuteResponse::dropped_object(object_type))
     }
 
     fn validate_dropped_role_ownership(
@@ -3721,7 +3721,7 @@ impl Coordinator {
             to_name: plan.to_name,
         };
         match self.catalog_transact(Some(session), vec![op]).await {
-            Ok(()) => Ok(ExecuteResponse::AlteredObject(plan.object_type)),
+            Ok(()) => Ok(ExecuteResponse::altered_object(plan.object_type)),
             Err(err) => Err(err),
         }
     }
@@ -3731,7 +3731,7 @@ impl Coordinator {
         plan: plan::AlterIndexSetOptionsPlan,
     ) -> Result<ExecuteResponse, AdapterError> {
         self.set_index_options(plan.id, plan.options)?;
-        Ok(ExecuteResponse::AlteredObject(ObjectType::Index))
+        Ok(ExecuteResponse::AlteredObjectIndex)
     }
 
     pub(super) fn sequence_alter_index_reset_options(
@@ -3751,7 +3751,7 @@ impl Coordinator {
 
         self.set_index_options(plan.id, options)?;
 
-        Ok(ExecuteResponse::AlteredObject(ObjectType::Index))
+        Ok(ExecuteResponse::AlteredObjectIndex)
     }
 
     fn set_index_options(
@@ -3815,7 +3815,7 @@ impl Coordinator {
 
         self.secrets_controller.ensure(id, &payload).await?;
 
-        Ok(ExecuteResponse::AlteredObject(ObjectType::Secret))
+        Ok(ExecuteResponse::AlteredObjectSecret)
     }
 
     pub(super) async fn sequence_alter_sink(
@@ -3835,7 +3835,7 @@ impl Coordinator {
             self.maybe_alter_linked_cluster(id).await;
         }
 
-        Ok(ExecuteResponse::AlteredObject(ObjectType::Sink))
+        Ok(ExecuteResponse::AlteredObjectSink)
     }
 
     pub(super) async fn sequence_alter_source(
@@ -4343,7 +4343,7 @@ impl Coordinator {
             }
         }
 
-        Ok(ExecuteResponse::AlteredObject(ObjectType::Source))
+        Ok(ExecuteResponse::AlteredObjectSource)
     }
 
     fn extract_secret(
@@ -4791,7 +4791,7 @@ impl Coordinator {
                         .resolve_full_name(entry.name(), Some(session.conn_id()))
                         .to_string();
                     session.add_notice(AdapterNotice::AlterIndexOwner { name });
-                    return Ok(ExecuteResponse::AlteredObject(object_type));
+                    return Ok(ExecuteResponse::altered_object(object_type));
                 }
 
                 // Alter owner cascades down to dependent indexes.
@@ -4851,7 +4851,7 @@ impl Coordinator {
 
         self.catalog_transact(Some(session), ops)
             .await
-            .map(|_| ExecuteResponse::AlteredObject(object_type))
+            .map(|_| ExecuteResponse::altered_object(object_type))
     }
 
     pub(super) async fn sequence_reassign_owned(

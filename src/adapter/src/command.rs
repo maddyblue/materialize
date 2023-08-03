@@ -487,8 +487,36 @@ impl fmt::Debug for AppendWebhookResponse {
 pub enum ExecuteResponse {
     /// The default privileges were altered.
     AlteredDefaultPrivileges,
-    /// The requested object was altered.
-    AlteredObject(ObjectType),
+    // The requested Table was altered.
+    AlteredObjectTable,
+    // The requested View was altered.
+    AlteredObjectView,
+    // The requested MaterializedView was altered.
+    AlteredObjectMaterializedView,
+    // The requested Source was altered.
+    AlteredObjectSource,
+    // The requested Sink was altered.
+    AlteredObjectSink,
+    // The requested Index was altered.
+    AlteredObjectIndex,
+    // The requested Type was altered.
+    AlteredObjectType,
+    // The requested Role was altered.
+    AlteredObjectRole,
+    // The requested Cluster was altered.
+    AlteredObjectCluster,
+    // The requested ClusterReplica was altered.
+    AlteredObjectClusterReplica,
+    // The requested Secret was altered.
+    AlteredObjectSecret,
+    // The requested Connection was altered.
+    AlteredObjectConnection,
+    // The requested Database was altered.
+    AlteredObjectDatabase,
+    // The requested Schema was altered.
+    AlteredObjectSchema,
+    // The requested Func was altered.
+    AlteredObjectFunc,
     /// The index was altered.
     AlteredIndexLogicalCompaction,
     /// The role was altered.
@@ -542,7 +570,9 @@ pub enum ExecuteResponse {
     /// The requested type was created.
     CreatedType,
     /// The requested prepared statement was removed.
-    Deallocate { all: bool },
+    Deallocate {
+        all: bool,
+    },
     /// The requested cursor was declared.
     DeclaredCursor,
     /// The specified number of rows were deleted from the requested table.
@@ -551,8 +581,36 @@ pub enum ExecuteResponse {
     DiscardedTemp,
     /// All state associated with the session has been discarded.
     DiscardedAll,
-    /// The requested object was dropped.
-    DroppedObject(ObjectType),
+    // The requested Table was dropped.
+    DroppedObjectTable,
+    // The requested View was dropped.
+    DroppedObjectView,
+    // The requested MaterializedView was dropped.
+    DroppedObjectMaterializedView,
+    // The requested Source was dropped.
+    DroppedObjectSource,
+    // The requested Sink was dropped.
+    DroppedObjectSink,
+    // The requested Index was dropped.
+    DroppedObjectIndex,
+    // The requested Type was dropped.
+    DroppedObjectType,
+    // The requested Role was dropped.
+    DroppedObjectRole,
+    // The requested Cluster was dropped.
+    DroppedObjectCluster,
+    // The requested ClusterReplica was dropped.
+    DroppedObjectClusterReplica,
+    // The requested Secret was dropped.
+    DroppedObjectSecret,
+    // The requested Connection was dropped.
+    DroppedObjectConnection,
+    // The requested Database was dropped.
+    DroppedObjectDatabase,
+    // The requested Schema was dropped.
+    DroppedObjectSchema,
+    // The requested Func was dropped.
+    DroppedObjectFunc,
     /// The requested objects were dropped.
     DroppedOwned,
     /// The provided query was empty.
@@ -599,7 +657,9 @@ pub enum ExecuteResponse {
     StartedTransaction,
     /// Updates to the requested source or view will be streamed to the
     /// contained receiver.
-    Subscribing { rx: RowBatchStream },
+    Subscribing {
+        rx: RowBatchStream,
+    },
     /// The active transaction committed.
     TransactionCommitted {
         /// Session parameters that changed because the transaction ended.
@@ -626,10 +686,33 @@ impl TryInto<ExecuteResponse> for ExecuteResponseKind {
             ExecuteResponseKind::AlteredDefaultPrivileges => {
                 Ok(ExecuteResponse::AlteredDefaultPrivileges)
             }
-            ExecuteResponseKind::AlteredObject => Err(()),
             ExecuteResponseKind::AlteredIndexLogicalCompaction => {
                 Ok(ExecuteResponse::AlteredIndexLogicalCompaction)
             }
+            ExecuteResponseKind::ValidatedConnection => Ok(ExecuteResponse::ValidatedConnection),
+            ExecuteResponseKind::AlteredObjectTable => Ok(ExecuteResponse::AlteredObjectTable),
+            ExecuteResponseKind::AlteredObjectView => Ok(ExecuteResponse::AlteredObjectView),
+            ExecuteResponseKind::AlteredObjectMaterializedView => {
+                Ok(ExecuteResponse::AlteredObjectMaterializedView)
+            }
+            ExecuteResponseKind::AlteredObjectSource => Ok(ExecuteResponse::AlteredObjectSource),
+            ExecuteResponseKind::AlteredObjectSink => Ok(ExecuteResponse::AlteredObjectSink),
+            ExecuteResponseKind::AlteredObjectIndex => Ok(ExecuteResponse::AlteredObjectIndex),
+            ExecuteResponseKind::AlteredObjectType => Ok(ExecuteResponse::AlteredObjectType),
+            ExecuteResponseKind::AlteredObjectRole => Ok(ExecuteResponse::AlteredObjectRole),
+            ExecuteResponseKind::AlteredObjectCluster => Ok(ExecuteResponse::AlteredObjectCluster),
+            ExecuteResponseKind::AlteredObjectClusterReplica => {
+                Ok(ExecuteResponse::AlteredObjectClusterReplica)
+            }
+            ExecuteResponseKind::AlteredObjectSecret => Ok(ExecuteResponse::AlteredObjectSecret),
+            ExecuteResponseKind::AlteredObjectConnection => {
+                Ok(ExecuteResponse::AlteredObjectConnection)
+            }
+            ExecuteResponseKind::AlteredObjectDatabase => {
+                Ok(ExecuteResponse::AlteredObjectDatabase)
+            }
+            ExecuteResponseKind::AlteredObjectSchema => Ok(ExecuteResponse::AlteredObjectSchema),
+            ExecuteResponseKind::AlteredObjectFunc => Ok(ExecuteResponse::AlteredObjectFunc),
             ExecuteResponseKind::AlteredRole => Ok(ExecuteResponse::AlteredRole),
             ExecuteResponseKind::AlteredSystemConfiguration => {
                 Ok(ExecuteResponse::AlteredSystemConfiguration)
@@ -663,7 +746,29 @@ impl TryInto<ExecuteResponse> for ExecuteResponseKind {
             ExecuteResponseKind::Deleted => Err(()),
             ExecuteResponseKind::DiscardedTemp => Ok(ExecuteResponse::DiscardedTemp),
             ExecuteResponseKind::DiscardedAll => Ok(ExecuteResponse::DiscardedAll),
-            ExecuteResponseKind::DroppedObject => Err(()),
+            ExecuteResponseKind::DroppedObjectTable => Ok(ExecuteResponse::DroppedObjectTable),
+            ExecuteResponseKind::DroppedObjectView => Ok(ExecuteResponse::DroppedObjectView),
+            ExecuteResponseKind::DroppedObjectMaterializedView => {
+                Ok(ExecuteResponse::DroppedObjectMaterializedView)
+            }
+            ExecuteResponseKind::DroppedObjectSource => Ok(ExecuteResponse::DroppedObjectSource),
+            ExecuteResponseKind::DroppedObjectSink => Ok(ExecuteResponse::DroppedObjectSink),
+            ExecuteResponseKind::DroppedObjectIndex => Ok(ExecuteResponse::DroppedObjectIndex),
+            ExecuteResponseKind::DroppedObjectType => Ok(ExecuteResponse::DroppedObjectType),
+            ExecuteResponseKind::DroppedObjectRole => Ok(ExecuteResponse::DroppedObjectRole),
+            ExecuteResponseKind::DroppedObjectCluster => Ok(ExecuteResponse::DroppedObjectCluster),
+            ExecuteResponseKind::DroppedObjectClusterReplica => {
+                Ok(ExecuteResponse::DroppedObjectClusterReplica)
+            }
+            ExecuteResponseKind::DroppedObjectSecret => Ok(ExecuteResponse::DroppedObjectSecret),
+            ExecuteResponseKind::DroppedObjectConnection => {
+                Ok(ExecuteResponse::DroppedObjectConnection)
+            }
+            ExecuteResponseKind::DroppedObjectDatabase => {
+                Ok(ExecuteResponse::DroppedObjectDatabase)
+            }
+            ExecuteResponseKind::DroppedObjectSchema => Ok(ExecuteResponse::DroppedObjectSchema),
+            ExecuteResponseKind::DroppedObjectFunc => Ok(ExecuteResponse::DroppedObjectFunc),
             ExecuteResponseKind::DroppedOwned => Ok(ExecuteResponse::DroppedOwned),
             ExecuteResponseKind::EmptyQuery => Ok(ExecuteResponse::EmptyQuery),
             ExecuteResponseKind::Fetch => Err(()),
@@ -682,17 +787,70 @@ impl TryInto<ExecuteResponse> for ExecuteResponseKind {
             ExecuteResponseKind::TransactionCommitted => Err(()),
             ExecuteResponseKind::TransactionRolledBack => Err(()),
             ExecuteResponseKind::Updated => Err(()),
-            ExecuteResponseKind::ValidatedConnection => Ok(ExecuteResponse::ValidatedConnection),
         }
     }
 }
 
 impl ExecuteResponse {
+    pub fn altered_object(typ: ObjectType) -> ExecuteResponse {
+        match typ {
+            ObjectType::Cluster => ExecuteResponse::AlteredObjectCluster,
+            ObjectType::ClusterReplica => ExecuteResponse::AlteredObjectClusterReplica,
+            ObjectType::Connection => ExecuteResponse::AlteredObjectConnection,
+            ObjectType::Database => ExecuteResponse::AlteredObjectDatabase,
+            ObjectType::Func => ExecuteResponse::AlteredObjectFunc,
+            ObjectType::Index => ExecuteResponse::AlteredObjectIndex,
+            ObjectType::MaterializedView => ExecuteResponse::AlteredObjectMaterializedView,
+            ObjectType::Role => ExecuteResponse::AlteredObjectRole,
+            ObjectType::Schema => ExecuteResponse::AlteredObjectSchema,
+            ObjectType::Secret => ExecuteResponse::AlteredObjectSecret,
+            ObjectType::Sink => ExecuteResponse::AlteredObjectSink,
+            ObjectType::Source => ExecuteResponse::AlteredObjectSource,
+            ObjectType::Table => ExecuteResponse::AlteredObjectTable,
+            ObjectType::Type => ExecuteResponse::AlteredObjectType,
+            ObjectType::View => ExecuteResponse::AlteredObjectView,
+        }
+    }
+
+    pub fn dropped_object(typ: ObjectType) -> ExecuteResponse {
+        match typ {
+            ObjectType::Cluster => ExecuteResponse::DroppedObjectCluster,
+            ObjectType::ClusterReplica => ExecuteResponse::DroppedObjectClusterReplica,
+            ObjectType::Connection => ExecuteResponse::DroppedObjectConnection,
+            ObjectType::Database => ExecuteResponse::DroppedObjectDatabase,
+            ObjectType::Func => ExecuteResponse::DroppedObjectFunc,
+            ObjectType::Index => ExecuteResponse::DroppedObjectIndex,
+            ObjectType::MaterializedView => ExecuteResponse::DroppedObjectMaterializedView,
+            ObjectType::Role => ExecuteResponse::DroppedObjectRole,
+            ObjectType::Schema => ExecuteResponse::DroppedObjectSchema,
+            ObjectType::Secret => ExecuteResponse::DroppedObjectSecret,
+            ObjectType::Sink => ExecuteResponse::DroppedObjectSink,
+            ObjectType::Source => ExecuteResponse::DroppedObjectSource,
+            ObjectType::Table => ExecuteResponse::DroppedObjectTable,
+            ObjectType::Type => ExecuteResponse::DroppedObjectType,
+            ObjectType::View => ExecuteResponse::DroppedObjectView,
+        }
+    }
+
     pub fn tag(&self) -> Option<String> {
         use ExecuteResponse::*;
         match self {
             AlteredDefaultPrivileges => Some("ALTER DEFAULT PRIVILEGES".into()),
-            AlteredObject(o) => Some(format!("ALTER {}", o)),
+            AlteredObjectCluster => Some("ALTER CLUSTER".into()),
+            AlteredObjectClusterReplica => Some("ALTER CLUSTER REPLICA".into()),
+            AlteredObjectConnection => Some("ALTER CONNECTION".into()),
+            AlteredObjectDatabase => Some("ALTER DATABASE".into()),
+            AlteredObjectFunc => Some("ALTER FUNC".into()),
+            AlteredObjectIndex => Some("ALTER INDEX".into()),
+            AlteredObjectMaterializedView => Some("ALTER MATERIALIZED VIEW".into()),
+            AlteredObjectRole => Some("ALTER ROLE".into()),
+            AlteredObjectSchema => Some("ALTER SCHEMA".into()),
+            AlteredObjectSecret => Some("ALTER SECRET".into()),
+            AlteredObjectSink => Some("ALTER SINK".into()),
+            AlteredObjectSource => Some("ALTER SOURCE".into()),
+            AlteredObjectTable => Some("ALTER TABLE".into()),
+            AlteredObjectType => Some("ALTER TYPE".into()),
+            AlteredObjectView => Some("ALTER VIEW".into()),
             AlteredIndexLogicalCompaction => Some("ALTER INDEX".into()),
             AlteredRole => Some("ALTER ROLE".into()),
             AlteredSystemConfiguration => Some("ALTER SYSTEM".into()),
@@ -721,7 +879,21 @@ impl ExecuteResponse {
             Deleted(n) => Some(format!("DELETE {}", n)),
             DiscardedTemp => Some("DISCARD TEMP".into()),
             DiscardedAll => Some("DISCARD ALL".into()),
-            DroppedObject(o) => Some(format!("DROP {o}")),
+            DroppedObjectCluster => Some("DROP CLUSTER".into()),
+            DroppedObjectClusterReplica => Some("DROP CLUSTER REPLICA".into()),
+            DroppedObjectConnection => Some("DROP CONNECTION".into()),
+            DroppedObjectDatabase => Some("DROP DATABASE".into()),
+            DroppedObjectFunc => Some("DROP FUNC".into()),
+            DroppedObjectIndex => Some("DROP INDEX".into()),
+            DroppedObjectMaterializedView => Some("DROP MATERIALIZED VIEW".into()),
+            DroppedObjectRole => Some("DROP ROLE".into()),
+            DroppedObjectSchema => Some("DROP SCHEMA".into()),
+            DroppedObjectSecret => Some("DROP SECRET".into()),
+            DroppedObjectSink => Some("DROP SINK".into()),
+            DroppedObjectSource => Some("DROP SOURCE".into()),
+            DroppedObjectTable => Some("DROP TABLE".into()),
+            DroppedObjectType => Some("DROP TYPE".into()),
+            DroppedObjectView => Some("DROP VIEW".into()),
             DroppedOwned => Some("DROP OWNED".into()),
             EmptyQuery => None,
             Fetch { .. } => None,
@@ -763,23 +935,38 @@ impl ExecuteResponse {
 
         match plan {
             AbortTransaction => vec![TransactionRolledBack],
-            AlterClusterRename
-            | AlterCluster
-            | AlterClusterReplicaRename
-            | AlterOwner
-            | AlterItemRename
-            | AlterNoop
-            | AlterSecret
-            | AlterSink
-            | AlterSource
-            | PurifiedAlterSource
-            | RotateKeys => {
-                vec![AlteredObject]
+            AlterClusterRename => vec![AlteredObjectCluster],
+            AlterCluster => vec![AlteredObjectCluster],
+            AlterClusterReplicaRename => vec![AlteredObjectClusterReplica],
+            AlterSecret => vec![AlteredObjectSecret],
+            AlterSink => vec![AlteredObjectSink],
+            AlterSource => vec![AlteredObjectSource],
+            PurifiedAlterSource => vec![AlteredObjectSource],
+            RotateKeys => vec![AlteredObjectConnection],
+
+            AlterOwner | AlterItemRename | AlterNoop => {
+                vec![
+                    AlteredObjectTable,
+                    AlteredObjectView,
+                    AlteredObjectMaterializedView,
+                    AlteredObjectSource,
+                    AlteredObjectSink,
+                    AlteredObjectIndex,
+                    AlteredObjectType,
+                    AlteredObjectRole,
+                    AlteredObjectCluster,
+                    AlteredObjectClusterReplica,
+                    AlteredObjectSecret,
+                    AlteredObjectConnection,
+                    AlteredObjectDatabase,
+                    AlteredObjectSchema,
+                    AlteredObjectFunc,
+                ]
             }
             AlterDefaultPrivileges => vec![AlteredDefaultPrivileges],
-            AlterSetCluster => vec![AlteredObject],
+            AlterSetCluster => vec![AlteredObjectCluster],
             AlterIndexSetOptions | AlterIndexResetOptions => {
-                vec![AlteredObject, AlteredIndexLogicalCompaction]
+                vec![AlteredObjectIndex, AlteredIndexLogicalCompaction]
             }
             AlterRole => vec![AlteredRole],
             AlterSystemSet | AlterSystemReset | AlterSystemResetAll => {

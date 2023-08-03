@@ -19,7 +19,7 @@ use mz_controller::clusters::{
 };
 use mz_ore::cast::CastFrom;
 use mz_repr::role_id::RoleId;
-use mz_sql::catalog::{CatalogCluster, CatalogItem, CatalogItemType, ObjectType};
+use mz_sql::catalog::{CatalogCluster, CatalogItem, CatalogItemType};
 use mz_sql::names::ObjectId;
 use mz_sql::plan::{
     AlterClusterPlan, AlterClusterRenamePlan, AlterClusterReplicaRenamePlan, AlterOptionParameter,
@@ -691,7 +691,7 @@ impl Coordinator {
         }
 
         if new_config == config {
-            return Ok(ExecuteResponse::AlteredObject(ObjectType::Cluster));
+            return Ok(ExecuteResponse::AlteredObjectCluster);
         }
 
         match (&config.variant, new_config.variant) {
@@ -720,7 +720,7 @@ impl Coordinator {
             }
         }
 
-        Ok(ExecuteResponse::AlteredObject(ObjectType::Cluster))
+        Ok(ExecuteResponse::AlteredObjectCluster)
     }
 
     async fn sequence_alter_cluster_managed_to_managed(
@@ -1043,7 +1043,7 @@ impl Coordinator {
     ) -> Result<ExecuteResponse, AdapterError> {
         let op = Op::RenameCluster { id, name, to_name };
         match self.catalog_transact(Some(session), vec![op]).await {
-            Ok(()) => Ok(ExecuteResponse::AlteredObject(ObjectType::Cluster)),
+            Ok(()) => Ok(ExecuteResponse::AlteredObjectCluster),
             Err(err) => Err(err),
         }
     }
@@ -1065,7 +1065,7 @@ impl Coordinator {
             to_name,
         };
         match self.catalog_transact(Some(session), vec![op]).await {
-            Ok(()) => Ok(ExecuteResponse::AlteredObject(ObjectType::ClusterReplica)),
+            Ok(()) => Ok(ExecuteResponse::AlteredObjectClusterReplica),
             Err(err) => Err(err),
         }
     }

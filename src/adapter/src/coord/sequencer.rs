@@ -306,7 +306,7 @@ impl Coordinator {
                 self.sequence_read_then_write(ctx, plan).await;
             }
             Plan::AlterNoop(plan) => {
-                ctx.retire(Ok(ExecuteResponse::AlteredObject(plan.object_type)));
+                ctx.retire(Ok(ExecuteResponse::altered_object(plan.object_type)));
             }
             Plan::AlterCluster(plan) => {
                 let result = self.sequence_alter_cluster(ctx.session(), plan).await;
