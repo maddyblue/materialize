@@ -20,7 +20,7 @@ use crate::coord::Coordinator;
 use crate::session::{Session, TransactionStatus};
 use crate::subscribe::ActiveSubscribe;
 use crate::util::describe;
-use crate::{metrics, AdapterError, ExecuteContext, ExecuteResponse};
+use crate::{metrics, AdapterError};
 
 impl Coordinator {
     pub(crate) fn plan_statement(
@@ -34,47 +34,6 @@ impl Coordinator {
         let catalog = self.catalog().for_session(session);
         let plan = mz_sql::plan::plan(Some(pcx), &catalog, stmt, params, resolved_ids)?;
         Ok(plan)
-    }
-
-    pub(crate) fn declare(
-        &self,
-        mut ctx: ExecuteContext,
-        name: String,
-        stmt: Statement<Raw>,
-        sql: String,
-        param_types: Vec<Option<ScalarType>>,
-    ) {
-        let catalog = self.owned_catalog();
-        mz_ore::task::spawn(|| "coord::declare", async move {
-            let result =
-                Self::declare_inner(ctx.session_mut(), &catalog, name, stmt, sql, param_types)
-                    .map(|()| ExecuteResponse::DeclaredCursor);
-            ctx.retire(result);
-        });
-    }
-
-    fn declare_inner(
-        session: &mut Session,
-        catalog: &Catalog,
-        name: String,
-        stmt: Statement<Raw>,
-        sql: String,
-        param_types: Vec<Option<ScalarType>>,
-    ) -> Result<(), AdapterError> {
-        let desc = describe(catalog, stmt.clone(), &param_types, session)?;
-        let params = vec![];
-        let result_formats = vec![mz_pgrepr::Format::Text; desc.arity()];
-        let logging = session.mint_logging(sql);
-        session.set_portal(
-            name,
-            desc,
-            Some(stmt),
-            logging,
-            params,
-            result_formats,
-            catalog.transient_revision(),
-        )?;
-        Ok(())
     }
 
     pub(crate) fn describe(
@@ -118,36 +77,11 @@ impl Coordinator {
         Ok(())
     }
 
-    /// Verify a portal is still valid.
-    pub(crate) fn verify_portal(
-        &self,
-        session: &mut Session,
-        name: &str,
-    ) -> Result<(), AdapterError> {
-        let portal = match session.get_portal_unverified(name) {
-            Some(portal) => portal,
-            None => return Err(AdapterError::UnknownCursor(name.to_string())),
-        };
-        if let Some(revision) = Self::verify_statement_revision(
-            self.catalog(),
-            session,
-            portal.stmt.as_ref(),
-            &portal.desc,
-            portal.catalog_revision,
-        )? {
-            let portal = session
-                .get_portal_unverified_mut(name)
-                .expect("known to exist");
-            portal.catalog_revision = revision;
-        }
-        Ok(())
-    }
-
     /// If the catalog and portal revisions don't match, re-describe the statement
     /// and ensure its result type has not changed. Return `Some(x)` with the new
     /// (valid) revision if its plan has changed. Return `None` if the revisions
     /// match. Return an error if the plan has changed.
-    fn verify_statement_revision(
+    pub(crate) fn verify_statement_revision(
         catalog: &Catalog,
         session: &Session,
         stmt: Option<&Statement<Raw>>,

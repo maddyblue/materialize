@@ -27,7 +27,7 @@ use crate::catalog::{
 };
 use crate::coord::Coordinator;
 use crate::error::AdapterError;
-use crate::session::Session;
+use crate::session::SessionMetadata;
 
 impl Coordinator {
     /// Generates the catalog operations to create a linked cluster for the
@@ -41,7 +41,7 @@ impl Coordinator {
         name: &QualifiedItemName,
         config: &SourceSinkClusterConfig,
         ops: &mut Vec<catalog::Op>,
-        session: &Session,
+        session: &SessionMetadata,
     ) -> Result<ClusterId, AdapterError> {
         let size = match config {
             SourceSinkClusterConfig::Linked { size } => size.clone(),

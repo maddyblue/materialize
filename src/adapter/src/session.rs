@@ -60,6 +60,55 @@ struct RoleMetadata {
     session_role: RoleId,
 }
 
+#[derive(Debug)]
+pub struct SessionMetadata {
+    conn_id: ConnectionId,
+    user: User,
+    application_name: String,
+    role_metadata: RoleMetadata,
+    connect_time: EpochMillis,
+    vars: SessionVars,
+}
+
+impl SessionMetadata {
+    pub fn conn_id(&self) -> &ConnectionId {
+        &self.conn_id
+    }
+
+    pub fn user(&self) -> &User {
+        &self.user
+    }
+
+    pub fn is_superuser(&self) -> bool {
+        self.vars.is_superuser()
+    }
+
+    pub fn vars(&self) -> &SessionVars {
+        &self.vars
+    }
+
+    pub fn application_name(&self) -> &str {
+        &self.application_name
+    }
+
+    pub fn current_role_id(&self) -> &RoleId {
+        &self.role_metadata.current_role
+    }
+
+    pub fn session_role_id(&self) -> &RoleId {
+        &self.role_metadata.session_role
+    }
+
+    pub fn connect_time(&self) -> EpochMillis {
+        self.connect_time
+    }
+}
+
+#[derive(Debug)]
+pub enum SessionChange {
+    Notice(AdapterNotice),
+}
+
 /// A session holds per-connection state.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -119,6 +168,22 @@ impl<T: TimestampManipulation> Session<T> {
     ) -> Session<T> {
         assert_ne!(conn_id, DUMMY_CONNECTION_ID);
         Self::new_internal(build_info, conn_id, user, connect_time)
+    }
+
+    pub(crate) fn metadata(&self) -> SessionMetadata {
+        SessionMetadata {
+            conn_id: self.conn_id.clone(),
+            user: self.user().clone(),
+            application_name: self.application_name().into(),
+            role_metadata: self
+                .role_metadata
+                .expect("role_metadata invariant violated")
+                .clone(),
+            connect_time: self.connect_time(),
+            // vars: self.vars().clone(),
+            // TODO(adapter)
+            vars: SessionVars::new(self.vars().build_info(), self.user().clone()),
+        }
     }
 
     /// Creates new statement logging metadata for a one-off

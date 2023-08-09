@@ -10,14 +10,14 @@
 use mz_sql::plan::AlterSetClusterPlan;
 
 use crate::coord::Coordinator;
-use crate::session::Session;
+use crate::session::SessionMetadata;
 use crate::{AdapterError, ExecuteResponse};
 
 impl Coordinator {
     /// Convert a [`AlterSetClusterPlan`] to a sequence of catalog operators and adjust state.
     pub(super) async fn sequence_alter_set_cluster(
         &mut self,
-        _session: &Session,
+        _session: &SessionMetadata,
         AlterSetClusterPlan { id, set_cluster: _ }: AlterSetClusterPlan,
     ) -> Result<ExecuteResponse, AdapterError> {
         // TODO: This function needs to be implemented.

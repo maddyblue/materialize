@@ -1508,7 +1508,7 @@ where
                 let msg = if let Some(var) = self
                     .adapter_client
                     .session()
-                    .vars_mut()
+                    .vars()
                     .notify_set()
                     .find(|v| v.name() == qn)
                 {

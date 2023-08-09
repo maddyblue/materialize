@@ -18,23 +18,23 @@ use mz_expr::OptimizedMirRelationExpr;
 use mz_ore::tracing::OpenTelemetryContext;
 use mz_repr::explain::ExplainFormat;
 use mz_repr::{GlobalId, Timestamp};
-use mz_sql::catalog::CatalogCluster;
 use mz_sql::names::ResolvedIds;
 use mz_sql::plan::{
-    AbortTransactionPlan, CommitTransactionPlan, CopyRowsPlan, CreateRolePlan, CreateSourcePlans,
-    FetchPlan, Params, Plan, PlanKind, RaisePlan, RotateKeysPlan,
+    AbortTransactionPlan, CommitTransactionPlan, CreateRolePlan, CreateSourcePlans, Params, Plan,
+    RotateKeysPlan,
 };
 use mz_sql_parser::ast::{Raw, Statement};
 use tokio::sync::oneshot;
-use tracing::{event, Level};
 
 use crate::command::{Command, ExecuteResponse, Response};
 use crate::coord::id_bundle::CollectionIdBundle;
-use crate::coord::{introspection, Coordinator, Message};
+use crate::coord::{Coordinator, Message};
 use crate::error::AdapterError;
 use crate::notice::AdapterNotice;
 use crate::session::{EndTransactionAction, Session, TransactionStatus};
 use crate::util::ClientTransmitter;
+use crate::util::{send_immediate_rows, ClientTransmitter};
+use crate::{rbac, ExecuteContext};
 use crate::{rbac, ExecuteContext, ExecuteResponseKind};
 
 // DO NOT make this visible in any way, i.e. do not add any version of
@@ -65,6 +65,8 @@ impl Coordinator {
         plan: Plan,
         resolved_ids: ResolvedIds,
     ) {
+        // TODO(adapter): (is this already done elsewhere?)
+        /*
         event!(Level::TRACE, plan = format!("{:?}", plan));
         let mut responses = ExecuteResponse::generated_from(PlanKind::from(&plan));
         responses.push(ExecuteResponseKind::Canceled);
@@ -104,13 +106,14 @@ impl Coordinator {
         ) {
             return ctx.retire(Err(e));
         }
+        */
 
         match plan {
             Plan::CreateSource(plan) => {
                 let source_id = return_if_err!(self.catalog_mut().allocate_user_id().await, ctx);
                 let result = self
                     .sequence_create_source(
-                        ctx.session_mut(),
+                        &mut ctx,
                         vec![CreateSourcePlans {
                             source_id,
                             plan,
@@ -125,7 +128,7 @@ impl Coordinator {
                     resolved_ids.0.is_empty(),
                     "each plan has separate resolved_ids"
                 );
-                let result = self.sequence_create_source(ctx.session_mut(), plans).await;
+                let result = self.sequence_create_source(&mut ctx, plans).await;
                 ctx.retire(result);
             }
             Plan::CreateConnection(plan) => {
@@ -133,17 +136,17 @@ impl Coordinator {
                     .await;
             }
             Plan::CreateDatabase(plan) => {
-                let result = self.sequence_create_database(ctx.session_mut(), plan).await;
+                let result = self.sequence_create_database(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::CreateSchema(plan) => {
-                let result = self.sequence_create_schema(ctx.session_mut(), plan).await;
+                let result = self.sequence_create_schema(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::CreateRole(plan) => {
                 let result = self.sequence_create_role(ctx.session(), plan).await;
                 if result.is_ok() {
-                    self.maybe_send_rbac_notice(ctx.session());
+                    self.maybe_send_rbac_notice(&mut ctx);
                 }
                 ctx.retire(result);
             }
@@ -159,12 +162,12 @@ impl Coordinator {
             }
             Plan::CreateTable(plan) => {
                 let result = self
-                    .sequence_create_table(ctx.session_mut(), plan, resolved_ids)
+                    .sequence_create_table(&mut ctx, plan, resolved_ids)
                     .await;
                 ctx.retire(result);
             }
             Plan::CreateSecret(plan) => {
-                let result = self.sequence_create_secret(ctx.session_mut(), plan).await;
+                let result = self.sequence_create_secret(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::CreateSink(plan) => {
@@ -172,19 +175,19 @@ impl Coordinator {
             }
             Plan::CreateView(plan) => {
                 let result = self
-                    .sequence_create_view(ctx.session_mut(), plan, resolved_ids)
+                    .sequence_create_view(&mut ctx, plan, resolved_ids)
                     .await;
                 ctx.retire(result);
             }
             Plan::CreateMaterializedView(plan) => {
                 let result = self
-                    .sequence_create_materialized_view(ctx.session_mut(), plan, resolved_ids)
+                    .sequence_create_materialized_view(&mut ctx, plan, resolved_ids)
                     .await;
                 ctx.retire(result);
             }
             Plan::CreateIndex(plan) => {
                 let result = self
-                    .sequence_create_index(ctx.session_mut(), plan, resolved_ids)
+                    .sequence_create_index(&mut ctx, plan, resolved_ids)
                     .await;
                 ctx.retire(result);
             }
@@ -195,77 +198,29 @@ impl Coordinator {
                 ctx.retire(result);
             }
             Plan::DropObjects(plan) => {
-                let result = self.sequence_drop_objects(ctx.session_mut(), plan).await;
+                let result = self.sequence_drop_objects(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::DropOwned(plan) => {
-                let result = self.sequence_drop_owned(ctx.session_mut(), plan).await;
+                let result = self.sequence_drop_owned(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::EmptyQuery => {
                 ctx.retire(Ok(ExecuteResponse::EmptyQuery));
             }
-            Plan::ShowAllVariables => {
-                let result = self.sequence_show_all_variables(ctx.session());
-                ctx.retire(result);
-            }
-            Plan::ShowVariable(plan) => {
-                let result = self.sequence_show_variable(ctx.session(), plan);
-                ctx.retire(result);
-            }
+            Plan::ShowAllVariables => unreachable!(),
+            Plan::ShowVariable(_) => unreachable!(),
             Plan::InspectShard(plan) => {
                 // TODO: Ideally, this await would happen off the main thread.
                 let result = self.sequence_inspect_shard(ctx.session(), plan).await;
                 ctx.retire(result);
             }
-            Plan::SetVariable(plan) => {
-                let result = self.sequence_set_variable(ctx.session_mut(), plan);
-                ctx.retire(result);
-            }
-            Plan::ResetVariable(plan) => {
-                let result = self.sequence_reset_variable(ctx.session_mut(), plan);
-                ctx.retire(result);
-            }
-            Plan::SetTransaction(plan) => {
-                let result = self.sequence_set_transaction(ctx.session_mut(), plan);
-                ctx.retire(result);
-            }
-            Plan::StartTransaction(plan) => {
-                if matches!(
-                    ctx.session().transaction(),
-                    TransactionStatus::InTransaction(_)
-                ) {
-                    ctx.session()
-                        .add_notice(AdapterNotice::ExistingTransactionInProgress);
-                }
-                let result = ctx.session_mut().start_transaction(
-                    self.now_datetime(),
-                    plan.access,
-                    plan.isolation_level,
-                );
-                ctx.retire(result.map(|_| ExecuteResponse::StartedTransaction))
-            }
-            Plan::CommitTransaction(CommitTransactionPlan {
-                ref transaction_type,
-            })
-            | Plan::AbortTransaction(AbortTransactionPlan {
-                ref transaction_type,
-            }) => {
-                let action = match &plan {
-                    Plan::CommitTransaction(_) => EndTransactionAction::Commit,
-                    Plan::AbortTransaction(_) => EndTransactionAction::Rollback,
-                    _ => unreachable!(),
-                };
-                if ctx.session().transaction().is_implicit() && !transaction_type.is_implicit() {
-                    // In Postgres, if a user sends a COMMIT or ROLLBACK in an
-                    // implicit transaction, a warning is sent warning them.
-                    // (The transaction is still closed and a new implicit
-                    // transaction started, though.)
-                    ctx.session()
-                        .add_notice(AdapterNotice::ExplicitTransactionControlInImplicitTransaction);
-                }
-                self.sequence_end_transaction(ctx, action);
-            }
+            Plan::SetVariable(_) => unreachable!(),
+            Plan::ResetVariable(_) => unreachable!(),
+            Plan::SetTransaction(_) => unreachable!(),
+            Plan::StartTransaction(_) => unreachable!(),
+            Plan::CommitTransaction(_) => unreachable!(),
+            Plan::AbortTransaction(_) => unreachable!(),
             Plan::Select(plan) => {
                 self.sequence_peek(ctx, plan, target_cluster).await;
             }
@@ -281,27 +236,12 @@ impl Coordinator {
             Plan::ShowCreate(plan) => {
                 ctx.retire(Ok(Self::send_immediate_rows(vec![plan.row])));
             }
-            Plan::CopyFrom(plan) => {
-                let (tx, _, session, ctx_extra) = ctx.into_parts();
-                tx.send(
-                    Ok(ExecuteResponse::CopyFrom {
-                        id: plan.id,
-                        columns: plan.columns,
-                        params: plan.params,
-                        ctx_extra,
-                    }),
-                    session,
-                );
-            }
-            Plan::CopyRows(CopyRowsPlan { id, columns, rows }) => {
-                self.sequence_copy_rows(ctx, id, columns, rows);
-            }
+            Plan::CopyFrom(_) => unreachable!(),
+            Plan::CopyRows(_) => unreachable!(),
             Plan::Explain(plan) => {
                 self.sequence_explain(ctx, plan, target_cluster).await;
             }
-            Plan::Insert(plan) => {
-                self.sequence_insert(ctx, plan).await;
-            }
+            Plan::Insert(_) => unreachable!(),
             Plan::ReadThenWrite(plan) => {
                 self.sequence_read_then_write(ctx, plan).await;
             }
@@ -343,7 +283,7 @@ impl Coordinator {
             Plan::AlterRole(plan) => {
                 let result = self.sequence_alter_role(ctx.session(), plan).await;
                 if result.is_ok() {
-                    self.maybe_send_rbac_notice(ctx.session());
+                    self.maybe_send_rbac_notice(&mut ctx);
                 }
                 ctx.retire(result);
             }
@@ -360,7 +300,7 @@ impl Coordinator {
                 subsources,
             } => {
                 let result = self
-                    .sequence_alter_source(ctx.session_mut(), alter_source, subsources)
+                    .sequence_alter_source(&mut ctx, alter_source, subsources)
                     .await;
                 ctx.retire(result);
             }
@@ -387,6 +327,7 @@ impl Coordinator {
             }
             Plan::DiscardAll => {
                 let ret = if let TransactionStatus::Started(_) = ctx.session().transaction() {
+                    // TODO(adapter): merge this with clear_transaction.
                     self.drop_temp_items(ctx.session()).await;
                     let conn_meta = self
                         .active_conns
@@ -394,7 +335,7 @@ impl Coordinator {
                         .expect("must exist for active session");
                     let drop_sinks = std::mem::take(&mut conn_meta.drop_sinks);
                     self.drop_compute_sinks(drop_sinks);
-                    ctx.session_mut().reset();
+                    &mut ctx.reset();
                     Ok(ExecuteResponse::DiscardedAll)
                 } else {
                     Err(AdapterError::OperationProhibitsTransaction(
@@ -481,42 +422,43 @@ impl Coordinator {
                     .add_notice(AdapterNotice::UserRequested { severity });
                 ctx.retire(Ok(ExecuteResponse::Raised));
             }
+            Plan::Declare(_) => unreachable!(),
+            Plan::Fetch(_) => unreachable!(),
+            Plan::Close(_) => unreachable!(),
+            Plan::Prepare(_) => unreachable!(),
+            Plan::Execute(_) => unreachable!(),
+            Plan::Deallocate(_) => unreachable!(),
+            Plan::Raise(_) => unreachable!(),
             Plan::RotateKeys(RotateKeysPlan { id }) => {
                 let result = self.sequence_rotate_keys(ctx.session(), id).await;
                 ctx.retire(result);
             }
             Plan::GrantPrivileges(plan) => {
-                let result = self
-                    .sequence_grant_privileges(ctx.session_mut(), plan)
-                    .await;
+                let result = self.sequence_grant_privileges(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::RevokePrivileges(plan) => {
-                let result = self
-                    .sequence_revoke_privileges(ctx.session_mut(), plan)
-                    .await;
+                let result = self.sequence_revoke_privileges(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::AlterDefaultPrivileges(plan) => {
-                let result = self
-                    .sequence_alter_default_privileges(ctx.session_mut(), plan)
-                    .await;
+                let result = self.sequence_alter_default_privileges(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::GrantRole(plan) => {
-                let result = self.sequence_grant_role(ctx.session_mut(), plan).await;
+                let result = self.sequence_grant_role(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::RevokeRole(plan) => {
-                let result = self.sequence_revoke_role(ctx.session_mut(), plan).await;
+                let result = self.sequence_revoke_role(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::AlterOwner(plan) => {
-                let result = self.sequence_alter_owner(ctx.session_mut(), plan).await;
+                let result = self.sequence_alter_owner(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::ReassignOwned(plan) => {
-                let result = self.sequence_reassign_owned(ctx.session_mut(), plan).await;
+                let result = self.sequence_reassign_owned(&mut ctx, plan).await;
                 ctx.retire(result);
             }
             Plan::ValidateConnection(plan) => {
@@ -587,7 +529,7 @@ impl Coordinator {
                 };
                 // We ignore the resp.result because it's not clear what to do if it failed since we
                 // can only send a single ExecuteResponse to tx.
-                tx.send(result, commit_response.session);
+                tx.send(result);
             },
         );
     }
@@ -598,7 +540,7 @@ impl Coordinator {
     #[tracing::instrument(level = "debug", skip(self))]
     pub(crate) async fn sequence_create_role_for_startup(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         plan: CreateRolePlan,
     ) -> Result<ExecuteResponse, AdapterError> {
         self.sequence_create_role(session, plan).await
@@ -632,12 +574,12 @@ impl Coordinator {
         Ok(GlobalId::Transient(id))
     }
 
-    fn maybe_send_rbac_notice(&self, session: &Session) {
-        if !rbac::is_rbac_enabled_for_session(self.catalog.system_config(), session) {
+    fn maybe_send_rbac_notice(&self, ctx: &mut ExecuteContext) {
+        if !rbac::is_rbac_enabled_for_session(self.catalog.system_config(), ctx.session()) {
             if !self.catalog.system_config().enable_ld_rbac_checks() {
-                session.add_notice(AdapterNotice::RbacSystemDisabled);
+                ctx.add_notice(AdapterNotice::RbacSystemDisabled);
             } else {
-                session.add_notice(AdapterNotice::RbacUserDisabled);
+                ctx.add_notice(AdapterNotice::RbacUserDisabled);
             }
         }
     }

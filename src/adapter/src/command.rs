@@ -26,28 +26,48 @@ use mz_ore::str::StrExt;
 use mz_ore::tracing::OpenTelemetryContext;
 use mz_pgcopy::CopyFormatParams;
 use mz_repr::statement_logging::StatementEndedExecutionReason;
-use mz_repr::{ColumnType, Datum, GlobalId, Row, RowArena, ScalarType};
+use mz_repr::{ColumnType, Datum, GlobalId, Row, RowArena};
 use mz_secrets::cache::CachingSecretsReader;
 use mz_secrets::SecretsReader;
 use mz_sql::ast::{FetchDirection, Raw, Statement};
 use mz_sql::catalog::ObjectType;
+use mz_sql::names::ResolvedIds;
 use mz_sql::plan::{ExecuteTimeout, Plan, PlanKind, WebhookValidation, WebhookValidationSecret};
 use mz_sql::session::vars::Var;
 use mz_sql_parser::ast::{AlterObjectRenameStatement, AlterOwnerStatement, DropObjectsStatement};
 use mz_storage_client::controller::MonotonicAppender;
 use tokio::sync::{oneshot, watch};
 
-use crate::client::{ConnectionId, ConnectionIdType};
+use crate::catalog::Catalog;
+use crate::client::ConnectionIdType;
 use crate::coord::peek::PeekResponseUnary;
 use crate::coord::ExecuteContextExtra;
 use crate::error::AdapterError;
-use crate::session::{EndTransactionAction, RowBatchStream, Session};
-use crate::util::Transmittable;
+use crate::session::{EndTransactionAction, RowBatchStream, SessionMetadata};
+use crate::util::{SessionResponse, Transmittable};
+
+#[derive(Debug)]
+pub struct CatalogSnapshot {
+    // TODO: Make this serialize-safe.
+    pub catalog: Option<Arc<Catalog>>,
+    // TODO: This probably can't be transient anymore, or we have to guarantee balancerd never
+    // connects to a second envd, even one at the same address.
+    pub current_transient_revision: u64,
+}
 
 #[derive(Debug)]
 pub enum Command {
+    CatalogSnapshot {
+        if_more_recent: Option<u64>,
+        tx: oneshot::Sender<Response<CatalogSnapshot>>,
+    },
+
+    AllocateUserId {
+        tx: oneshot::Sender<Response<GlobalId>>,
+    },
+
     Startup {
-        session: Session,
+        session: SessionMetadata,
         cancel_tx: Arc<watch::Sender<Canceled>>,
         tx: oneshot::Sender<Response<StartupResponse>>,
         /// keys of settings that were set on statup, and thus should not be
@@ -55,42 +75,19 @@ pub enum Command {
         set_setting_keys: Vec<String>,
     },
 
-    Declare {
-        name: String,
-        stmt: Statement<Raw>,
-        inner_sql: String,
-        param_types: Vec<Option<ScalarType>>,
-        session: Session,
-        tx: oneshot::Sender<Response<ExecuteResponse>>,
-    },
-
-    Prepare {
-        name: String,
-        stmt: Option<Statement<Raw>>,
-        sql: String,
-        param_types: Vec<Option<ScalarType>>,
-        session: Session,
-        tx: oneshot::Sender<Response<()>>,
-    },
-
-    VerifyPreparedStatement {
-        name: String,
-        session: Session,
-        tx: oneshot::Sender<Response<()>>,
-    },
-
-    Execute {
-        portal_name: String,
-        session: Session,
-        tx: oneshot::Sender<Response<ExecuteResponse>>,
+    Sequence {
+        plan: Plan,
+        resolved_ids: ResolvedIds,
+        session: SessionMetadata,
+        tx: oneshot::Sender<Response<SessionResponse>>,
         outer_ctx_extra: Option<ExecuteContextExtra>,
         span: tracing::Span,
     },
 
     Commit {
         action: EndTransactionAction,
-        session: Session,
-        tx: oneshot::Sender<Response<ExecuteResponse>>,
+        session: SessionMetadata,
+        tx: oneshot::Sender<Response<SessionResponse>>,
         // TODO: Ideally this would just be a tracing::Span, but that seems like
         // it might be tickling a bug in tracing_opentelemetry:
         // https://github.com/tokio-rs/tracing-opentelemetry/issues/14
@@ -103,20 +100,16 @@ pub enum Command {
     },
 
     PrivilegedCancelRequest {
-        conn_id: ConnectionId,
-    },
-
-    DumpCatalog {
-        session: Session,
-        tx: oneshot::Sender<Response<CatalogDump>>,
+        session: SessionMetadata,
     },
 
     CopyRows {
         id: GlobalId,
         columns: Vec<usize>,
         rows: Vec<Row>,
-        session: Session,
-        tx: oneshot::Sender<Response<ExecuteResponse>>,
+
+        session: SessionMetadata,
+        tx: oneshot::Sender<Response<SessionResponse>>,
         ctx_extra: ExecuteContextExtra,
     },
 
@@ -124,23 +117,23 @@ pub enum Command {
         database: String,
         schema: String,
         name: String,
-        conn_id: ConnectionId,
+        session: SessionMetadata,
         tx: oneshot::Sender<Result<AppendWebhookResponse, AdapterError>>,
     },
 
     GetSystemVars {
-        session: Session,
+        session: SessionMetadata,
         tx: oneshot::Sender<Response<GetVariablesResponse>>,
     },
 
     SetSystemVars {
         vars: BTreeMap<String, String>,
-        session: Session,
+        session: SessionMetadata,
         tx: oneshot::Sender<Response<()>>,
     },
 
     Terminate {
-        session: Session,
+        session: SessionMetadata,
         tx: Option<oneshot::Sender<Response<()>>>,
     },
 
@@ -157,43 +150,21 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn session(&self) -> Option<&Session> {
+    pub fn session(&self) -> Option<&SessionMetadata> {
         match self {
             Command::Startup { session, .. }
-            | Command::Declare { session, .. }
-            | Command::Prepare { session, .. }
-            | Command::VerifyPreparedStatement { session, .. }
-            | Command::Execute { session, .. }
             | Command::Commit { session, .. }
-            | Command::DumpCatalog { session, .. }
             | Command::CopyRows { session, .. }
             | Command::GetSystemVars { session, .. }
             | Command::SetSystemVars { session, .. }
+            | Command::Sequence { session, .. }
             | Command::Terminate { session, .. } => Some(session),
             Command::CancelRequest { .. }
             | Command::PrivilegedCancelRequest { .. }
             | Command::AppendWebhook { .. }
-            | Command::RetireExecute { .. } => None,
-        }
-    }
-
-    pub fn session_mut(&mut self) -> Option<&mut Session> {
-        match self {
-            Command::Startup { session, .. }
-            | Command::Declare { session, .. }
-            | Command::Prepare { session, .. }
-            | Command::VerifyPreparedStatement { session, .. }
-            | Command::Execute { session, .. }
-            | Command::Commit { session, .. }
-            | Command::DumpCatalog { session, .. }
-            | Command::CopyRows { session, .. }
-            | Command::GetSystemVars { session, .. }
-            | Command::SetSystemVars { session, .. }
-            | Command::Terminate { session, .. } => Some(session),
-            Command::CancelRequest { .. }
-            | Command::PrivilegedCancelRequest { .. }
-            | Command::AppendWebhook { .. }
-            | Command::RetireExecute { .. } => None,
+            | Command::RetireExecute { .. }
+            | Command::CatalogSnapshot { .. }
+            | Command::AllocateUserId { .. } => None,
         }
     }
 }
@@ -201,7 +172,6 @@ impl Command {
 #[derive(Debug)]
 pub struct Response<T> {
     pub result: Result<T, AdapterError>,
-    pub session: Session,
 }
 
 pub type RowsFuture = Pin<Box<dyn Future<Output = PeekResponseUnary> + Send>>;

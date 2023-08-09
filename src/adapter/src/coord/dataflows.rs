@@ -104,7 +104,7 @@ pub enum ExprPrepStyle<'a> {
     /// time in the specified session.
     OneShot {
         logical_time: EvalTime,
-        session: &'a Session,
+        session: &'a SessionMetadata,
     },
     /// The expression is being prepared for evaluation in an AS OF or UP TO clause.
     AsOfUpTo,
@@ -714,7 +714,7 @@ fn eval_unmaterializable_func(
     state: &CatalogState,
     f: &UnmaterializableFunc,
     logical_time: EvalTime,
-    session: &Session,
+    session: &SessionMetadata,
 ) -> Result<MirScalarExpr, AdapterError> {
     let pack_1d_array = |datums: Vec<Datum>| {
         let mut row = Row::default();

@@ -29,11 +29,11 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
 use crate::catalog::{Catalog, CatalogState};
-use crate::command::{Command, Response};
+use crate::command::Response;
 use crate::coord::{Message, PendingTxnResponse};
 use crate::error::AdapterError;
-use crate::session::{EndTransactionAction, Session};
-use crate::{ExecuteContext, ExecuteResponse};
+use crate::session::{EndTransactionAction, Session, SessionChange};
+use crate::{ExecuteContext, ExecuteResponse, ExecuteResponseKind, PeekResponseUnary};
 
 /// Handles responding to clients.
 #[derive(Debug)]
@@ -64,7 +64,7 @@ impl<T: Transmittable + std::fmt::Debug> ClientTransmitter<T> {
     /// # Panics
     /// - If in `soft_assert`, `result.is_ok()`, `self.allowed.is_some()`, and
     ///   the result value is not in the set of allowed values.
-    pub fn send(mut self, result: Result<T, AdapterError>, session: Session) {
+    pub fn send(mut self, result: Result<T, AdapterError>) {
         // Guarantee that the value sent is of an allowed type.
         soft_assert!(
             match (&result, self.allowed.take()) {
@@ -81,14 +81,17 @@ impl<T: Transmittable + std::fmt::Debug> ClientTransmitter<T> {
             .tx
             .take()
             .expect("tx will always be `Some` unless `self` has been consumed")
-            .send(Response { result, session })
+            .send(Response { result })
         {
+            // TODO(adapter)
+            /*
             self.internal_cmd_tx
                 .send(Message::Command(Command::Terminate {
                     session: res.session,
                     tx: None,
                 }))
                 .expect("coordinator unexpectedly gone");
+            */
         }
     }
 
@@ -103,6 +106,19 @@ impl<T: Transmittable + std::fmt::Debug> ClientTransmitter<T> {
     /// [`Transmittable::to_allowed`].
     pub fn set_allowed(&mut self, allowed: Vec<T::Allowed>) {
         self.allowed = Some(allowed);
+    }
+}
+
+#[derive(Debug)]
+pub struct SessionResponse {
+    response: ExecuteResponse,
+    changes: Vec<SessionChange>,
+}
+
+impl Transmittable for SessionResponse {
+    type Allowed = ExecuteResponseKind;
+    fn to_allowed(&self) -> Self::Allowed {
+        ExecuteResponseKind::from(&self.response)
     }
 }
 

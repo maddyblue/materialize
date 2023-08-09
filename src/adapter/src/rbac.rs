@@ -34,7 +34,7 @@ use crate::catalog::Catalog;
 use crate::client::ConnectionId;
 use crate::command::Command;
 use crate::coord::{ConnMeta, Coordinator};
-use crate::session::Session;
+use crate::session::{Session, SessionMetadata};
 use crate::AdapterError;
 
 /// Common checks that need to be performed before we can start checking a role's privileges.
@@ -125,6 +125,8 @@ pub fn check_command(catalog: &Catalog, cmd: &Command) -> Result<(), Unauthorize
     }
 
     match cmd {
+        // TODO(adapter): Correctly limit this.
+        /*
         Command::DumpCatalog { session, .. } => {
             if session.is_superuser() {
                 Ok(())
@@ -134,11 +136,9 @@ pub fn check_command(catalog: &Catalog, cmd: &Command) -> Result<(), Unauthorize
                 })
             }
         }
+        */
         Command::Startup { .. }
-        | Command::Declare { .. }
         | Command::Prepare { .. }
-        | Command::VerifyPreparedStatement { .. }
-        | Command::Execute { .. }
         | Command::Commit { .. }
         | Command::CancelRequest { .. }
         | Command::PrivilegedCancelRequest { .. }
@@ -189,7 +189,7 @@ pub fn check_item_usage(
 /// Checks if a session is authorized to execute a plan. If not, an error is returned.
 pub fn check_plan(
     coord: &Coordinator,
-    catalog: &impl SessionCatalog,
+    catalog: &dyn SessionCatalog,
     session: &Session,
     plan: &Plan,
     target_cluster_id: Option<ClusterId>,
@@ -249,7 +249,7 @@ pub fn check_plan(
 }
 
 /// Returns true if RBAC is turned on for a session, false otherwise.
-pub fn is_rbac_enabled_for_session(system_vars: &SystemVars, session: &Session) -> bool {
+pub fn is_rbac_enabled_for_session(system_vars: &SystemVars, session: &SessionMetadata) -> bool {
     let ld_enabled = system_vars.enable_ld_rbac_checks();
     let server_enabled = system_vars.enable_rbac_checks();
     let session_enabled = session.vars().enable_session_rbac_checks();

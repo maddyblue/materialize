@@ -61,7 +61,7 @@ use crate::catalog::{
     Database, DefaultPrivilegeObject, Error, ErrorKind, Func, Index, MaterializedView, Sink,
     StorageSinkConnectionState, Type, View, SYSTEM_CONN_ID,
 };
-use crate::session::Session;
+use crate::session::SessionMetadata;
 use crate::subscribe::ActiveSubscribe;
 
 /// An update to a built-in table.
@@ -1277,7 +1277,7 @@ impl CatalogState {
         }
     }
 
-    pub fn pack_session_update(&self, session: &Session, diff: Diff) -> BuiltinTableUpdate {
+    pub fn pack_session_update(&self, session: &SessionMetadata, diff: Diff) -> BuiltinTableUpdate {
         let connect_dt = mz_ore::now::to_datetime(session.connect_time());
         BuiltinTableUpdate {
             id: self.resolve_builtin_table(&MZ_SESSIONS),

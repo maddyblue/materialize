@@ -10,7 +10,7 @@
 //! Logic for processing [`Coordinator`] messages. The [`Coordinator`] receives
 //! messages from various sources (ex: controller, clients, background tasks, etc).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use chrono::DurationRound;
@@ -19,9 +19,7 @@ use mz_controller::ControllerResponse;
 use mz_ore::now::EpochMillis;
 use mz_ore::task;
 use mz_persist_client::usage::ShardsUsageReferenced;
-use mz_sql::ast::Statement;
 use mz_sql::names::ResolvedIds;
-use mz_sql::plan::{CreateSourcePlans, Plan};
 use mz_storage_client::controller::CollectionMetadata;
 use rand::{rngs, Rng, SeedableRng};
 use tracing::{event, warn, Instrument, Level};
@@ -31,8 +29,7 @@ use crate::command::{Command, ExecuteResponse};
 use crate::coord::appends::Deferred;
 use crate::coord::{
     Coordinator, CreateConnectionValidationReady, Message, PeekStage, PeekStageFinish,
-    PendingReadTxn, PlanValidity, PurifiedStatementReady, RealTimeRecencyContext,
-    SinkConnectionReady,
+    PendingReadTxn, PlanValidity, RealTimeRecencyContext, SinkConnectionReady,
 };
 use crate::util::{ComputeSinkId, ResultExt};
 use crate::{catalog, AdapterNotice, TimestampContext};
@@ -50,9 +47,6 @@ impl Coordinator {
                 {
                     self.message_controller(m).await
                 }
-            }
-            Message::PurifiedStatementReady(ready) => {
-                self.message_purified_statement_ready(ready).await
             }
             Message::CreateConnectionValidationReady(ready) => {
                 self.message_create_connection_validation_ready(ready).await
@@ -331,128 +325,10 @@ impl Coordinator {
     }
 
     #[tracing::instrument(level = "debug", skip(self, ctx))]
-    async fn message_purified_statement_ready(
-        &mut self,
-        PurifiedStatementReady {
-            ctx,
-            result,
-            params,
-            resolved_ids,
-            original_stmt,
-            otel_ctx,
-        }: PurifiedStatementReady,
-    ) {
-        otel_ctx.attach_as_parent();
-
-        // Ensure that all dependencies still exist after purification, as a
-        // `DROP CONNECTION` may have sneaked in. If any have gone missing, we
-        // repurify the original statement. This will either produce a nice
-        // "unknown connector" error, or pick up a new connector that has
-        // replaced the dropped connector.
-        //
-        // WARNING: If we support `ALTER CONNECTION`, we'll need to also check
-        // for connectors that were altered while we were purifying.
-        if !resolved_ids
-            .0
-            .iter()
-            .all(|id| self.catalog().try_get_entry(id).is_some())
-        {
-            self.handle_execute_inner(original_stmt, params, ctx).await;
-            return;
-        }
-
-        let (subsource_stmts, stmt) = match result {
-            Ok(ok) => ok,
-            Err(e) => return ctx.retire(Err(e)),
-        };
-
-        let mut plans: Vec<CreateSourcePlans> = vec![];
-        let mut id_allocation = BTreeMap::new();
-
-        // First we'll allocate global ids for each subsource and plan them
-        for (transient_id, subsource_stmt) in subsource_stmts {
-            let resolved_ids = mz_sql::names::visit_dependencies(&subsource_stmt);
-            let source_id = match self.catalog_mut().allocate_user_id().await {
-                Ok(id) => id,
-                Err(e) => return ctx.retire(Err(e.into())),
-            };
-            let plan = match self.plan_statement(
-                ctx.session(),
-                Statement::CreateSubsource(subsource_stmt),
-                &params,
-                &resolved_ids,
-            ) {
-                Ok(Plan::CreateSource(plan)) => plan,
-                Ok(_) => {
-                    unreachable!("planning CREATE SUBSOURCE must result in a Plan::CreateSource")
-                }
-                Err(e) => return ctx.retire(Err(e)),
-            };
-            id_allocation.insert(transient_id, source_id);
-            plans.push(CreateSourcePlans {
-                source_id,
-                plan,
-                resolved_ids,
-            });
-        }
-
-        // Then, we'll rewrite the source statement to point to the newly minted global ids and
-        // plan it too
-        let stmt = match mz_sql::names::resolve_transient_ids(&id_allocation, stmt) {
-            Ok(ok) => ok,
-            Err(e) => return ctx.retire(Err(e.into())),
-        };
-
-        let resolved_ids = mz_sql::names::visit_dependencies(&stmt);
-
-        match self.plan_statement(ctx.session(), stmt, &params, &resolved_ids) {
-            Ok(Plan::CreateSource(plan)) => {
-                let source_id = match self.catalog_mut().allocate_user_id().await {
-                    Ok(id) => id,
-                    Err(e) => return ctx.retire(Err(e.into())),
-                };
-
-                plans.push(CreateSourcePlans {
-                    source_id,
-                    plan,
-                    resolved_ids,
-                });
-
-                // Finally, sequence all plans in one go
-                self.sequence_plan(
-                    ctx,
-                    Plan::CreateSources(plans),
-                    ResolvedIds(BTreeSet::new()),
-                )
-                .await;
-            }
-            Ok(Plan::AlterSource(alter_source)) => {
-                self.sequence_plan(
-                    ctx,
-                    Plan::PurifiedAlterSource {
-                        alter_source,
-                        subsources: plans,
-                    },
-                    ResolvedIds(BTreeSet::new()),
-                )
-                .await;
-            }
-            Ok(plan @ Plan::AlterNoop(..)) => {
-                self.sequence_plan(ctx, plan, ResolvedIds(BTreeSet::new()))
-                    .await
-            }
-            Ok(p) => {
-                unreachable!("{:?} is not purified", p)
-            }
-            Err(e) => ctx.retire(Err(e)),
-        };
-    }
-
-    #[tracing::instrument(level = "debug", skip(self, ctx))]
     async fn message_create_connection_validation_ready(
         &mut self,
         CreateConnectionValidationReady {
-            mut ctx,
+            ctx,
             result,
             connection_gid,
             mut plan_validity,
@@ -481,7 +357,7 @@ impl Coordinator {
 
         let result = self
             .sequence_create_connection_stage_finish(
-                ctx.session_mut(),
+                ctx.session(),
                 connection_gid,
                 plan,
                 ResolvedIds(plan_validity.dependency_ids),

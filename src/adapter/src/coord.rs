@@ -103,9 +103,9 @@ use mz_repr::statement_logging::{StatementEndedExecutionReason, StatementExecuti
 use mz_repr::{Datum, GlobalId, RelationType, Row, Timestamp};
 use mz_secrets::cache::CachingSecretsReader;
 use mz_secrets::SecretsController;
-use mz_sql::ast::{CreateSubsourceStatement, Raw, Statement};
+use mz_sql::ast::{Raw, Statement};
 use mz_sql::catalog::EnvironmentId;
-use mz_sql::names::{Aug, ResolvedIds};
+use mz_sql::names::ResolvedIds;
 use mz_sql::plan::{CopyFormat, CreateConnectionPlan, Params, QueryWhen};
 use mz_sql::session::vars::ConnectionCounter;
 use mz_storage_client::controller::{
@@ -139,15 +139,18 @@ use crate::coord::timeline::{TimelineContext, TimelineState, WriteTimestamp};
 use crate::coord::timestamp_selection::TimestampContext;
 use crate::error::AdapterError;
 use crate::metrics::Metrics;
-use crate::session::{EndTransactionAction, Session};
+use crate::session::{EndTransactionAction, SessionChange, SessionMetadata};
 use crate::subscribe::ActiveSubscribe;
-use crate::util::{ClientTransmitter, CompletedClientTransmitter, ComputeSinkId, ResultExt};
+use crate::util::{
+    ClientTransmitter, CompletedClientTransmitter, ComputeSinkId, ResultExt, SessionResponse,
+};
 use crate::{flags, AdapterNotice, TimestampProvider};
 
 pub(crate) mod dataflows;
 use self::statement_logging::{StatementLogging, StatementLoggingId};
 
 pub(crate) mod id_bundle;
+pub(crate) mod introspection;
 pub(crate) mod peek;
 pub(crate) mod statement_logging;
 pub(crate) mod timeline;
@@ -157,7 +160,6 @@ mod appends;
 mod command_handler;
 mod ddl;
 mod indexes;
-mod introspection;
 mod message_handler;
 mod read_policy;
 mod sequencer;
@@ -187,7 +189,6 @@ pub const DEFAULT_LOGICAL_COMPACTION_WINDOW_TS: mz_repr::Timestamp =
 pub enum Message<T = mz_repr::Timestamp> {
     Command(Command),
     ControllerReady,
-    PurifiedStatementReady(PurifiedStatementReady),
     CreateConnectionValidationReady(CreateConnectionValidationReady),
     SinkConnectionReady(SinkConnectionReady),
     WriteLockGrant(tokio::sync::OwnedMutexGuard<()>),
@@ -244,11 +245,6 @@ pub struct BackgroundWorkResult<T> {
     pub original_stmt: Statement<Raw>,
     pub otel_ctx: OpenTelemetryContext,
 }
-
-pub type PurifiedStatementReady = BackgroundWorkResult<(
-    Vec<(GlobalId, CreateSubsourceStatement<Aug>)>,
-    Statement<Aug>,
-)>;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -616,14 +612,17 @@ impl PendingRead {
                     },
                 ..
             } => {
+                // TODO(adapter)
+                /*
                 let changed = ctx.session_mut().vars_mut().end_transaction(action);
                 // Append any parameters that changed to the response.
                 let response = response.map(|mut r| {
                     r.extend_params(changed);
                     ExecuteResponse::from(r)
                 });
+                */
 
-                Some((ctx, response))
+                Some((ctx, response.map(ExecuteResponse::from)))
             }
             PendingRead::ReadThenWrite { tx, .. } => {
                 // Ignore errors if the caller has hung up.
@@ -699,21 +698,19 @@ impl Drop for ExecuteContextExtra {
 /// the `ExecuteContextExtra` object (today, it is simply empty).
 #[derive(Debug)]
 pub struct ExecuteContext {
-    tx: ClientTransmitter<ExecuteResponse>,
+    tx: ClientTransmitter<SessionResponse>,
     internal_cmd_tx: mpsc::UnboundedSender<Message>,
-    session: Session,
+    session: SessionMetadata,
     extra: ExecuteContextExtra,
+    changes: Vec<SessionChange>,
 }
 
 impl ExecuteContext {
-    pub fn session(&self) -> &Session {
+    pub fn session(&self) -> &SessionMetadata {
         &self.session
     }
 
-    pub fn session_mut(&mut self) -> &mut Session {
-        &mut self.session
-    }
-
+    /*
     pub fn tx(&self) -> &ClientTransmitter<ExecuteResponse> {
         &self.tx
     }
@@ -721,18 +718,21 @@ impl ExecuteContext {
     pub fn tx_mut(&mut self) -> &mut ClientTransmitter<ExecuteResponse> {
         &mut self.tx
     }
+    */
 
     pub fn from_parts(
-        tx: ClientTransmitter<ExecuteResponse>,
+        tx: ClientTransmitter<SessionResponse>,
         internal_cmd_tx: mpsc::UnboundedSender<Message>,
-        session: Session,
+        session: SessionMetadata,
         extra: ExecuteContextExtra,
+        changes: Vec<SessionChange>,
     ) -> Self {
         Self {
             tx,
             session,
             extra,
             internal_cmd_tx,
+            changes,
         }
     }
 
@@ -747,18 +747,30 @@ impl ExecuteContext {
     pub fn into_parts(
         self,
     ) -> (
-        ClientTransmitter<ExecuteResponse>,
+        ClientTransmitter<SessionResponse>,
         mpsc::UnboundedSender<Message>,
-        Session,
+        SessionMetadata,
         ExecuteContextExtra,
+        Vec<SessionChange>,
     ) {
         let Self {
             tx,
             internal_cmd_tx,
             session,
             extra,
+            changes,
         } = self;
-        (tx, internal_cmd_tx, session, extra)
+        (tx, internal_cmd_tx, session, extra, changes)
+    }
+
+    pub fn add_notice(&mut self, notice: AdapterNotice) {
+        self.changes.push(SessionChange::Notice(notice));
+    }
+
+    pub fn add_notices(&self, notices: impl IntoIterator<Item = AdapterNotice>) {
+        for notice in notices {
+            self.add_notice(notice)
+        }
     }
 
     /// Retire the execution, by sending a message to the coordinator.
@@ -766,8 +778,9 @@ impl ExecuteContext {
         let Self {
             tx,
             internal_cmd_tx,
-            session,
+            session: _,
             extra,
+            changes,
         } = self;
         let reason = if extra.is_trivial() {
             None
@@ -867,7 +880,7 @@ impl ExecuteContext {
                 },
             })
         };
-        tx.send(result, session);
+        tx.send(result.map(|response| SessionResponse { response, changes }));
         if let Some(reason) = reason {
             if let Err(e) = internal_cmd_tx.send(Message::RetireExecute {
                 data: extra,
@@ -1994,6 +2007,7 @@ pub async fn serve(
     let span = tracing::Span::current();
     let coord_now = now.clone();
     let advance_timelines_interval = tokio::time::interval(catalog.config().timestamp_interval);
+    let client_connection_context = Arc::new(connection_context.clone());
     let thread = thread::Builder::new()
         // The Coordinator thread tends to keep a lot of data on its stack. To
         // prevent a stack overflow we allocate a stack twice as big as the default
@@ -2086,6 +2100,7 @@ pub async fn serve(
                 now,
                 environment_id,
                 segment_client_clone,
+                client_connection_context,
             );
             Ok((handle, client))
         }

@@ -106,7 +106,7 @@ use crate::client::ConnectionId;
 use crate::command::CatalogDump;
 use crate::config::{SynchronizedParameters, SystemParameterFrontend, SystemParameterSyncConfig};
 use crate::coord::{TargetCluster, DEFAULT_LOGICAL_COMPACTION_WINDOW};
-use crate::session::{PreparedStatement, Session, DEFAULT_DATABASE_NAME};
+use crate::session::{PreparedStatement, Session, SessionMetadata, DEFAULT_DATABASE_NAME};
 use crate::util::{index_sql, ResultExt};
 use crate::{rbac, AdapterError, AdapterNotice, ExecuteResponse};
 
@@ -1417,7 +1417,7 @@ impl CatalogState {
 
     pub fn resolve_search_path(
         &self,
-        session: &Session,
+        session: &SessionMetadata,
     ) -> Vec<(ResolvedDatabaseSpecifier, SchemaSpecifier)> {
         let database = self
             .database_by_name
@@ -1632,7 +1632,7 @@ impl CatalogState {
     fn add_to_audit_log(
         &self,
         oracle_write_ts: mz_repr::Timestamp,
-        session: Option<&Session>,
+        session: Option<&SessionMetadata>,
         tx: &mut storage::Transaction,
         builtin_table_updates: &mut Vec<BuiltinTableUpdate>,
         audit_events: &mut Vec<VersionedEvent>,
@@ -4695,11 +4695,14 @@ impl Catalog {
         Ok(catalog)
     }
 
-    pub fn for_session<'a>(&'a self, session: &'a Session) -> ConnCatalog<'a> {
+    pub fn for_session<'a>(&'a self, session: &'a SessionMetadata) -> ConnCatalog<'a> {
         Self::for_session_state(&self.state, session)
     }
 
-    pub fn for_session_state<'a>(state: &'a CatalogState, session: &'a Session) -> ConnCatalog<'a> {
+    pub fn for_session_state<'a>(
+        state: &'a CatalogState,
+        session: &'a SessionMetadata,
+    ) -> ConnCatalog<'a> {
         let search_path = state.resolve_search_path(session);
         let database = state
             .database_by_name
@@ -4713,8 +4716,12 @@ impl Catalog {
             database,
             search_path,
             role_id: session.current_role_id().clone(),
-            prepared_statements: Some(session.prepared_statements()),
-            notices_tx: session.retain_notice_transmitter(),
+
+            // TODO(adapter)
+            prepared_statements: todo!(),
+            notices_tx: todo!(),
+            //prepared_statements: Some(session.prepared_statements()),
+            //notices_tx: session.retain_notice_transmitter(),
         }
     }
 
@@ -4889,7 +4896,7 @@ impl Catalog {
 
     pub fn resolve_search_path(
         &self,
-        session: &Session,
+        session: &SessionMetadata,
     ) -> Vec<(ResolvedDatabaseSpecifier, SchemaSpecifier)> {
         self.state.resolve_search_path(session)
     }
@@ -4950,7 +4957,7 @@ impl Catalog {
     pub fn resolve_target_cluster(
         &self,
         target_cluster: TargetCluster,
-        session: &Session,
+        session: &SessionMetadata,
     ) -> Result<&Cluster, AdapterError> {
         match target_cluster {
             TargetCluster::Introspection => {
@@ -4960,7 +4967,7 @@ impl Catalog {
         }
     }
 
-    pub fn active_cluster(&self, session: &Session) -> Result<&Cluster, AdapterError> {
+    pub fn active_cluster(&self, session: &SessionMetadata) -> Result<&Cluster, AdapterError> {
         // TODO(benesch): this check here is not sufficiently protective. It'd
         // be very easy for a code path to accidentally avoid this check by
         // calling `resolve_cluster(session.vars().cluster())`.
@@ -5354,7 +5361,7 @@ impl Catalog {
     pub async fn transact<F, R>(
         &mut self,
         oracle_write_ts: mz_repr::Timestamp,
-        session: Option<&Session>,
+        session: Option<&SessionMetadata>,
         ops: Vec<Op>,
         f: F,
     ) -> Result<TransactionResult<R>, AdapterError>
@@ -5431,7 +5438,7 @@ impl Catalog {
     #[tracing::instrument(name = "catalog::transact_inner", level = "debug", skip_all)]
     fn transact_inner(
         oracle_write_ts: mz_repr::Timestamp,
-        session: Option<&Session>,
+        session: Option<&SessionMetadata>,
         ops: Vec<Op>,
         temporary_ids: Vec<GlobalId>,
         builtin_table_updates: &mut Vec<BuiltinTableUpdate>,
@@ -8976,7 +8983,7 @@ mod tests {
                 );
                 assert_eq!(
                     catalog
-                        .for_session(&Session::dummy())
+                        .for_session(&Session::dummy().metadata())
                         .minimal_qualification(&tc.input),
                     tc.normal_output
                 );
@@ -9039,7 +9046,7 @@ mod tests {
             );
 
             // Behavior with the default search_schema (public)
-            let session = Session::dummy();
+            let session = Session::dummy().metadata();
             let conn_catalog = catalog.for_session(&session);
             assert_ne!(
                 conn_catalog.effective_search_path(false),
@@ -9068,7 +9075,7 @@ mod tests {
             );
 
             // missing schemas are added when missing
-            let mut session = Session::dummy();
+            let mut session = Session::dummy().metadata();
             session
                 .vars_mut()
                 .set(
@@ -9110,7 +9117,7 @@ mod tests {
                     false,
                 )
                 .expect("failed to set search_path");
-            let conn_catalog = catalog.for_session(&session);
+            let conn_catalog = catalog.for_session(&session.metadata());
             assert_ne!(
                 conn_catalog.effective_search_path(false),
                 conn_catalog.search_path
@@ -9142,7 +9149,7 @@ mod tests {
                     false,
                 )
                 .expect("failed to set search_path");
-            let conn_catalog = catalog.for_session(&session);
+            let conn_catalog = catalog.for_session(&session.metadata());
             assert_ne!(
                 conn_catalog.effective_search_path(false),
                 conn_catalog.search_path

@@ -1,0 +1,19 @@
+subscribe needs session for:
+active cluster (user().name and vars().cluster())
+vars.cluster_replica
+add_transaction_ops
+evaluate_when: error message: catalog::for_session_state(catalog, session).humanize_column_type(&ty) 
+determine_timestamp: vars.transaction_isolation, vars.real_time_recency, evaluate_when, connid in log message
+add_notice
+
+Coordinator fns that could be changed to only take a catalog:
+validate_timeline_context
+get_timeline_contexts
+get_timeline_context
+ids_in_timeline
+
+
+Coordinator::timedomain_for needs a catalog and index oracle, could then be separated from coord.
+index oracle only needs a compute instance snapshot
+
+Seems likely that sequence_peek_timestamp needs to be changed to take the current transaction timestamp determination. If its None, then sequence_peek_timestamp probably needs to return the chosen timestamp.

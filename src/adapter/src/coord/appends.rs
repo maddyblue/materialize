@@ -118,6 +118,8 @@ impl PendingWriteTxn {
 #[macro_export]
 macro_rules! guard_write_critical_section {
     ($coord:expr, $ctx:expr, $plan_to_defer:expr, $dependency_ids:expr) => {
+        // TODO(adapter)
+        /*
         if !$ctx.session().has_write_lock() {
             if $coord
                 .try_grant_session_write_lock($ctx.session_mut())
@@ -136,6 +138,7 @@ macro_rules! guard_write_critical_section {
                 return;
             }
         }
+        */
     };
 }
 
@@ -433,7 +436,7 @@ impl Coordinator {
     /// return after calling it.
     pub(crate) fn defer_write(&mut self, deferred: Deferred) {
         let id = match &deferred {
-            Deferred::Plan(plan) => plan.ctx.session().conn_id().to_string(),
+            Deferred::Plan(plan) => plan.ctx.session.conn_id().to_string(),
             Deferred::GroupCommit => "group_commit".to_string(),
         };
         self.write_lock_wait_group.push_back(deferred);

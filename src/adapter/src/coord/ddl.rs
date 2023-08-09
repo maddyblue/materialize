@@ -49,7 +49,7 @@ use crate::client::ConnectionId;
 use crate::coord::read_policy::SINCE_GRANULARITY;
 use crate::coord::timeline::{TimelineContext, TimelineState};
 use crate::coord::{Coordinator, ReplicaMetadata};
-use crate::session::Session;
+use crate::session::SessionMetadata;
 use crate::telemetry::SegmentClientExt;
 use crate::util::{ComputeSinkId, ResultExt};
 use crate::{catalog, flags, AdapterError, AdapterNotice};
@@ -65,7 +65,7 @@ impl Coordinator {
     #[tracing::instrument(level = "debug", skip_all)]
     pub(crate) async fn catalog_transact(
         &mut self,
-        session: Option<&Session>,
+        session: Option<&SessionMetadata>,
         ops: Vec<catalog::Op>,
     ) -> Result<(), AdapterError> {
         self.catalog_transact_with(session, ops, |_| Ok(())).await
@@ -84,7 +84,7 @@ impl Coordinator {
     #[tracing::instrument(level = "debug", skip_all)]
     pub(crate) async fn catalog_transact_with<F, R>(
         &mut self,
-        session: Option<&Session>,
+        session: Option<&SessionMetadata>,
         mut ops: Vec<catalog::Op>,
         f: F,
     ) -> Result<R, AdapterError>
@@ -669,7 +669,7 @@ impl Coordinator {
 
     /// Removes all temporary items created by the specified connection, though
     /// not the temporary schema itself.
-    pub(crate) async fn drop_temp_items(&mut self, session: &Session) {
+    pub(crate) async fn drop_temp_items(&mut self, session: &SessionMetadata) {
         let ops = self.catalog_mut().drop_temp_item_ops(session.conn_id());
         if ops.is_empty() {
             return;
@@ -806,7 +806,7 @@ impl Coordinator {
         oid: u32,
         connection: StorageSinkConnection,
         create_export_token: CreateExportToken,
-        session: Option<&Session>,
+        session: Option<&SessionMetadata>,
     ) -> Result<(), AdapterError> {
         // Update catalog entry with sink connection.
         let entry = self.catalog().get_entry(&id);

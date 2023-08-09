@@ -175,7 +175,7 @@ pub fn auto_run_on_introspection<'a, 's, 'p>(
 /// Checks if we're currently running on the [`MZ_INTROSPECTION_CLUSTER`], and if so, do
 /// we depend on any objects that we're not allowed to query from the cluster.
 pub fn check_cluster_restrictions(
-    catalog: &impl SessionCatalog,
+    catalog: &dyn SessionCatalog,
     plan: &Plan,
 ) -> Result<(), AdapterError> {
     // We only impose restrictions if the current cluster is the introspection cluster.
@@ -231,7 +231,7 @@ pub fn check_cluster_restrictions(
 ///  a more robust privileges framework, then this function should be replaced with that
 ///  framework.
 pub fn user_privilege_hack(
-    catalog: &impl SessionCatalog,
+    catalog: &dyn SessionCatalog,
     session: &Session,
     plan: &Plan,
     resolved_ids: &ResolvedIds,

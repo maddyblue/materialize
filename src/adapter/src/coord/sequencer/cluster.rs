@@ -32,14 +32,14 @@ use crate::catalog::{
     ClusterConfig, ClusterVariant, ClusterVariantManaged, Op, SerializedReplicaLocation,
 };
 use crate::coord::{Coordinator, DEFAULT_LOGICAL_COMPACTION_WINDOW_TS};
-use crate::session::Session;
+use crate::session::SessionMetadata;
 use crate::{catalog, AdapterError, ExecuteResponse};
 
 impl Coordinator {
     #[tracing::instrument(level = "debug", skip(self))]
     pub(super) async fn sequence_create_cluster(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         CreateClusterPlan { name, variant }: CreateClusterPlan,
     ) -> Result<ExecuteResponse, AdapterError> {
         tracing::debug!("sequence_create_cluster");
@@ -98,7 +98,7 @@ impl Coordinator {
     #[tracing::instrument(level = "debug", skip(self))]
     pub(super) async fn sequence_create_managed_cluster(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         CreateClusterManagedPlan {
             availability_zones,
             compute,
@@ -229,7 +229,7 @@ impl Coordinator {
     #[tracing::instrument(level = "debug", skip(self))]
     pub(super) async fn sequence_create_unmanaged_cluster(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         CreateClusterUnmanagedPlan { replicas }: CreateClusterUnmanagedPlan,
         id: ClusterId,
         mut ops: Vec<catalog::Op>,
@@ -373,7 +373,7 @@ impl Coordinator {
     #[tracing::instrument(level = "debug", skip(self))]
     pub(super) async fn sequence_create_cluster_replica(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         CreateClusterReplicaPlan {
             name,
             cluster_id,
@@ -489,7 +489,7 @@ impl Coordinator {
 
     pub(super) async fn sequence_alter_cluster(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         AlterClusterPlan {
             id: cluster_id,
             name: _,
@@ -650,7 +650,7 @@ impl Coordinator {
 
     async fn sequence_alter_cluster_managed_to_managed(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         cluster_id: ClusterId,
         config: &ClusterVariantManaged,
         new_config: ClusterVariantManaged,
@@ -795,7 +795,7 @@ impl Coordinator {
 
     async fn sequence_alter_cluster_unmanaged_to_managed(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         cluster_id: ClusterId,
         mut new_config: ClusterVariantManaged,
         options: PlanClusterOption,
@@ -935,7 +935,7 @@ impl Coordinator {
 
     async fn sequence_alter_cluster_managed_to_unmanaged(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         cluster_id: ClusterId,
     ) -> Result<(), AdapterError> {
         let cluster = self.catalog().get_cluster(cluster_id);
@@ -954,7 +954,7 @@ impl Coordinator {
 
     fn sequence_alter_cluster_unmanaged_to_unmanaged(
         &self,
-        _session: &Session,
+        _session: &SessionMetadata,
         _cluster_id: ClusterId,
         _replicas: AlterOptionParameter<Vec<(String, mz_sql::plan::ReplicaConfig)>>,
     ) -> Result<(), AdapterError> {
@@ -963,7 +963,7 @@ impl Coordinator {
 
     pub(super) async fn sequence_alter_cluster_rename(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         AlterClusterRenamePlan { id, name, to_name }: AlterClusterRenamePlan,
     ) -> Result<ExecuteResponse, AdapterError> {
         let op = Op::RenameCluster { id, name, to_name };
@@ -975,7 +975,7 @@ impl Coordinator {
 
     pub(super) async fn sequence_alter_cluster_replica_rename(
         &mut self,
-        session: &Session,
+        session: &SessionMetadata,
         AlterClusterReplicaRenamePlan {
             cluster_id,
             replica_id,
