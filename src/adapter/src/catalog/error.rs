@@ -18,7 +18,7 @@ use mz_sql::catalog::CatalogError as SqlCatalogError;
 #[error(transparent)]
 pub struct Error {
     #[from]
-    pub(crate) kind: ErrorKind,
+    pub kind: ErrorKind,
 }
 
 #[derive(Debug, thiserror::Error)]

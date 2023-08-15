@@ -86,6 +86,7 @@ use mz_ore::soft_assert;
 use mz_proto::{RustType, TryFromProtoError};
 use serde::{Deserialize, Serialize};
 use timely::progress::Antichain;
+use tokio_postgres::error::SqlState;
 
 pub mod objects;
 
@@ -216,6 +217,16 @@ impl StashError {
     pub fn is_unrecoverable(&self) -> bool {
         match &self.inner {
             InternalStashError::Fence(_) | InternalStashError::StashNotWritable(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Reports whether the error is a retryable error.
+    pub fn is_retryable(&self) -> bool {
+        match &self.inner {
+            InternalStashError::Postgres(err) => {
+                err.code() == Some(&SqlState::T_R_SERIALIZATION_FAILURE)
+            }
             _ => false,
         }
     }

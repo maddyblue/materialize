@@ -91,7 +91,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
 use mz_adapter::catalog::storage::{stash, BootstrapArgs};
-use mz_adapter::catalog::ClusterReplicaSizeMap;
+use mz_adapter::catalog::{ClusterReplicaSizeMap, ErrorKind};
 use mz_adapter::config::{system_parameter_sync, SystemParameterSyncConfig};
 use mz_build_info::{build_info, BuildInfo};
 use mz_cloud_resources::CloudResourceController;
@@ -387,25 +387,34 @@ impl Listeners {
             tracing::info!("Found stash generation {stash_generation:?}");
             if stash_generation < Some(deploy_generation) {
                 tracing::info!("Stash generation {stash_generation:?} is less than deploy generation {deploy_generation}. Performing pre-flight checks");
-                if let Err(e) = mz_adapter::catalog::storage::Connection::open(
-                    stash,
-                    config.now.clone(),
-                    &BootstrapArgs {
-                        default_cluster_replica_size: config
-                            .bootstrap_default_cluster_replica_size
-                            .clone(),
-                        builtin_cluster_replica_size: config
-                            .bootstrap_builtin_cluster_replica_size
-                            .clone(),
-                        bootstrap_role: config.bootstrap_role.clone(),
-                    },
-                    None,
-                )
-                .await
-                {
-                    return Err(
-                        anyhow!(e).context("Stash upgrade would have failed with this error")
-                    );
+                loop {
+                    match mz_adapter::catalog::storage::Connection::open(
+                        stash,
+                        config.now.clone(),
+                        &BootstrapArgs {
+                            default_cluster_replica_size: config
+                                .bootstrap_default_cluster_replica_size
+                                .clone(),
+                            builtin_cluster_replica_size: config
+                                .bootstrap_builtin_cluster_replica_size
+                                .clone(),
+                            bootstrap_role: config.bootstrap_role.clone(),
+                        },
+                        None,
+                    )
+                    .await
+                    {
+                        Ok(_) => break,
+                        Err(err) => {
+                            if let ErrorKind::Stash(inner) = &err.kind {
+                                if inner.is_retryable() {
+                                    continue;
+                                }
+                            }
+                            return Err(anyhow!(err)
+                                .context("Stash upgrade would have failed with this error"));
+                        }
+                    }
                 }
 
                 if let Err(()) = ready_to_promote_tx.send(()) {
