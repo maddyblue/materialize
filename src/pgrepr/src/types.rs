@@ -1260,6 +1260,9 @@ impl From<&ScalarType> for Type {
                 element_type: Box::new(From::from(&**element_type)),
             },
             ScalarType::MzAclItem => Type::MzAclItem,
+            ScalarType::SessionCatalog => {
+                unreachable!("internal error: session catalog should never be constructed")
+            }
         }
     }
 }

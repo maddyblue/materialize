@@ -601,6 +601,7 @@ fn eval_unmaterializable_func(
                 .map(|var| (var.name().to_lowercase(), var.value()))
                 .collect(),
         ),
+        UnmaterializableFunc::SessionCatalog => {}
         UnmaterializableFunc::CurrentTimestamp => {
             let t: Datum = session.pcx().wall_time.try_into()?;
             pack(t)

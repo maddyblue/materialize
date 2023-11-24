@@ -241,6 +241,9 @@ impl ToJson for TypedDatum<'_> {
                 json!(datum.unwrap_range().to_string())
             }
             ScalarType::MzAclItem => json!(datum.unwrap_mz_acl_item().to_string()),
+            ScalarType::SessionCatalog => {
+                unreachable!("internal error: session catalog should never be constructed")
+            }
         };
         // We don't need to recurse into map or object here because those already recursively call
         // .json() with the number policy to generate the member Values.
@@ -391,6 +394,9 @@ fn build_row_schema_field_type(
         // https://debezium.io/documentation/reference/stable/connectors/postgresql.html
         ScalarType::Range { .. } => json!("string"),
         ScalarType::MzAclItem => json!("string"),
+        ScalarType::SessionCatalog => {
+            unreachable!("internal error: session catalog should never be constructed")
+        }
     };
     if typ.nullable {
         // Should be revisited if we ever support a different kind of union scheme.

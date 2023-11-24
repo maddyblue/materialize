@@ -103,6 +103,7 @@ pub enum UnmaterializableFunc {
     SessionUser,
     Version,
     ViewableVariables,
+    SessionCatalog,
 }
 
 impl UnmaterializableFunc {
@@ -151,6 +152,7 @@ impl UnmaterializableFunc {
                 custom_id: None,
             }
             .nullable(false),
+            UnmaterializableFunc::SessionCatalog => ScalarType::SessionCatalog.nullable(false),
         }
     }
 }
@@ -180,6 +182,7 @@ impl fmt::Display for UnmaterializableFunc {
             UnmaterializableFunc::SessionUser => f.write_str("session_user"),
             UnmaterializableFunc::Version => f.write_str("version"),
             UnmaterializableFunc::ViewableVariables => f.write_str("viewable_variables"),
+            UnmaterializableFunc::SessionCatalog => f.write_str("session_catalog"),
         }
     }
 }
@@ -206,6 +209,7 @@ impl RustType<ProtoUnmaterializableFunc> for UnmaterializableFunc {
             UnmaterializableFunc::MzVersionNum => MzVersionNum(()),
             UnmaterializableFunc::PgBackendPid => PgBackendPid(()),
             UnmaterializableFunc::PgPostmasterStartTime => PgPostmasterStartTime(()),
+            UnmaterializableFunc::SessionCatalog => SessionCatalog(()),
             UnmaterializableFunc::SessionUser => SessionUser(()),
             UnmaterializableFunc::Version => Version(()),
         };
@@ -238,6 +242,7 @@ impl RustType<ProtoUnmaterializableFunc> for UnmaterializableFunc {
                 PgPostmasterStartTime(()) => Ok(UnmaterializableFunc::PgPostmasterStartTime),
                 SessionUser(()) => Ok(UnmaterializableFunc::SessionUser),
                 Version(()) => Ok(UnmaterializableFunc::Version),
+                SessionCatalog(_) => Ok(UnmaterializableFunc::SessionCatalog),
             }
         } else {
             Err(TryFromProtoError::missing_field(
@@ -6616,6 +6621,9 @@ where
             None => Ok::<_, EvalError>(buf.write_null()),
         }),
         MzAclItem => Ok(strconv::format_mz_acl_item(buf, d.unwrap_mz_acl_item())),
+        SessionCatalog => {
+            unreachable!("internal error: session catalog should never be constructed")
+        }
     }
 }
 

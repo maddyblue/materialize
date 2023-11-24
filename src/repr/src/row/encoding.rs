@@ -144,7 +144,8 @@ impl ColumnType {
                 | Int2Vector
                 | Range { .. }
                 | MzAclItem
-                | AclItem,
+                | AclItem
+                | SessionCatalog,
             ) => None,
         }
     }

@@ -77,7 +77,8 @@ impl TypeCategory {
             | ScalarType::Bytes
             | ScalarType::Jsonb
             | ScalarType::Uuid
-            | ScalarType::MzAclItem => Self::UserDefined,
+            | ScalarType::MzAclItem
+            | ScalarType::SessionCatalog => Self::UserDefined,
             ScalarType::Date
             | ScalarType::Time
             | ScalarType::Timestamp { .. }
@@ -890,6 +891,7 @@ impl From<ScalarBaseType> for ParamType {
             Int2Vector => ScalarType::Int2Vector,
             MzTimestamp => ScalarType::MzTimestamp,
             MzAclItem => ScalarType::MzAclItem,
+            SessionCatalog => ScalarType::SessionCatalog,
         };
         ParamType::Plain(s)
     }
@@ -4735,3 +4737,5 @@ fn current_settings(
     };
     Ok(expr)
 }
+
+fn simplify_names() {}

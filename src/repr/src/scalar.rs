@@ -1484,6 +1484,7 @@ pub enum ScalarType {
     MzAclItem,
     /// The type of [`Datum::AclItem`]
     AclItem,
+    SessionCatalog,
 }
 
 impl RustType<ProtoRecordField> for (ColumnName, ColumnType) {
@@ -1576,6 +1577,7 @@ impl RustType<ProtoScalarType> for ScalarType {
                 })),
                 ScalarType::MzAclItem => MzAclItem(()),
                 ScalarType::AclItem => AclItem(()),
+                ScalarType::SessionCatalog => SessionCatalog(()),
             }),
         }
     }
@@ -1662,6 +1664,7 @@ impl RustType<ProtoScalarType> for ScalarType {
             }),
             MzAclItem(()) => Ok(ScalarType::MzAclItem),
             AclItem(()) => Ok(ScalarType::AclItem),
+            SessionCatalog(()) => Ok(ScalarType::SessionCatalog),
         }
     }
 }
@@ -3133,6 +3136,7 @@ impl ScalarType {
         });
         // aclitem has no binary encoding so we can't test it here.
         static ACLITEM: Lazy<Row> = Lazy::new(|| Row::pack_slice(&[]));
+        static SESSIONCATALOG: Lazy<Row> = Lazy::new(|| Row::pack_slice(&[]));
 
         match self {
             ScalarType::Bool => (*BOOL).iter(),
@@ -3171,6 +3175,7 @@ impl ScalarType {
             ScalarType::Range { .. } => (*RANGE).iter(),
             ScalarType::MzAclItem { .. } => (*MZACLITEM).iter(),
             ScalarType::AclItem { .. } => (*ACLITEM).iter(),
+            ScalarType::SessionCatalog { .. } => (*SESSIONCATALOG).iter(),
         }
     }
 
@@ -3295,7 +3300,8 @@ impl ScalarType {
             t @ (ScalarType::Char { .. }
             // not sensible to put in arrays
             | ScalarType::Map { .. }
-            | ScalarType::List { .. }) => Err(t),
+            | ScalarType::List { .. }
+            | ScalarType::SessionCatalog) => Err(t),
         }
     }
 }
