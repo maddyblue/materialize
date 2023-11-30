@@ -1206,7 +1206,7 @@ impl Coordinator {
 
                 coord.ship_dataflow(df_desc, cluster_id).await;
 
-                coord.set_index_options(id, options).expect("index enabled");
+                coord.set_index_options(id, options);
             })
             .await;
 
@@ -4578,7 +4578,7 @@ impl Coordinator {
         &mut self,
         plan: plan::AlterIndexSetOptionsPlan,
     ) -> Result<ExecuteResponse, AdapterError> {
-        self.set_index_options(plan.id, plan.options)?;
+        self.set_index_options(plan.id, plan.options);
         Ok(ExecuteResponse::AlteredObject(ObjectType::Index))
     }
 
@@ -4590,23 +4590,17 @@ impl Coordinator {
         for o in plan.options {
             options.push(match o {
                 IndexOptionName::LogicalCompactionWindow => {
-                    IndexOption::LogicalCompactionWindow(Some(Duration::from_millis(
-                        DEFAULT_LOGICAL_COMPACTION_WINDOW_TS.into(),
-                    )))
+                    IndexOption::LogicalCompactionWindow(Some(DEFAULT_LOGICAL_COMPACTION_WINDOW_TS))
                 }
             });
         }
 
-        self.set_index_options(plan.id, options)?;
+        self.set_index_options(plan.id, options);
 
         Ok(ExecuteResponse::AlteredObject(ObjectType::Index))
     }
 
-    pub(super) fn set_index_options(
-        &mut self,
-        id: GlobalId,
-        options: Vec<IndexOption>,
-    ) -> Result<(), AdapterError> {
+    pub(super) fn set_index_options(&mut self, id: GlobalId, options: Vec<IndexOption>) {
         for o in options {
             match o {
                 IndexOption::LogicalCompactionWindow(window) => {
@@ -4618,16 +4612,13 @@ impl Coordinator {
                         .expect("setting options on index")
                         .cluster_id;
                     let policy = match window {
-                        Some(time) => {
-                            ReadPolicy::lag_writes_by(time.try_into()?, SINCE_GRANULARITY)
-                        }
+                        Some(time) => ReadPolicy::lag_writes_by(time, SINCE_GRANULARITY),
                         None => ReadPolicy::ValidFrom(Antichain::from_elem(Timestamp::minimum())),
                     };
                     self.update_compute_base_read_policy(cluster, id, policy);
                 }
             }
         }
-        Ok(())
     }
 
     pub(super) async fn sequence_alter_role(
