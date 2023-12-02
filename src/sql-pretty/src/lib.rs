@@ -83,23 +83,12 @@ use mz_sql_parser::parser::{parse_statements, ParserStatementError};
 use pretty::RcDoc;
 use thiserror::Error;
 
-use crate::doc::{
-    doc_copy, doc_create_materialized_view, doc_create_view, doc_display, doc_insert,
-    doc_select_statement, doc_subscribe,
-};
-
 const TAB: isize = 4;
 
-fn to_doc<T: AstInfo>(v: &Statement<T>) -> RcDoc {
-    match v {
-        Statement::Select(v) => doc_select_statement(v),
-        Statement::Insert(v) => doc_insert(v),
-        Statement::CreateView(v) => doc_create_view(v),
-        Statement::CreateMaterializedView(v) => doc_create_materialized_view(v),
-        Statement::Copy(v) => doc_copy(v),
-        Statement::Subscribe(v) => doc_subscribe(v),
-        _ => doc_display(v, "statement"),
-    }
+fn to_doc<'a, T: AstInfo>(v: &'a Statement<T>) -> RcDoc<'a, ()> {
+    let p = Prettier::default();
+    let doc = p.to_doc(v);
+    doc
 }
 
 /// Pretty prints a statement at a width.
@@ -128,4 +117,23 @@ pub enum Error {
     Parser(#[from] ParserStatementError),
     #[error("expected exactly one statement")]
     ExpectedOne,
+}
+
+#[derive(Default)]
+pub struct Prettier {
+    pub stable_idents: bool,
+}
+
+impl Prettier {
+    fn to_doc<T: AstInfo>(&self, v: &Statement<T>) -> RcDoc {
+        match v {
+            Statement::Select(v) => self.doc_select_statement(v),
+            Statement::Insert(v) => self.doc_insert(v),
+            Statement::CreateView(v) => self.doc_create_view(v),
+            Statement::CreateMaterializedView(v) => self.doc_create_materialized_view(v),
+            Statement::Copy(v) => self.doc_copy(v),
+            Statement::Subscribe(v) => self.doc_subscribe(v),
+            _ => self.doc_display(v, "statement"),
+        }
+    }
 }
