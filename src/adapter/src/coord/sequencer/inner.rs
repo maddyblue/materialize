@@ -54,9 +54,9 @@ use mz_catalog::memory::objects::{
     CatalogItem, Cluster, Connection, DataSourceDesc, Secret, Sink, Source, Table, Type, View,
 };
 use mz_sql::plan::{
-    AlterConnectionAction, AlterConnectionPlan, AlterOptionParameter, ExplainSinkSchemaPlan,
-    Explainee, Index, IndexOption, MaterializedView, MutationKind, Params, Plan,
-    PlannedAlterRoleOption, PlannedRoleVariable, QueryWhen, SideEffectingFunc,
+    AlterConnectionAction, AlterConnectionPlan, AlterOptionParameter, CompactionWindow,
+    ExplainSinkSchemaPlan, Explainee, Index, IndexOption, MaterializedView, MutationKind, Params,
+    Plan, PlannedAlterRoleOption, PlannedRoleVariable, QueryWhen, SideEffectingFunc,
     SourceSinkClusterConfig, UpdatePrivilege, VariableValue,
 };
 use mz_sql::session::vars::{
@@ -964,6 +964,7 @@ impl Coordinator {
                     column_names,
                     cluster_id,
                     non_null_assertions,
+                    compaction_window,
                 },
             replace: _,
             drop_ids,
@@ -1091,7 +1092,7 @@ impl Coordinator {
                 coord
                     .initialize_storage_read_policies(
                         vec![id],
-                        Some(DEFAULT_LOGICAL_COMPACTION_WINDOW_TS),
+                        Self::compaction_window_to_policy(compaction_window),
                     )
                     .await;
 
@@ -1112,6 +1113,14 @@ impl Coordinator {
                 Ok(ExecuteResponse::CreatedMaterializedView)
             }
             Err(err) => Err(err),
+        }
+    }
+
+    fn compaction_window_to_policy(cw: CompactionWindow) -> Option<Timestamp> {
+        match cw {
+            CompactionWindow::Default => Some(DEFAULT_LOGICAL_COMPACTION_WINDOW_TS),
+            CompactionWindow::Disabled => None,
+            CompactionWindow::Window(duration) => Some(duration),
         }
     }
 

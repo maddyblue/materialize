@@ -1431,6 +1431,7 @@ pub struct MaterializedView {
     pub column_names: Vec<ColumnName>,
     pub cluster_id: ClusterId,
     pub non_null_assertions: Vec<usize>,
+    pub compaction_window: CompactionWindow,
 }
 
 #[derive(Clone, Debug)]
@@ -1548,6 +1549,16 @@ pub enum IndexOption {
     /// Configures the logical compaction window for an index. `None` disables
     /// logical compaction entirely.
     LogicalCompactionWindow(Option<mz_repr::Timestamp>),
+}
+
+#[derive(Clone, Debug)]
+pub enum CompactionWindow {
+    /// Unspecified by the user, use a system-provided default.
+    Default,
+    /// Disable logical compaction entirely.
+    Disabled,
+    /// Create a compaction window for a specified duration.
+    Window(mz_repr::Timestamp),
 }
 
 #[derive(Clone, Debug)]

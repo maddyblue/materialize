@@ -96,6 +96,7 @@ use mz_environmentd::test_util::{
     self, MzTimestamp, PostgresErrorExt, TestServerWithRuntime, KAFKA_ADDRS,
 };
 use mz_ore::assert_contains;
+use mz_ore::collections::CollectionExt;
 use mz_ore::now::{NowFn, NOW_ZERO, SYSTEM_TIME};
 use mz_ore::result::ResultExt;
 use mz_ore::retry::Retry;
@@ -110,6 +111,7 @@ use serde_json::json;
 use timely::order::PartialOrder;
 use tokio::sync::{mpsc, oneshot};
 use tokio_postgres::error::{DbError, SqlState};
+use tokio_postgres::Client;
 use tracing::{debug, info};
 
 /// An HTTP server whose responses can be controlled from another thread.
@@ -3524,5 +3526,81 @@ fn test_peek_on_dropped_indexed_view() {
                 Ok(())
             }
         })
+        .unwrap();
+}
+
+// Test that RETAIN HISTORY results in the since and upper being separated by the specified amount.
+#[mz_ore::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+async fn test_retain_history() {
+    let server = test_util::TestHarness::default().start().await;
+    let client = server.connect().await.unwrap();
+    let sys_client = server
+        .connect()
+        .internal()
+        .user(&SYSTEM_USER.name)
+        .await
+        .unwrap();
+
+    assert!(client
+        .batch_execute(
+            "CREATE MATERIALIZED VIEW v WITH (RETAIN HISTORY = FOR '2s') AS SELECT * FROM t",
+        )
+        .await
+        .is_err());
+
+    sys_client
+        .batch_execute("ALTER SYSTEM SET enable_logical_compaction_window = true")
+        .await
+        .unwrap();
+
+    client
+        .batch_execute("CREATE TABLE t (a INT4)")
+        .await
+        .unwrap();
+    client
+        .batch_execute("INSERT INTO t VALUES (1)")
+        .await
+        .unwrap();
+
+    assert_contains!(
+        client
+            .batch_execute(
+                "CREATE MATERIALIZED VIEW v WITH (RETAIN HISTORY = FOR '-2s') AS SELECT * FROM t",
+            )
+            .await
+            .unwrap_err()
+            .to_string(),
+        "invalid RETAIN HISTORY"
+    );
+
+    client
+        .batch_execute(
+            "CREATE MATERIALIZED VIEW v WITH (RETAIN HISTORY = FOR '2s') AS SELECT * FROM t",
+        )
+        .await
+        .unwrap();
+
+    async fn get_ts(client: &Client) -> TimestampExplanation<Timestamp> {
+        let row = client
+            .query_one("EXPLAIN TIMESTAMP AS JSON FOR SELECT * FROM v;", &[])
+            .await
+            .unwrap();
+        let explain: String = row.get(0);
+        serde_json::from_str(&explain).unwrap()
+    }
+
+    Retry::default()
+        .retry_async(|_| async {
+            let ts = get_ts(&client).await;
+            let source = ts.sources.into_element();
+            let upper = source.write_frontier.into_element();
+            let since = source.read_frontier.into_element();
+            if upper.saturating_sub(since) >= Timestamp::from(2000u64) {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            Err::<(), String>(format!("{upper} - {since} should be atleast 2s apart"))
+        })
+        .await
         .unwrap();
 }
