@@ -12,15 +12,9 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Deref, DerefMut};
-use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use mz_adapter_types::compaction::DEFAULT_LOGICAL_COMPACTION_WINDOW;
 use mz_adapter_types::connection::ConnectionId;
-use once_cell::sync::Lazy;
-use serde::ser::SerializeSeq;
-use serde::{Deserialize, Serialize};
-
 use mz_compute_client::logging::LogVariant;
 use mz_controller::clusters::{
     ClusterRole, ClusterStatus, ProcessId, ReplicaConfig, ReplicaLogging,
@@ -44,8 +38,8 @@ use mz_sql::names::{
     ResolvedDatabaseSpecifier, ResolvedIds, SchemaId, SchemaSpecifier,
 };
 use mz_sql::plan::{
-    CreateSourcePlan, HirRelationExpr, Ingestion as PlanIngestion, WebhookHeaders,
-    WebhookValidation,
+    CompactionWindow, CreateSourcePlan, HirRelationExpr, Ingestion as PlanIngestion,
+    WebhookHeaders, WebhookValidation,
 };
 use mz_sql::rbac;
 use mz_sql::session::vars::OwnedVarInput;
@@ -55,6 +49,9 @@ use mz_storage_types::sinks::{SinkEnvelope, StorageSinkConnection};
 use mz_storage_types::sources::{
     IngestionDescription, SourceConnection, SourceDesc, SourceEnvelope, SourceExport, Timeline,
 };
+use once_cell::sync::Lazy;
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Serialize};
 
 use crate::builtin::{MZ_INTROSPECTION_CLUSTER, MZ_SYSTEM_CLUSTER};
 use crate::durable;
@@ -365,7 +362,7 @@ pub struct Table {
     #[serde(skip)]
     pub conn_id: Option<ConnectionId>,
     pub resolved_ids: ResolvedIds,
-    pub custom_logical_compaction_window: Option<Duration>,
+    pub custom_logical_compaction_window: CompactionWindow,
     /// Whether the table's logical compaction window is controlled by
     /// METRICS_RETENTION
     pub is_retained_metrics_object: bool,
@@ -448,7 +445,7 @@ pub struct Source {
     pub desc: RelationDesc,
     pub timeline: Timeline,
     pub resolved_ids: ResolvedIds,
-    pub custom_logical_compaction_window: Option<Duration>,
+    pub custom_logical_compaction_window: CompactionWindow,
     /// Whether the source's logical compaction window is controlled by
     /// METRICS_RETENTION
     pub is_retained_metrics_object: bool,
@@ -466,7 +463,7 @@ impl Source {
         plan: CreateSourcePlan,
         cluster_id: Option<ClusterId>,
         resolved_ids: ResolvedIds,
-        custom_logical_compaction_window: Option<Duration>,
+        custom_logical_compaction_window: CompactionWindow,
         is_retained_metrics_object: bool,
     ) -> Source {
         Source {
@@ -678,6 +675,7 @@ pub struct MaterializedView {
     pub resolved_ids: ResolvedIds,
     pub cluster_id: ClusterId,
     pub non_null_assertions: Vec<usize>,
+    pub compaction_window: CompactionWindow,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -688,7 +686,7 @@ pub struct Index {
     pub conn_id: Option<ConnectionId>,
     pub resolved_ids: ResolvedIds,
     pub cluster_id: ClusterId,
-    pub custom_logical_compaction_window: Option<Duration>,
+    pub custom_logical_compaction_window: CompactionWindow,
     pub is_retained_metrics_object: bool,
 }
 
@@ -1061,17 +1059,13 @@ impl CatalogItem {
     }
 
     /// The custom compaction window, if any has been set.
-    // Note[btv]: As of 2023-04-10, this is only set
-    // for objects with `is_retained_metrics_object`. That
-    // may not always be true in the future, if we enable user-settable
-    // compaction windows.
-    pub fn custom_logical_compaction_window(&self) -> Option<Duration> {
+    pub fn custom_logical_compaction_window(&self) -> Option<CompactionWindow> {
         match self {
-            CatalogItem::Table(table) => table.custom_logical_compaction_window,
-            CatalogItem::Source(source) => source.custom_logical_compaction_window,
-            CatalogItem::Index(index) => index.custom_logical_compaction_window,
-            CatalogItem::MaterializedView(_)
-            | CatalogItem::Log(_)
+            CatalogItem::Table(table) => Some(table.custom_logical_compaction_window),
+            CatalogItem::Source(source) => Some(source.custom_logical_compaction_window),
+            CatalogItem::Index(index) => Some(index.custom_logical_compaction_window),
+            CatalogItem::MaterializedView(mview) => Some(mview.compaction_window),
+            CatalogItem::Log(_)
             | CatalogItem::View(_)
             | CatalogItem::Sink(_)
             | CatalogItem::Type(_)
@@ -1089,7 +1083,7 @@ impl CatalogItem {
     ///
     /// For objects that do not have the concept of compaction window,
     /// return nothing.
-    pub fn initial_logical_compaction_window(&self) -> Option<Duration> {
+    pub fn initial_logical_compaction_window(&self) -> Option<CompactionWindow> {
         let custom_logical_compaction_window = match self {
             CatalogItem::Table(_)
             | CatalogItem::Source(_)
@@ -1103,7 +1097,7 @@ impl CatalogItem {
             | CatalogItem::Secret(_)
             | CatalogItem::Connection(_) => return None,
         };
-        Some(custom_logical_compaction_window.unwrap_or(DEFAULT_LOGICAL_COMPACTION_WINDOW))
+        Some(custom_logical_compaction_window.unwrap_or(CompactionWindow::Default))
     }
 
     /// Whether the item's logical compaction window

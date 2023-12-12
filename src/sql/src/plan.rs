@@ -1551,7 +1551,7 @@ pub enum IndexOption {
     LogicalCompactionWindow(Option<mz_repr::Timestamp>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CompactionWindow {
     /// Unspecified by the user, use a system-provided default.
     Default,
@@ -1559,6 +1559,12 @@ pub enum CompactionWindow {
     Disabled,
     /// Create a compaction window for a specified duration.
     Window(mz_repr::Timestamp),
+}
+
+impl Default for CompactionWindow {
+    fn default() -> Self {
+        Self::Default
+    }
 }
 
 #[derive(Clone, Debug)]

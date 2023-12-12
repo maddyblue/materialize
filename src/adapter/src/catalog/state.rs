@@ -927,6 +927,7 @@ impl CatalogState {
                     resolved_ids,
                     cluster_id: materialized_view.cluster_id,
                     non_null_assertions: materialized_view.non_null_assertions,
+                    compaction_window: materialized_view.compaction_window,
                 })
             }
             Plan::CreateIndex(CreateIndexPlan { index, .. }) => CatalogItem::Index(Index {

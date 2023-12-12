@@ -1042,6 +1042,7 @@ impl Coordinator {
                 resolved_ids,
                 cluster_id,
                 non_null_assertions,
+                compaction_window: compaction_window.clone(),
             }),
             owner_id: *session.current_role_id(),
         });
@@ -1116,7 +1117,7 @@ impl Coordinator {
         }
     }
 
-    fn compaction_window_to_policy(cw: CompactionWindow) -> Option<Timestamp> {
+    pub fn compaction_window_to_policy(cw: CompactionWindow) -> Option<Timestamp> {
         match cw {
             CompactionWindow::Default => Some(DEFAULT_LOGICAL_COMPACTION_WINDOW_TS),
             CompactionWindow::Disabled => None,

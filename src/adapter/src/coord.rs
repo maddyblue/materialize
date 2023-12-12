@@ -110,7 +110,7 @@ use mz_secrets::{SecretsController, SecretsReader};
 use mz_sql::ast::{CreateSubsourceStatement, Raw, Statement};
 use mz_sql::catalog::EnvironmentId;
 use mz_sql::names::{Aug, ResolvedIds};
-use mz_sql::plan::{CopyFormat, CreateConnectionPlan, Params, QueryWhen};
+use mz_sql::plan::{CompactionWindow, CopyFormat, CreateConnectionPlan, Params, QueryWhen};
 use mz_sql::rbac::UnauthorizedError;
 use mz_sql::session::user::{RoleMetadata, User};
 use mz_sql::session::vars::{self, ConnectionCounter, OwnedVarInput, SystemVars};
@@ -1087,16 +1087,8 @@ impl Coordinator {
         self.controller
             .set_default_arrangement_exert_proportionality(exert_prop);
 
-        // Capture identifiers that need to have their read holds relaxed once the bootstrap completes.
-        //
-        // TODO[btv] -- This is of type `Timestamp` because that's what `initialize_read_policies`
-        // takes, but it's not clear that that type makes sense. Read policies are logically
-        // durations, not instants.
-        //
-        // Ultimately, it doesn't concretely matter today, because the type ends up just being
-        // u64 anyway.
-        let mut policies_to_set: BTreeMap<Timestamp, CollectionIdBundle> = Default::default();
-        policies_to_set.insert(DEFAULT_LOGICAL_COMPACTION_WINDOW_TS, Default::default());
+        let mut policies_to_set: BTreeMap<CompactionWindow, CollectionIdBundle> =
+            Default::default();
 
         debug!("coordinator init: creating compute replicas");
         let mut replicas_to_start = vec![];
@@ -1271,7 +1263,7 @@ impl Coordinator {
                         u64::try_from(duration.as_millis())
                             .expect("Timestamp millis must fit in u64"),
                     );
-                    ts
+                    CompactionWindow::Window(ts)
                 });
             match entry.item() {
                 // Currently catalog item rebuild assumes that sinks and
@@ -1409,8 +1401,9 @@ impl Coordinator {
         // As of this writing, there can only be at most two keys in `policies_to_set`,
         // so the extra load isn't crazy, but that might not be true in general if we
         // open up custom compaction windows to users.
-        for (ts, policies) in policies_to_set {
-            self.initialize_read_policies(&policies, Some(ts)).await;
+        for (cw, policies) in policies_to_set {
+            self.initialize_read_policies(&policies, Self::compaction_window_to_policy(cw))
+                .await;
         }
 
         debug!("coordinator init: announcing completion of initialization to controller");
