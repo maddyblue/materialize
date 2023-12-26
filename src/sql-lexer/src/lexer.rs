@@ -85,7 +85,7 @@ pub enum Token {
     String(String),
     HexString(String),
     Number(String),
-    Parameter(usize),
+    Parameter(String, usize),
     Op(String),
     Star,
     Eq,
@@ -98,6 +98,18 @@ pub enum Token {
     Colon,
     DoubleColon,
     Semicolon,
+    Whitespace(String),
+    LineComment(String),
+    MultilineComment(String),
+}
+
+impl Token {
+    pub fn is_trivia(&self) -> bool {
+        matches!(
+            self,
+            Token::Whitespace(_) | Token::LineComment(_) | Token::MultilineComment(_)
+        )
+    }
 }
 
 impl fmt::Display for Token {
@@ -108,7 +120,7 @@ impl fmt::Display for Token {
             Token::String(s) => write!(f, "string literal {}", s.quoted()),
             Token::HexString(s) => write!(f, "hex string literal {}", s.quoted()),
             Token::Number(n) => write!(f, "number \"{}\"", n),
-            Token::Parameter(n) => write!(f, "parameter \"${}\"", n),
+            Token::Parameter(s, _) => write!(f, "parameter \"{}\"", s),
             Token::Op(op) => write!(f, "operator {}", op.quoted()),
             Token::Star => f.write_str("star"),
             Token::Eq => f.write_str("equals sign"),
@@ -121,13 +133,18 @@ impl fmt::Display for Token {
             Token::Colon => f.write_str("colon"),
             Token::DoubleColon => f.write_str("double colon"),
             Token::Semicolon => f.write_str("semicolon"),
+            Token::Whitespace(_) => f.write_str("whitespace"),
+            Token::LineComment(_) => f.write_str("linecomment"),
+            Token::MultilineComment(_) => f.write_str("multilinecomment"),
         }
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct PosToken {
     pub kind: Token,
     pub offset: usize,
+    pub original: String,
 }
 
 macro_rules! bail {
@@ -149,15 +166,9 @@ pub fn lex(query: &str) -> Result<Vec<PosToken>, LexerError> {
     while let Some(ch) = buf.next() {
         let pos = buf.pos() - ch.len_utf8();
         let token = match ch {
-            _ if ch.is_ascii_whitespace() => continue,
-            '-' if buf.consume('-') => {
-                lex_line_comment(buf);
-                continue;
-            }
-            '/' if buf.consume('*') => {
-                lex_multiline_comment(buf)?;
-                continue;
-            }
+            _ if ch.is_ascii_whitespace() => lex_whitespace(buf),
+            '-' if buf.consume('-') => lex_line_comment(buf),
+            '/' if buf.consume('*') => lex_multiline_comment(buf)?,
             '\'' => Token::String(lex_string(buf)?),
             'x' | 'X' if buf.consume('\'') => Token::HexString(lex_string(buf)?),
             'e' | 'E' if buf.consume('\'') => lex_extended_string(buf)?,
@@ -183,29 +194,42 @@ pub fn lex(query: &str) -> Result<Vec<PosToken>, LexerError> {
         tokens.push(PosToken {
             kind: token,
             offset: pos,
+            original: query[pos..buf.pos()].into(),
         })
     }
 
     #[cfg(debug_assertions)]
-    for token in &tokens {
-        assert!(query.is_char_boundary(token.offset));
+    {
+        let mut s = String::new();
+        for token in &tokens {
+            s.push_str(&token.original);
+            assert!(query.is_char_boundary(token.offset));
+        }
+        assert_eq!(s.to_lowercase(), query.to_lowercase());
     }
 
     Ok(tokens)
 }
 
-fn lex_line_comment(buf: &mut LexBuf) {
-    buf.take_while(|ch| ch != '\n');
+fn lex_whitespace(buf: &mut LexBuf) -> Token {
+    buf.prev();
+    Token::Whitespace(buf.take_while(|ch| ch.is_ascii_whitespace()).into())
 }
 
-fn lex_multiline_comment(buf: &mut LexBuf) -> Result<(), LexerError> {
+fn lex_line_comment(buf: &mut LexBuf) -> Token {
+    buf.prev();
+    buf.prev();
+    Token::LineComment(buf.take_while(|ch| ch != '\n').into())
+}
+
+fn lex_multiline_comment(buf: &mut LexBuf) -> Result<Token, LexerError> {
     let pos = buf.pos() - 2;
     let mut nesting = 0;
     while let Some(ch) = buf.next() {
         match ch {
             '*' if buf.consume('/') => {
                 if nesting == 0 {
-                    return Ok(());
+                    return Ok(Token::MultilineComment(buf.inner()[pos..buf.pos()].into()));
                 } else {
                     nesting -= 1;
                 }
@@ -354,11 +378,11 @@ fn lex_dollar_string(buf: &mut LexBuf) -> Result<Token, LexerError> {
 
 fn lex_parameter(buf: &mut LexBuf) -> Result<Token, LexerError> {
     let pos = buf.pos() - 1;
-    let n = buf
-        .take_while(|ch| matches!(ch, '0'..='9'))
+    let s = buf.take_while(|ch| matches!(ch, '0'..='9'));
+    let n = s
         .parse()
         .map_err(|_| LexerError::new(pos, "invalid parameter number"))?;
-    Ok(Token::Parameter(n))
+    Ok(Token::Parameter(buf.inner()[pos..buf.pos()].into(), n))
 }
 
 fn lex_number(buf: &mut LexBuf) -> Result<Token, LexerError> {

@@ -274,7 +274,9 @@ impl From<Keyword> for Ident {
 /// SQL Parser
 struct Parser<'a> {
     sql: &'a str,
+    /// Tokens that are not whitespace or comments.
     tokens: Vec<PosToken>,
+    all_tokens: Vec<PosToken>,
     /// The index of the first unprocessed token in `self.tokens`
     index: usize,
     recursion_guard: RecursionGuard,
@@ -309,10 +311,15 @@ enum SetPrecedence {
 
 impl<'a> Parser<'a> {
     /// Parse the specified tokens
-    fn new(sql: &'a str, tokens: Vec<PosToken>) -> Self {
+    fn new(sql: &'a str, all_tokens: Vec<PosToken>) -> Self {
         Parser {
             sql,
-            tokens,
+            tokens: all_tokens
+                .iter()
+                .filter(|t| !t.kind.is_trivia())
+                .cloned()
+                .collect(),
+            all_tokens,
             index: 0,
             recursion_guard: RecursionGuard::with_limit(RECURSION_LIMIT),
         }
@@ -621,7 +628,7 @@ impl<'a> Parser<'a> {
                 self.prev_token();
                 Ok(Expr::Value(self.parse_value()?))
             }
-            Token::Parameter(n) => Ok(Expr::Parameter(n)),
+            Token::Parameter(_, n) => Ok(Expr::Parameter(n)),
             Token::LParen => {
                 let expr = self.parse_parenthesized_expr()?;
                 self.expect_token(&Token::RParen)?;
