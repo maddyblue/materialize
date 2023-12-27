@@ -276,10 +276,14 @@ struct Parser<'a> {
     sql: &'a str,
     /// Tokens that are not whitespace or comments.
     tokens: Vec<PosToken>,
-    all_tokens: Vec<PosToken>,
     /// The index of the first unprocessed token in `self.tokens`
     index: usize,
     recursion_guard: RecursionGuard,
+
+    /// Bursera work.
+    all_tokens: Vec<PosToken>,
+    builder: GreenNodeBuilder<'static>,
+    // errors:Vec<String>,
 }
 
 /// Defines a number of precedence classes operators follow. Since this enum derives Ord, the
@@ -322,6 +326,7 @@ impl<'a> Parser<'a> {
             all_tokens,
             index: 0,
             recursion_guard: RecursionGuard::with_limit(RECURSION_LIMIT),
+            builder: GreenNodeBuilder::new(),
         }
     }
 
@@ -332,6 +337,7 @@ impl<'a> Parser<'a> {
     fn parse_statements(&mut self) -> Result<Vec<StatementParseResult<'a>>, ParserStatementError> {
         let mut stmts = Vec::new();
         let mut expecting_statement_delimiter = false;
+        self.builder.start_node(ROOT.into());
         loop {
             // ignore empty statements (between successive statement delimiters)
             while self.consume_token(&Token::Semicolon) {
@@ -350,6 +356,9 @@ impl<'a> Parser<'a> {
             stmts.push(s);
             expecting_statement_delimiter = true;
         }
+        // Trailing whitespace.
+        self.skip_ws();
+        self.builder.finish_node();
         Ok(stmts)
     }
     /// Parse a single top-level statement (such as SELECT, INSERT, CREATE, etc.),
