@@ -1333,6 +1333,7 @@ fn generate_rbac_requirements(
             stmt: _,
             sql: _,
             params: _,
+            green_node: _,
         })
         | Plan::Fetch(plan::FetchPlan {
             name: _,

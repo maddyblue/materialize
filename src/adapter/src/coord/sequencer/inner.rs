@@ -1691,12 +1691,20 @@ impl Coordinator {
                     .expect("sending to strict_serializable_reads_tx cannot fail");
                 return;
             }
-            Ok((Some(TransactionOps::SingleStatement { stmt, params }), _)) => {
+            Ok((
+                Some(TransactionOps::SingleStatement {
+                    stmt,
+                    green_node,
+                    params,
+                }),
+                _,
+            )) => {
                 self.internal_cmd_tx
                     .send(Message::ExecuteSingleStatementTransaction {
                         ctx,
                         otel_ctx: OpenTelemetryContext::obtain(),
                         stmt,
+                        green_node,
                         params,
                     })
                     .expect("must send");
@@ -5129,10 +5137,19 @@ impl Coordinator {
             .get_prepared_statement_unverified(&plan.name)
             .expect("known to exist");
         let stmt = ps.stmt().cloned();
+        let green_node = ps.green_node().clone();
         let desc = ps.desc().clone();
         let revision = ps.catalog_revision;
         let logging = Arc::clone(ps.logging());
-        session.create_new_portal(stmt, logging, desc, plan.params, Vec::new(), revision)
+        session.create_new_portal(
+            stmt,
+            green_node,
+            logging,
+            desc,
+            plan.params,
+            Vec::new(),
+            revision,
+        )
     }
 
     pub(super) async fn sequence_grant_privileges(

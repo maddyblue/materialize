@@ -41,6 +41,7 @@ use mz_sql_parser::ast::{StatementKind, TransactionIsolationLevel};
 use mz_storage_types::sources::Timeline;
 use qcell::{QCell, QCellOwner};
 use rand::Rng;
+use rowan::GreenNode;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::watch;
 use tokio::sync::OwnedMutexGuard;
@@ -493,6 +494,7 @@ impl<T: TimestampManipulation> Session<T> {
         name: String,
         stmt: Option<Statement<Raw>>,
         sql: String,
+        green_node: GreenNode,
         desc: StatementDesc,
         catalog_revision: u64,
         now: EpochMillis,
@@ -504,6 +506,7 @@ impl<T: TimestampManipulation> Session<T> {
         let kind = stmt.as_ref().map(StatementKind::from);
         let statement = PreparedStatement {
             stmt,
+            green_node,
             desc,
             catalog_revision,
             logging: Arc::new(QCell::new(
@@ -572,6 +575,7 @@ impl<T: TimestampManipulation> Session<T> {
         portal_name: String,
         desc: StatementDesc,
         stmt: Option<Statement<Raw>>,
+        green_node: GreenNode,
         logging: Arc<QCell<PreparedStatementLoggingInfo>>,
         params: Vec<(Datum, ScalarType)>,
         result_formats: Vec<Format>,
@@ -585,6 +589,7 @@ impl<T: TimestampManipulation> Session<T> {
             portal_name,
             Portal {
                 stmt: stmt.map(Arc::new),
+                green_node,
                 desc,
                 catalog_revision,
                 parameters: Params {
@@ -624,6 +629,7 @@ impl<T: TimestampManipulation> Session<T> {
     pub fn create_new_portal(
         &mut self,
         stmt: Option<Statement<Raw>>,
+        green_node: GreenNode,
         logging: Arc<QCell<PreparedStatementLoggingInfo>>,
         desc: StatementDesc,
         parameters: Params,
@@ -639,6 +645,7 @@ impl<T: TimestampManipulation> Session<T> {
                 Entry::Vacant(entry) => {
                     entry.insert(Portal {
                         stmt: stmt.map(Arc::new),
+                        green_node,
                         desc,
                         catalog_revision,
                         parameters,
@@ -789,6 +796,7 @@ impl<T: TimestampManipulation> Session<T> {
 #[derivative(Debug)]
 pub struct PreparedStatement {
     stmt: Option<Statement<Raw>>,
+    green_node: GreenNode,
     desc: StatementDesc,
     /// The most recent catalog revision that has verified this statement.
     pub catalog_revision: u64,
@@ -808,6 +816,11 @@ impl PreparedStatement {
         &self.desc
     }
 
+    /// Returns the GreenNode of the prepared statement.
+    pub fn green_node(&self) -> &GreenNode {
+        &self.green_node
+    }
+
     /// Returns a handle to the metadata for statement logging.
     pub fn logging(&self) -> &Arc<QCell<PreparedStatementLoggingInfo>> {
         &self.logging
@@ -820,6 +833,8 @@ impl PreparedStatement {
 pub struct Portal {
     /// The statement that is bound to this portal.
     pub stmt: Option<Arc<Statement<Raw>>>,
+    /// The GreenNode syntax tree of the bound statement.
+    pub green_node: GreenNode,
     /// The statement description.
     pub desc: StatementDesc,
     /// The most recent catalog revision that has verified this statement.
@@ -1286,6 +1301,8 @@ pub enum TransactionOps<T> {
     SingleStatement {
         /// The prospective statement.
         stmt: Arc<Statement<Raw>>,
+        /// The statements GreenNode syntax tree.
+        green_node: GreenNode,
         /// The statement params.
         params: mz_sql::plan::Params,
     },

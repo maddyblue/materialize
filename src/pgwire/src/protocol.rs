@@ -44,6 +44,7 @@ use mz_sql::plan::{CopyFormat, ExecuteTimeout, StatementDesc};
 use mz_sql::session::user::{User, INTERNAL_USER_NAMES};
 use mz_sql::session::vars::{ConnectionCounter, DropConnection, Var, VarInput, MAX_COPY_FROM_SIZE};
 use postgres::error::SqlState;
+use rowan::GreenNode;
 use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::select;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -606,13 +607,18 @@ where
     }
 
     #[instrument(level = "debug", skip_all)]
-    async fn one_query(&mut self, stmt: Statement<Raw>, sql: String) -> Result<State, io::Error> {
+    async fn one_query(
+        &mut self,
+        stmt: Statement<Raw>,
+        sql: String,
+        green_node: GreenNode,
+    ) -> Result<State, io::Error> {
         // Bind the portal. Note that this does not set the empty string prepared
         // statement.
         const EMPTY_PORTAL: &str = "";
         if let Err(e) = self
             .adapter_client
-            .declare(EMPTY_PORTAL.to_string(), stmt, sql)
+            .declare(EMPTY_PORTAL.to_string(), stmt, sql, green_node)
             .await
         {
             return self.error(e.into_response(Severity::Error)).await;
@@ -719,7 +725,7 @@ where
         for StatementParseResult {
             ast: stmt,
             sql,
-            green_node: _,
+            green_node,
         } in stmts
         {
             // In an aborted transaction, reject all commands except COMMIT/ROLLBACK.
@@ -737,7 +743,7 @@ where
             // statement.
             self.ensure_transaction(num_stmts).await?;
 
-            match self.one_query(stmt, sql.to_string()).await? {
+            match self.one_query(stmt, sql.to_string(), green_node).await? {
                 State::Ready => (),
                 State::Drain => break,
                 State::Done => return Ok(State::Done),
@@ -808,20 +814,21 @@ where
                 ))
                 .await;
         }
-        let (maybe_stmt, sql) = match stmts.into_iter().next() {
-            None => (None, ""),
+        let (maybe_stmt, sql, green_node) = match stmts.into_iter().next() {
+            // TODO: 0 should be SyntaxKind::ROOT.
+            None => (None, "", GreenNode::new(rowan::SyntaxKind(0), [])),
             Some(StatementParseResult {
                 ast,
                 sql,
-                green_node: _,
-            }) => (Some(ast), sql),
+                green_node,
+            }) => (Some(ast), sql, green_node),
         };
         if self.is_aborted_txn() && !is_txn_exit_stmt(maybe_stmt.as_ref()) {
             return self.aborted_txn_error().await;
         }
         match self
             .adapter_client
-            .prepare(name, maybe_stmt, sql.to_string(), param_types)
+            .prepare(name, maybe_stmt, sql.to_string(), param_types, green_node)
             .await
         {
             Ok(()) => {
@@ -973,11 +980,13 @@ where
         let desc = stmt.desc().clone();
         let revision = stmt.catalog_revision;
         let logging = Arc::clone(stmt.logging());
+        let green_node = stmt.green_node().clone();
         let stmt = stmt.stmt().cloned();
         if let Err(err) = self.adapter_client.session().set_portal(
             portal_name,
             desc,
             stmt,
+            green_node,
             logging,
             params,
             result_formats,

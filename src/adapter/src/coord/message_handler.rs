@@ -137,11 +137,14 @@ impl Coordinator {
                     ctx,
                     otel_ctx,
                     stmt,
+                    green_node,
                     params,
                 } => {
                     otel_ctx.attach_as_parent();
-                    self.sequence_execute_single_statement_transaction(ctx, stmt, params)
-                        .await;
+                    self.sequence_execute_single_statement_transaction(
+                        ctx, stmt, green_node, params,
+                    )
+                    .await;
                 }
                 Message::PeekStageReady {
                     ctx,
@@ -396,6 +399,7 @@ impl Coordinator {
             params,
             resolved_ids,
             original_stmt,
+            green_node,
             otel_ctx,
         }: PurifiedStatementReady,
     ) {
@@ -416,7 +420,8 @@ impl Coordinator {
             .iter()
             .all(|id| self.catalog().try_get_entry(id).is_some())
         {
-            self.handle_execute_inner(original_stmt, params, ctx).await;
+            self.handle_execute_inner(original_stmt, green_node, params, ctx)
+                .await;
             return;
         }
 

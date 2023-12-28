@@ -14,6 +14,7 @@
 
 use mz_repr::{GlobalId, RelationDesc, ScalarType};
 use mz_sql_parser::ast::InspectShardStatement;
+use rowan::GreenNode;
 use std::time::Duration;
 use uncased::UncasedStr;
 
@@ -181,6 +182,8 @@ pub fn plan_declare(
         name: name.to_string(),
         stmt: *stmt,
         sql,
+        // TODO: Implement.
+        green_node: GreenNode::new(mz_sql_parser::syntax::SyntaxKind::ROOT.into(), []),
         params: params.clone(),
     }))
 }

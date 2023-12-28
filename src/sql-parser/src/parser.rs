@@ -7432,6 +7432,7 @@ impl<'a> Parser<'a> {
         let StatementParseResult {
             ast,
             sql,
+            // TODO: Use this. Currently hard due to walkabout.
             green_node: _,
         } = self.parse_statement()?;
         if !matches!(

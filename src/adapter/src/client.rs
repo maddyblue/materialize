@@ -37,6 +37,7 @@ use mz_sql_parser::ast::display::AstDisplay;
 use mz_sql_parser::ast::StatementKind;
 use mz_sql_parser::parser::{ParserStatementError, StatementParseResult};
 use prometheus::Histogram;
+use rowan::GreenNode;
 use serde_json::json;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::{error, instrument};
@@ -282,13 +283,13 @@ Issue a SQL query to get started. Need help?
         let StatementParseResult {
             ast: stmt,
             sql,
-            green_node: _,
+            green_node,
         } = stmts.into_element();
 
         const EMPTY_PORTAL: &str = "";
         session_client.start_transaction(Some(1))?;
         session_client
-            .declare(EMPTY_PORTAL.into(), stmt, sql.to_string())
+            .declare(EMPTY_PORTAL.into(), stmt, sql.to_string(), green_node)
             .await?;
         match session_client
             .execute(EMPTY_PORTAL.into(), futures::future::pending(), None)
@@ -459,6 +460,7 @@ impl SessionClient {
         stmt: Option<Statement<Raw>>,
         sql: String,
         param_types: Vec<Option<ScalarType>>,
+        green_node: GreenNode,
     ) -> Result<(), AdapterError> {
         let catalog = self.catalog_snapshot().await;
 
@@ -480,6 +482,7 @@ impl SessionClient {
             name,
             stmt,
             sql,
+            green_node,
             desc,
             catalog.transient_revision(),
             now,
@@ -494,6 +497,7 @@ impl SessionClient {
         name: String,
         stmt: Statement<Raw>,
         sql: String,
+        green_node: GreenNode,
     ) -> Result<(), AdapterError> {
         let catalog = self.catalog_snapshot().await;
         let param_types = vec![];
@@ -510,6 +514,7 @@ impl SessionClient {
             name,
             desc,
             Some(stmt),
+            green_node,
             logging,
             params,
             result_formats,

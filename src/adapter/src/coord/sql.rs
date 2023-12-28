@@ -17,6 +17,7 @@ use mz_sql::names::{Aug, ResolvedIds};
 use mz_sql::plan::{Params, StatementDesc};
 use mz_sql_parser::ast::display::AstDisplay;
 use mz_sql_parser::ast::{Raw, Statement, StatementKind};
+use rowan::GreenNode;
 
 use crate::catalog::Catalog;
 use crate::coord::appends::BuiltinTableAppendNotify;
@@ -46,14 +47,23 @@ impl Coordinator {
         name: String,
         stmt: Statement<Raw>,
         sql: String,
+        green_node: GreenNode,
         params: Params,
     ) {
         let catalog = self.owned_catalog();
         let now = self.now();
         mz_ore::task::spawn(|| "coord::declare", async move {
-            let result =
-                Self::declare_inner(ctx.session_mut(), &catalog, name, stmt, sql, params, now)
-                    .map(|()| ExecuteResponse::DeclaredCursor);
+            let result = Self::declare_inner(
+                ctx.session_mut(),
+                &catalog,
+                name,
+                stmt,
+                sql,
+                green_node,
+                params,
+                now,
+            )
+            .map(|()| ExecuteResponse::DeclaredCursor);
             ctx.retire(result);
         });
     }
@@ -64,6 +74,7 @@ impl Coordinator {
         name: String,
         stmt: Statement<Raw>,
         sql: String,
+        green_node: GreenNode,
         params: Params,
         now: EpochMillis,
     ) -> Result<(), AdapterError> {
@@ -82,6 +93,7 @@ impl Coordinator {
             name,
             desc,
             Some(stmt),
+            green_node,
             logging,
             params,
             result_formats,

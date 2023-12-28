@@ -37,6 +37,7 @@ use mz_sql::session::vars::{
     EndTransactionAction, OwnedVarInput, Value, Var, STATEMENT_LOGGING_SAMPLE_RATE,
 };
 use opentelemetry::trace::TraceContextExt;
+use rowan::GreenNode;
 use tokio::sync::{mpsc, oneshot, watch};
 use tracing::{debug_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -383,12 +384,13 @@ impl Coordinator {
         // The reference to `portal` can't outlive `session`, which we
         // use to construct the context, so scope the reference to this block where we
         // get everything we need from the portal for later.
-        let (stmt, ctx, params) = {
+        let (stmt, ctx, params, green_node) = {
             let portal = session
                 .get_portal_unverified(&portal_name)
                 .expect("known to exist");
             let params = portal.parameters.clone();
             let stmt = portal.stmt.clone();
+            let green_node = portal.green_node.clone();
             let logging = Arc::clone(&portal.logging);
 
             let extra = if let Some(extra) = outer_context {
@@ -404,7 +406,7 @@ impl Coordinator {
                 ExecuteContextExtra::new(maybe_uuid)
             };
             let ctx = ExecuteContext::from_parts(tx, self.internal_cmd_tx.clone(), session, extra);
-            (stmt, ctx, params)
+            (stmt, ctx, params, green_node)
         };
 
         let stmt = match stmt {
@@ -435,13 +437,15 @@ impl Coordinator {
             _ => {}
         }
 
-        self.handle_execute_inner(stmt, params, ctx).await
+        self.handle_execute_inner(stmt, green_node, params, ctx)
+            .await
     }
 
     #[tracing::instrument(level = "debug", skip(self, ctx))]
     pub(crate) async fn handle_execute_inner(
         &mut self,
         stmt: Arc<Statement<Raw>>,
+        green_node: GreenNode,
         params: Params,
         mut ctx: ExecuteContext,
     ) {
@@ -592,8 +596,12 @@ impl Coordinator {
                             // <stmt>; COMMIT`), we generate the expected tag from a successful <stmt>, but
                             // delay execution until `COMMIT`.
                             if let Ok(resp) = ExecuteResponse::try_from(&*stmt) {
-                                if let Err(err) = txn_status
-                                    .add_ops(TransactionOps::SingleStatement { stmt, params })
+                                if let Err(err) =
+                                    txn_status.add_ops(TransactionOps::SingleStatement {
+                                        stmt,
+                                        green_node,
+                                        params,
+                                    })
                                 {
                                     ctx.retire(Err(err));
                                     return;
@@ -670,6 +678,7 @@ impl Coordinator {
                             params,
                             resolved_ids,
                             original_stmt,
+                            green_node,
                             otel_ctx,
                         },
                     ));

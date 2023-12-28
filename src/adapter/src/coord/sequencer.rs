@@ -28,7 +28,9 @@ use mz_sql::plan::{
 };
 use mz_sql::rbac;
 use mz_sql_parser::ast::{Raw, Statement};
+use mz_sql_parser::syntax::SyntaxKind;
 use mz_storage_types::connections::inline::IntoInlineConnection;
+use rowan::GreenNode;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tracing::{event, Instrument, Level, Span};
@@ -455,7 +457,14 @@ impl Coordinator {
                     ctx.retire(ret);
                 }
                 Plan::Declare(plan) => {
-                    self.declare(ctx, plan.name, plan.stmt, plan.sql, plan.params);
+                    self.declare(
+                        ctx,
+                        plan.name,
+                        plan.stmt,
+                        plan.sql,
+                        plan.green_node,
+                        plan.params,
+                    );
                 }
                 Plan::Fetch(FetchPlan {
                     name,
@@ -489,6 +498,8 @@ impl Coordinator {
                             plan.name,
                             Some(plan.stmt),
                             plan.sql,
+                            // TODO: Implement.
+                            GreenNode::new(SyntaxKind::ROOT.into(), []),
                             plan.desc,
                             self.catalog().transient_revision(),
                             self.now(),
@@ -594,6 +605,7 @@ impl Coordinator {
         &mut self,
         ctx: ExecuteContext,
         stmt: Arc<Statement<Raw>>,
+        green_node: GreenNode,
         params: Params,
     ) {
         // Put the session into single statement implicit so anything can execute.
@@ -606,7 +618,8 @@ impl Coordinator {
         let (sub_tx, sub_rx) = oneshot::channel();
         let sub_ct = ClientTransmitter::new(sub_tx, self.internal_cmd_tx.clone());
         let sub_ctx = ExecuteContext::from_parts(sub_ct, internal_cmd_tx, session, extra);
-        self.handle_execute_inner(stmt, params, sub_ctx).await;
+        self.handle_execute_inner(stmt, green_node, params, sub_ctx)
+            .await;
 
         // The response can need off-thread processing. Wait for it elsewhere so the coordinator can
         // continue processing.

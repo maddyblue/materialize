@@ -38,6 +38,7 @@ use mz_sql::ast::display::AstDisplay;
 use mz_sql::ast::{Raw, Statement, StatementKind};
 use mz_sql::parse::StatementParseResult;
 use mz_sql::plan::Plan;
+use rowan::GreenNode;
 use serde::{Deserialize, Serialize};
 use tokio::{select, time};
 use tokio_postgres::error::SqlState;
@@ -864,10 +865,10 @@ async fn send_and_retire<S: ResultSender>(
 async fn execute_stmt_group<S: ResultSender>(
     client: &mut SessionClient,
     sender: &mut S,
-    stmt_group: Vec<(Statement<Raw>, String, Vec<Option<String>>)>,
+    stmt_group: Vec<(Statement<Raw>, String, Vec<Option<String>>, GreenNode)>,
 ) -> Result<Result<(), ()>, Error> {
     let num_stmts = stmt_group.len();
-    for (stmt, sql, params) in stmt_group {
+    for (stmt, sql, params, green_node) in stmt_group {
         assert!(num_stmts <= 1 || params.is_empty(),
             "statement groups contain more than 1 statement iff Simple request, which does not support parameters"
         );
@@ -886,7 +887,7 @@ async fn execute_stmt_group<S: ResultSender>(
             let _ = send_and_retire(err.into(), client, sender).await?;
             return Ok(Err(()));
         }
-        let res = execute_stmt(client, sender, stmt, sql, params).await?;
+        let res = execute_stmt(client, sender, stmt, sql, green_node, params).await?;
         let is_err = send_and_retire(res, client, sender).await?;
 
         if is_err.is_err() {
@@ -980,11 +981,11 @@ async fn execute_request<S: ResultSender>(
             for StatementParseResult {
                 ast: stmt,
                 sql,
-                green_node: _,
+                green_node,
             } in stmts
             {
                 check_prohibited_stmts(sender, &stmt)?;
-                stmt_group.push((stmt, sql.to_string(), vec![]));
+                stmt_group.push((stmt, sql.to_string(), vec![], green_node));
             }
             stmt_groups.push(stmt_group);
         }
@@ -1002,11 +1003,11 @@ async fn execute_request<S: ResultSender>(
                 let StatementParseResult {
                     ast: stmt,
                     sql,
-                    green_node: _,
+                    green_node,
                 } = stmts.pop().unwrap();
                 check_prohibited_stmts(sender, &stmt)?;
 
-                stmt_groups.push(vec![(stmt, sql.to_string(), params)]);
+                stmt_groups.push(vec![(stmt, sql.to_string(), params, green_node)]);
             }
         }
     }
@@ -1036,11 +1037,18 @@ async fn execute_stmt<S: ResultSender>(
     sender: &mut S,
     stmt: Statement<Raw>,
     sql: String,
+    green_node: GreenNode,
     raw_params: Vec<Option<String>>,
 ) -> Result<StatementResult, Error> {
     const EMPTY_PORTAL: &str = "";
     if let Err(e) = client
-        .prepare(EMPTY_PORTAL.into(), Some(stmt.clone()), sql, vec![])
+        .prepare(
+            EMPTY_PORTAL.into(),
+            Some(stmt.clone()),
+            sql,
+            vec![],
+            green_node,
+        )
         .await
     {
         return Ok(SqlResult::err(client, e).into());
@@ -1101,11 +1109,13 @@ async fn execute_stmt<S: ResultSender>(
     let desc = prep_stmt.desc().clone();
     let revision = prep_stmt.catalog_revision;
     let stmt = prep_stmt.stmt().cloned();
+    let green_node = prep_stmt.green_node().clone();
     let logging = Arc::clone(prep_stmt.logging());
     if let Err(err) = client.session().set_portal(
         EMPTY_PORTAL.into(),
         desc,
         stmt,
+        green_node,
         logging,
         params,
         result_formats,

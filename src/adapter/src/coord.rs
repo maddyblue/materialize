@@ -125,6 +125,7 @@ use mz_storage_types::connections::ConnectionContext;
 use mz_storage_types::controller::PersistTxnTablesImpl;
 use mz_storage_types::sources::Timeline;
 use opentelemetry::trace::TraceContextExt;
+use rowan::GreenNode;
 use timely::progress::Antichain;
 use timely::PartialOrder;
 use tokio::runtime::Handle as TokioHandle;
@@ -229,6 +230,7 @@ pub enum Message<T = mz_repr::Timestamp> {
         ctx: ExecuteContext,
         otel_ctx: OpenTelemetryContext,
         stmt: Arc<Statement<Raw>>,
+        green_node: GreenNode,
         params: mz_sql::plan::Params,
     },
     PeekStageReady {
@@ -318,6 +320,7 @@ pub struct BackgroundWorkResult<T> {
     pub params: Params,
     pub resolved_ids: ResolvedIds,
     pub original_stmt: Arc<Statement<Raw>>,
+    pub green_node: GreenNode,
     pub otel_ctx: OpenTelemetryContext,
 }
 
