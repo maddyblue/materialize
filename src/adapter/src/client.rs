@@ -279,7 +279,11 @@ Issue a SQL query to get started. Need help?
         if stmts.len() != 1 {
             bail!("must supply exactly one query");
         }
-        let StatementParseResult { ast: stmt, sql } = stmts.into_element();
+        let StatementParseResult {
+            ast: stmt,
+            sql,
+            green_node: _,
+        } = stmts.into_element();
 
         const EMPTY_PORTAL: &str = "";
         session_client.start_transaction(Some(1))?;

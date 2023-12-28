@@ -716,7 +716,12 @@ where
         let num_stmts = stmts.len();
 
         // Compare with postgres' backend/tcop/postgres.c exec_simple_query.
-        for StatementParseResult { ast: stmt, sql } in stmts {
+        for StatementParseResult {
+            ast: stmt,
+            sql,
+            green_node: _,
+        } in stmts
+        {
             // In an aborted transaction, reject all commands except COMMIT/ROLLBACK.
             if self.is_aborted_txn() && !is_txn_exit_stmt(Some(&stmt)) {
                 self.aborted_txn_error().await?;
@@ -805,7 +810,11 @@ where
         }
         let (maybe_stmt, sql) = match stmts.into_iter().next() {
             None => (None, ""),
-            Some(StatementParseResult { ast, sql }) => (Some(ast), sql),
+            Some(StatementParseResult {
+                ast,
+                sql,
+                green_node: _,
+            }) => (Some(ast), sql),
         };
         if self.is_aborted_txn() && !is_txn_exit_stmt(maybe_stmt.as_ref()) {
             return self.aborted_txn_error().await;

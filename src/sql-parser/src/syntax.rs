@@ -32,16 +32,23 @@ pub enum SyntaxKind {
     SELECT,
 
     // Inner composite nodes.
-    OBJECT_TYPE,
-    ORDER_BY,
-    ORDER_BY_EXPR,
-    ORDER_BY_DIRECTION,
     CASCADE_OR_RESTRICT,
+    DATABASE_NAME,
     EXPR,
-    WHERE,
     FROM,
+    ITEM_NAME,
     GROUP_BY,
     HAVING,
+    CLUSTER_REPLICA_NAME,
+    IF_EXISTS,
+    OBJECT_NAMES,
+    SCHEMA_NAME,
+    OBJECT_TYPE,
+    ORDER_BY_DIRECTION,
+    ORDER_BY_EXPR,
+    ORDER_BY,
+    WHERE,
+    COMMA_SEPARATED,
 
     // Must be last.
     ERR,

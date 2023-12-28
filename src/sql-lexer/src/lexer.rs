@@ -78,6 +78,7 @@ impl LexerError {
     }
 }
 
+// TODO: make these 'a str to avoid cloning
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Keyword(Keyword),
@@ -109,6 +110,34 @@ impl Token {
             self,
             Token::Whitespace(_) | Token::LineComment(_) | Token::MultilineComment(_)
         )
+    }
+}
+
+impl Token {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Token::Keyword(s) => s.as_str(),
+            Token::Ident(s) => s,
+            Token::String(s) => s,
+            Token::HexString(s) => s,
+            Token::Number(s) => s,
+            Token::Parameter(s, _) => s,
+            Token::Op(s) => s,
+            Token::Star => "*",
+            Token::Eq => "=",
+            Token::LParen => "(",
+            Token::RParen => ")",
+            Token::LBracket => "[",
+            Token::RBracket => "]",
+            Token::Dot => ".",
+            Token::Comma => ",",
+            Token::Colon => ":",
+            Token::DoubleColon => "::",
+            Token::Semicolon => ";",
+            Token::Whitespace(s) => s,
+            Token::LineComment(s) => s,
+            Token::MultilineComment(s) => s,
+        }
     }
 }
 

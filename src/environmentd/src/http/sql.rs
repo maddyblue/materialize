@@ -977,7 +977,12 @@ async fn execute_request<S: ResultSender>(
         SqlRequest::Simple { query } => {
             let stmts = parse(client, &query)?;
             let mut stmt_group = Vec::with_capacity(stmts.len());
-            for StatementParseResult { ast: stmt, sql } in stmts {
+            for StatementParseResult {
+                ast: stmt,
+                sql,
+                green_node: _,
+            } in stmts
+            {
                 check_prohibited_stmts(sender, &stmt)?;
                 stmt_group.push((stmt, sql.to_string(), vec![]));
             }
@@ -994,7 +999,11 @@ async fn execute_request<S: ResultSender>(
                     )));
                 }
 
-                let StatementParseResult { ast: stmt, sql } = stmts.pop().unwrap();
+                let StatementParseResult {
+                    ast: stmt,
+                    sql,
+                    green_node: _,
+                } = stmts.pop().unwrap();
                 check_prohibited_stmts(sender, &stmt)?;
 
                 stmt_groups.push(vec![(stmt, sql.to_string(), params)]);

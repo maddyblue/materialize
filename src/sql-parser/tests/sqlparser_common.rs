@@ -101,6 +101,14 @@ use mz_sql_parser::parser::{
 };
 
 #[mz_ore::test]
+fn test_bursera() {
+    let q = "drop table if exists a, b cascade";
+    let s = parse_statements(q).unwrap();
+    let s = s.get(0).unwrap();
+    dbg!(s.syntax());
+}
+
+#[mz_ore::test]
 #[cfg_attr(miri, ignore)] // unsupported operation: can't call foreign function `rust_psm_stack_pointer` on OS `linux`
 fn datadriven() {
     walk("tests/testdata", |f| {

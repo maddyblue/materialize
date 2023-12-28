@@ -31,6 +31,7 @@ use mz_ore::option::OptionExt;
 use mz_ore::stack::{CheckedRecursion, RecursionGuard, RecursionLimitError};
 use mz_sql_lexer::keywords::*;
 use mz_sql_lexer::lexer::{self, LexerError, PosToken, Token};
+use rowan::{GreenNode, GreenNodeBuilder};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use IsLateral::*;
@@ -38,6 +39,7 @@ use IsOptional::*;
 
 use crate::ast::*;
 use crate::ident;
+use crate::syntax::{SyntaxKind as Sk, SyntaxNode};
 
 // NOTE(benesch): this recursion limit was chosen based on the maximum amount of
 // nesting I've ever seen in a production SQL query (i.e., about a dozen) times
@@ -62,12 +64,21 @@ macro_rules! parser_err {
 #[derive(Debug, Clone)]
 pub struct StatementParseResult<'a> {
     pub ast: Statement<Raw>,
+    pub green_node: GreenNode,
     pub sql: &'a str,
 }
 
 impl<'a> StatementParseResult<'a> {
-    pub fn new(ast: Statement<Raw>, sql: &'a str) -> Self {
-        Self { ast, sql }
+    pub fn new(ast: Statement<Raw>, sql: &'a str, green_node: GreenNode) -> Self {
+        Self {
+            ast,
+            sql,
+            green_node,
+        }
+    }
+
+    pub fn syntax(&self) -> SyntaxNode {
+        SyntaxNode::new_root(self.green_node.clone())
     }
 }
 
@@ -280,8 +291,11 @@ struct Parser<'a> {
     index: usize,
     recursion_guard: RecursionGuard,
 
-    /// Bursera work.
-    all_tokens: Vec<PosToken>,
+    /// For the same index in `tokens`, the preceeding trivia tokens. Includes on additional entry
+    /// for trivia after the final non-trivia token.
+    trivia_tokens: Vec<Vec<PosToken>>,
+    /// Index into tokens of the next un-bumped token.
+    trivia_pos: usize,
     builder: GreenNodeBuilder<'static>,
     // errors:Vec<String>,
 }
@@ -313,20 +327,73 @@ enum SetPrecedence {
     Intersect,
 }
 
+// Bursera.
+impl<'a> Parser<'a> {
+    /// Advance tokens up through `self.index`, adding them and their trivia to the current branch
+    /// of the tree builder.
+    fn bump(&mut self) {
+        while self.trivia_pos < self.index {
+            for tok in self
+                .trivia_tokens
+                .get(self.trivia_pos)
+                .into_iter()
+                .flatten()
+                .chain(self.tokens.get(self.trivia_pos))
+            {
+                let kind: crate::syntax::SyntaxKind = (&tok.kind).into();
+                self.builder.token(kind.into(), tok.kind.as_str());
+            }
+            self.trivia_pos += 1;
+        }
+    }
+
+    /// Calls next_token and bump. Must not call prev_token after.
+    fn bump_next_token(&mut self) -> Option<Token> {
+        let t = self.next_token();
+        self.bump();
+        t
+    }
+
+    fn start_node(&mut self, kind: impl Into<rowan::SyntaxKind>) {
+        self.builder.start_node(kind.into());
+    }
+
+    fn as_kind<F, T>(&mut self, kind: impl Into<rowan::SyntaxKind>, mut f: F) -> T
+    where
+        F: FnMut(&mut Self) -> T,
+    {
+        self.start_node(kind);
+        let res = f(self);
+        self.bump();
+        self.builder.finish_node();
+        res
+    }
+}
+
 impl<'a> Parser<'a> {
     /// Parse the specified tokens
-    fn new(sql: &'a str, all_tokens: Vec<PosToken>) -> Self {
+    fn new(sql: &'a str, raw_tokens: Vec<PosToken>) -> Self {
+        // Split tokens into trivia and regular.
+        let mut tokens = Vec::new();
+        let mut trivia_tokens: Vec<Vec<PosToken>> = vec![vec![]];
+        for t in raw_tokens.into_iter() {
+            if t.kind.is_trivia() {
+                trivia_tokens[tokens.len()].push(t);
+            } else {
+                tokens.push(t);
+                trivia_tokens.push(Vec::new());
+            }
+        }
+        assert_eq!(tokens.len() + 1, trivia_tokens.len());
+
         Parser {
             sql,
-            tokens: all_tokens
-                .iter()
-                .filter(|t| !t.kind.is_trivia())
-                .cloned()
-                .collect(),
-            all_tokens,
+            tokens,
+            trivia_tokens,
             index: 0,
             recursion_guard: RecursionGuard::with_limit(RECURSION_LIMIT),
             builder: GreenNodeBuilder::new(),
+            trivia_pos: 0,
         }
     }
 
@@ -337,7 +404,6 @@ impl<'a> Parser<'a> {
     fn parse_statements(&mut self) -> Result<Vec<StatementParseResult<'a>>, ParserStatementError> {
         let mut stmts = Vec::new();
         let mut expecting_statement_delimiter = false;
-        self.builder.start_node(ROOT.into());
         loop {
             // ignore empty statements (between successive statement delimiters)
             while self.consume_token(&Token::Semicolon) {
@@ -356,9 +422,7 @@ impl<'a> Parser<'a> {
             stmts.push(s);
             expecting_statement_delimiter = true;
         }
-        // Trailing whitespace.
-        self.skip_ws();
-        self.builder.finish_node();
+
         Ok(stmts)
     }
     /// Parse a single top-level statement (such as SELECT, INSERT, CREATE, etc.),
@@ -366,18 +430,28 @@ impl<'a> Parser<'a> {
     /// fragment corresponding to it.
     fn parse_statement(&mut self) -> Result<StatementParseResult<'a>, ParserStatementError> {
         let before = self.peek_pos();
+        self.start_node(Sk::ROOT);
+        self.trivia_pos = self.index;
         let statement = self.parse_statement_inner()?;
         let after = self.peek_pos();
+        self.bump();
+        self.builder.finish_node();
+        let builder = std::mem::take(&mut self.builder);
+        let green_node = builder.finish();
         Ok(StatementParseResult::new(
             statement,
             self.sql[before..after].trim(),
+            green_node,
         ))
     }
 
     /// Parse a single top-level statement (such as SELECT, INSERT, CREATE, etc.),
     /// stopping before the statement separator, if any.
     fn parse_statement_inner(&mut self) -> Result<Statement<Raw>, ParserStatementError> {
-        match self.next_token() {
+        self.bump();
+        let checkpoint = self.builder.checkpoint();
+        let mut kind = None;
+        let res = match self.bump_next_token() {
             Some(t) => match t {
                 Token::Keyword(SELECT)
                 | Token::Keyword(WITH)
@@ -393,7 +467,11 @@ impl<'a> Parser<'a> {
                 Token::Keyword(DISCARD) => Ok(self
                     .parse_discard()
                     .map_parser_err(StatementKind::Discard)?),
-                Token::Keyword(DROP) => Ok(self.parse_drop()?),
+                Token::Keyword(DROP) => {
+                    let (res, inner_kind) = self.parse_drop()?;
+                    kind = inner_kind;
+                    Ok(res)
+                }
                 Token::Keyword(DELETE) => {
                     Ok(self.parse_delete().map_parser_err(StatementKind::Delete)?)
                 }
@@ -489,7 +567,12 @@ impl<'a> Parser<'a> {
             None => self
                 .expected(self.peek_prev_pos(), "SQL statement", None)
                 .map_no_statement_parser_err(),
+        };
+        if let Some(kind) = kind {
+            self.builder.start_node_at(checkpoint, kind.into());
+            self.builder.finish_node();
         }
+        res
     }
 
     /// Parse a new expression
@@ -1796,14 +1879,17 @@ impl<'a> Parser<'a> {
     where
         F: FnMut(&mut Self) -> Result<T, ParserError>,
     {
-        let mut values = vec![];
-        loop {
-            values.push(f(self)?);
-            if !self.consume_token(&Token::Comma) {
-                break;
+        self.as_kind(Sk::COMMA_SEPARATED, |slf| {
+            let mut values = vec![];
+            loop {
+                values.push(f(slf)?);
+                if !slf.consume_token(&Token::Comma) {
+                    break;
+                }
+                slf.bump();
             }
-        }
-        Ok(values)
+            Ok(values)
+        })
     }
 
     #[must_use]
@@ -3676,13 +3762,21 @@ impl<'a> Parser<'a> {
         ))
     }
 
+    fn parse_cascade_restrict(&mut self, location: &str) -> Result<Option<Keyword>, ParserError> {
+        self.as_kind(Sk::CASCADE_OR_RESTRICT, |slf| {
+            slf.parse_at_most_one_keyword(&[CASCADE, RESTRICT], location)
+        })
+    }
+
     fn parse_if_exists(&mut self) -> Result<bool, ParserError> {
-        if self.parse_keyword(IF) {
-            self.expect_keyword(EXISTS)?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        self.as_kind(Sk::IF_EXISTS, |slf| {
+            if slf.parse_keyword(IF) {
+                slf.expect_keyword(EXISTS)?;
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        })
     }
 
     fn parse_if_not_exists(&mut self) -> Result<bool, ParserError> {
@@ -3752,12 +3846,14 @@ impl<'a> Parser<'a> {
         Ok(Statement::Discard(DiscardStatement { target }))
     }
 
-    fn parse_drop(&mut self) -> Result<Statement<Raw>, ParserStatementError> {
+    fn parse_drop(&mut self) -> Result<(Statement<Raw>, Option<Sk>), ParserStatementError> {
         if self.parse_keyword(OWNED) {
             self.parse_drop_owned()
+                .map(|r| (r, None))
                 .map_parser_err(StatementKind::DropOwned)
         } else {
             self.parse_drop_objects()
+                .map(|r| (r, Some(Sk::DROP_OBJECTS)))
                 .map_parser_err(StatementKind::DropObjects)
         }
     }
@@ -3765,13 +3861,12 @@ impl<'a> Parser<'a> {
     fn parse_drop_objects(&mut self) -> Result<Statement<Raw>, ParserError> {
         let object_type = self.expect_object_type()?;
         let if_exists = self.parse_if_exists()?;
+        self.start_node(Sk::OBJECT_NAMES);
         match object_type {
             ObjectType::Database => {
                 let name = UnresolvedObjectName::Database(self.parse_database_name()?);
-                let restrict = matches!(
-                    self.parse_at_most_one_keyword(&[CASCADE, RESTRICT], "DROP")?,
-                    Some(RESTRICT),
-                );
+                self.builder.finish_node();
+                let restrict = matches!(self.parse_cascade_restrict("DROP")?, Some(RESTRICT));
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type: ObjectType::Database,
                     if_exists,
@@ -3783,11 +3878,8 @@ impl<'a> Parser<'a> {
                 let names = self.parse_comma_separated(|parser| {
                     Ok(UnresolvedObjectName::Schema(parser.parse_schema_name()?))
                 })?;
-
-                let cascade = matches!(
-                    self.parse_at_most_one_keyword(&[CASCADE, RESTRICT], "DROP")?,
-                    Some(CASCADE),
-                );
+                self.builder.finish_node();
+                let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type: ObjectType::Schema,
                     if_exists,
@@ -3799,6 +3891,7 @@ impl<'a> Parser<'a> {
                 let names = self.parse_comma_separated(|parser| {
                     Ok(UnresolvedObjectName::Role(parser.parse_identifier()?))
                 })?;
+                self.builder.finish_node();
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type: ObjectType::Role,
                     if_exists,
@@ -3820,10 +3913,8 @@ impl<'a> Parser<'a> {
                 let names = self.parse_comma_separated(|parser| {
                     Ok(UnresolvedObjectName::Item(parser.parse_item_name()?))
                 })?;
-                let cascade = matches!(
-                    self.parse_at_most_one_keyword(&[CASCADE, RESTRICT], "DROP")?,
-                    Some(CASCADE),
-                );
+                self.builder.finish_node();
+                let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type,
                     if_exists,
@@ -3843,10 +3934,8 @@ impl<'a> Parser<'a> {
         let names = self.parse_comma_separated(|parser| {
             Ok(UnresolvedObjectName::Cluster(parser.parse_identifier()?))
         })?;
-        let cascade = matches!(
-            self.parse_at_most_one_keyword(&[CASCADE, RESTRICT], "DROP")?,
-            Some(CASCADE),
-        );
+        self.builder.finish_node();
+        let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
         Ok(Statement::DropObjects(DropObjectsStatement {
             object_type: ObjectType::Cluster,
             if_exists,
@@ -3864,6 +3953,7 @@ impl<'a> Parser<'a> {
                 p.parse_cluster_replica_name()?,
             ))
         })?;
+        self.builder.finish_node();
         Ok(Statement::DropObjects(DropObjectsStatement {
             object_type: ObjectType::ClusterReplica,
             if_exists,
@@ -3875,10 +3965,7 @@ impl<'a> Parser<'a> {
     fn parse_drop_owned(&mut self) -> Result<Statement<Raw>, ParserError> {
         self.expect_keyword(BY)?;
         let role_names = self.parse_comma_separated(Parser::parse_identifier)?;
-        let cascade = matches!(
-            self.parse_at_most_one_keyword(&[CASCADE, RESTRICT], "DROP")?,
-            Some(CASCADE),
-        );
+        let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
         Ok(Statement::DropOwned(DropOwnedStatement {
             role_names,
             cascade,
@@ -3886,10 +3973,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_cluster_replica_name(&mut self) -> Result<QualifiedReplica, ParserError> {
-        let cluster = self.parse_identifier()?;
-        self.expect_token(&Token::Dot)?;
-        let replica = self.parse_identifier()?;
-        Ok(QualifiedReplica { cluster, replica })
+        self.as_kind(Sk::CLUSTER_REPLICA_NAME, |slf| {
+            let cluster = slf.parse_identifier()?;
+            slf.expect_token(&Token::Dot)?;
+            let replica = slf.parse_identifier()?;
+            Ok(QualifiedReplica { cluster, replica })
+        })
     }
 
     fn parse_create_table(&mut self) -> Result<Statement<Raw>, ParserError> {
@@ -4406,7 +4495,7 @@ impl<'a> Parser<'a> {
                         .map_parser_err(StatementKind::AlterSource)?;
 
                     let cascade = matches!(
-                        self.parse_at_most_one_keyword(&[CASCADE, RESTRICT], "ALTER SOURCE...DROP")
+                        self.parse_cascade_restrict("ALTER SOURCE...DROP")
                             .map_parser_err(StatementKind::AlterSource)?,
                         Some(CASCADE),
                     );
@@ -5594,19 +5683,25 @@ impl<'a> Parser<'a> {
     /// Parse a possibly quoted database identifier, e.g.
     /// `foo` or `"mydatabase"`
     fn parse_database_name(&mut self) -> Result<UnresolvedDatabaseName, ParserError> {
-        Ok(UnresolvedDatabaseName(self.parse_identifier()?))
+        self.as_kind(Sk::DATABASE_NAME, |slf| {
+            Ok(UnresolvedDatabaseName(slf.parse_identifier()?))
+        })
     }
 
     /// Parse a possibly qualified, possibly quoted schema identifier, e.g.
     /// `foo` or `mydatabase."schema"`
     fn parse_schema_name(&mut self) -> Result<UnresolvedSchemaName, ParserError> {
-        Ok(UnresolvedSchemaName(self.parse_identifiers()?))
+        self.as_kind(Sk::SCHEMA_NAME, |slf| {
+            Ok(UnresolvedSchemaName(slf.parse_identifiers()?))
+        })
     }
 
     /// Parse a possibly qualified, possibly quoted object identifier, e.g.
     /// `foo` or `myschema."table"`
     fn parse_item_name(&mut self) -> Result<UnresolvedItemName, ParserError> {
-        Ok(UnresolvedItemName(self.parse_identifiers()?))
+        self.as_kind(Sk::ITEM_NAME, |slf| {
+            Ok(UnresolvedItemName(slf.parse_identifiers()?))
+        })
     }
 
     /// Parse an object name.
@@ -7305,7 +7400,11 @@ impl<'a> Parser<'a> {
         let _ = self.parse_keywords(&[WITHOUT, HOLD]);
         self.expect_keyword(FOR)
             .map_parser_err(StatementKind::Declare)?;
-        let StatementParseResult { ast, sql } = self.parse_statement()?;
+        let StatementParseResult {
+            ast,
+            sql,
+            green_node: _,
+        } = self.parse_statement()?;
         Ok(Statement::Declare(DeclareStatement {
             name,
             stmt: Box::new(ast),
@@ -7330,7 +7429,11 @@ impl<'a> Parser<'a> {
             .map_parser_err(StatementKind::Prepare)?;
         let pos = self.peek_pos();
         //
-        let StatementParseResult { ast, sql } = self.parse_statement()?;
+        let StatementParseResult {
+            ast,
+            sql,
+            green_node: _,
+        } = self.parse_statement()?;
         if !matches!(
             ast,
             Statement::Select(_)
@@ -7632,53 +7735,55 @@ impl<'a> Parser<'a> {
 
     /// Bail out if the current token is not an object type, or consume and return it if it is.
     fn expect_object_type(&mut self) -> Result<ObjectType, ParserError> {
-        Ok(
-            match self.expect_one_of_keywords(&[
-                TABLE,
-                VIEW,
-                MATERIALIZED,
-                SOURCE,
-                SINK,
-                INDEX,
-                TYPE,
-                ROLE,
-                USER,
-                CLUSTER,
-                SECRET,
-                CONNECTION,
-                DATABASE,
-                SCHEMA,
-                FUNCTION,
-            ])? {
-                TABLE => ObjectType::Table,
-                VIEW => ObjectType::View,
-                MATERIALIZED => {
-                    if let Err(e) = self.expect_keyword(VIEW) {
-                        self.prev_token();
-                        return Err(e);
+        self.as_kind(Sk::OBJECT_TYPE, |slf| {
+            Ok(
+                match slf.expect_one_of_keywords(&[
+                    TABLE,
+                    VIEW,
+                    MATERIALIZED,
+                    SOURCE,
+                    SINK,
+                    INDEX,
+                    TYPE,
+                    ROLE,
+                    USER,
+                    CLUSTER,
+                    SECRET,
+                    CONNECTION,
+                    DATABASE,
+                    SCHEMA,
+                    FUNCTION,
+                ])? {
+                    TABLE => ObjectType::Table,
+                    VIEW => ObjectType::View,
+                    MATERIALIZED => {
+                        if let Err(e) = slf.expect_keyword(VIEW) {
+                            slf.prev_token();
+                            return Err(e);
+                        }
+                        ObjectType::MaterializedView
                     }
-                    ObjectType::MaterializedView
-                }
-                SOURCE => ObjectType::Source,
-                SINK => ObjectType::Sink,
-                INDEX => ObjectType::Index,
-                TYPE => ObjectType::Type,
-                ROLE | USER => ObjectType::Role,
-                CLUSTER => {
-                    if self.parse_keyword(REPLICA) {
-                        ObjectType::ClusterReplica
-                    } else {
-                        ObjectType::Cluster
+                    SOURCE => ObjectType::Source,
+                    SINK => ObjectType::Sink,
+                    INDEX => ObjectType::Index,
+                    TYPE => ObjectType::Type,
+                    ROLE | USER => ObjectType::Role,
+                    CLUSTER => {
+                        if slf.parse_keyword(REPLICA) {
+                            ObjectType::ClusterReplica
+                        } else {
+                            ObjectType::Cluster
+                        }
                     }
-                }
-                SECRET => ObjectType::Secret,
-                CONNECTION => ObjectType::Connection,
-                DATABASE => ObjectType::Database,
-                SCHEMA => ObjectType::Schema,
-                FUNCTION => ObjectType::Func,
-                _ => unreachable!(),
-            },
-        )
+                    SECRET => ObjectType::Secret,
+                    CONNECTION => ObjectType::Connection,
+                    DATABASE => ObjectType::Database,
+                    SCHEMA => ObjectType::Schema,
+                    FUNCTION => ObjectType::Func,
+                    _ => unreachable!(),
+                },
+            )
+        })
     }
 
     /// Look for an object type and return it if it matches.
