@@ -3864,7 +3864,9 @@ impl<'a> Parser<'a> {
         self.start_node(Sk::OBJECT_NAMES);
         match object_type {
             ObjectType::Database => {
-                let name = UnresolvedObjectName::Database(self.parse_database_name()?);
+                let name = self
+                    .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_database_name)
+                    .map(UnresolvedObjectName::Database)?;
                 self.builder.finish_node();
                 let restrict = matches!(self.parse_cascade_restrict("DROP")?, Some(RESTRICT));
                 Ok(Statement::DropObjects(DropObjectsStatement {
@@ -3876,7 +3878,9 @@ impl<'a> Parser<'a> {
             }
             ObjectType::Schema => {
                 let names = self.parse_comma_separated(|parser| {
-                    Ok(UnresolvedObjectName::Schema(parser.parse_schema_name()?))
+                    parser
+                        .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_schema_name)
+                        .map(UnresolvedObjectName::Schema)
                 })?;
                 self.builder.finish_node();
                 let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
@@ -3889,7 +3893,9 @@ impl<'a> Parser<'a> {
             }
             ObjectType::Role => {
                 let names = self.parse_comma_separated(|parser| {
-                    Ok(UnresolvedObjectName::Role(parser.parse_identifier()?))
+                    parser
+                        .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_identifier)
+                        .map(UnresolvedObjectName::Role)
                 })?;
                 self.builder.finish_node();
                 Ok(Statement::DropObjects(DropObjectsStatement {
@@ -3911,7 +3917,9 @@ impl<'a> Parser<'a> {
             | ObjectType::Secret
             | ObjectType::Connection => {
                 let names = self.parse_comma_separated(|parser| {
-                    Ok(UnresolvedObjectName::Item(parser.parse_item_name()?))
+                    parser
+                        .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_item_name)
+                        .map(UnresolvedObjectName::Item)
                 })?;
                 self.builder.finish_node();
                 let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
@@ -3932,7 +3940,9 @@ impl<'a> Parser<'a> {
 
     fn parse_drop_clusters(&mut self, if_exists: bool) -> Result<Statement<Raw>, ParserError> {
         let names = self.parse_comma_separated(|parser| {
-            Ok(UnresolvedObjectName::Cluster(parser.parse_identifier()?))
+            parser
+                .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_identifier)
+                .map(UnresolvedObjectName::Cluster)
         })?;
         self.builder.finish_node();
         let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
@@ -3948,10 +3958,10 @@ impl<'a> Parser<'a> {
         &mut self,
         if_exists: bool,
     ) -> Result<Statement<Raw>, ParserError> {
-        let names = self.parse_comma_separated(|p| {
-            Ok(UnresolvedObjectName::ClusterReplica(
-                p.parse_cluster_replica_name()?,
-            ))
+        let names = self.parse_comma_separated(|parser| {
+            parser
+                .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_cluster_replica_name)
+                .map(UnresolvedObjectName::ClusterReplica)
         })?;
         self.builder.finish_node();
         Ok(Statement::DropObjects(DropObjectsStatement {

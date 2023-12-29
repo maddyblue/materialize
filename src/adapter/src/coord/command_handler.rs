@@ -36,6 +36,7 @@ use mz_sql::session::user::User;
 use mz_sql::session::vars::{
     EndTransactionAction, OwnedVarInput, Value, Var, STATEMENT_LOGGING_SAMPLE_RATE,
 };
+use mz_sql_parser::syntax::SyntaxNode;
 use opentelemetry::trace::TraceContextExt;
 use rowan::GreenNode;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -628,6 +629,9 @@ impl Coordinator {
             Ok(resolved) => resolved,
             Err(e) => return ctx.retire(Err(e.into())),
         };
+        let _syntax_node_resolved =
+            mz_sql::names::resolve_syntax(&catalog, SyntaxNode::new_root(green_node.clone()));
+        //   .expect("must succeed because above succeeded");
         // N.B. The catalog can change during purification so we must validate that the dependencies still exist after
         // purification.  This should be done back on the main thread.
         // We do the validation:

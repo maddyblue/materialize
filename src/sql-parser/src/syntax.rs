@@ -33,6 +33,7 @@ pub enum SyntaxKind {
 
     // Inner composite nodes.
     CASCADE_OR_RESTRICT,
+    UNRESOLVED_OBJECT_NAME,
     DATABASE_NAME,
     EXPR,
     FROM,
@@ -50,18 +51,17 @@ pub enum SyntaxKind {
     WHERE,
     COMMA_SEPARATED,
 
+    // Resolved nodes.
+    RESOLVED_OBJECT_NAME,
+    RESOLVED_ITEM_NAME,
+
     // Must be last.
     ERR,
     ROOT,
 }
+
 use mz_sql_lexer::lexer::Token;
 use SyntaxKind::*;
-
-impl SyntaxKind {
-    pub fn _is_comment(&self) -> bool {
-        matches!(self, LINECOMMENT | MULTILINECOMMENT)
-    }
-}
 
 impl From<SyntaxKind> for rowan::SyntaxKind {
     fn from(kind: SyntaxKind) -> Self {

@@ -22,8 +22,10 @@ use mz_repr::role_id::RoleId;
 use mz_repr::ColumnName;
 use mz_repr::GlobalId;
 use mz_sql_parser::ident;
+use mz_sql_parser::syntax::{SyntaxKind as Sk, SyntaxNode};
 use once_cell::sync::Lazy;
 use proptest_derive::Arbitrary;
+use rowan::{NodeOrToken, TextSize};
 use serde::{Deserialize, Serialize};
 use uncased::UncasedStr;
 
@@ -2000,6 +2002,77 @@ where
     let result = node.fold(&mut resolver);
     resolver.status?;
     Ok((result, ResolvedIds(resolver.ids)))
+}
+
+pub fn resolve_syntax(
+    catalog: &dyn SessionCatalog,
+    node: SyntaxNode,
+) -> Result<(ResolvedSyntaxNode, ResolvedIds), PlanError> {
+    let mut resolver = NameResolver::new(catalog);
+    let mut resolved_node = ResolvedSyntaxNode {
+        node: node.clone(),
+        resolutions: BTreeMap::new(),
+    };
+
+    // Search for all nodes that have a ITEM_NAME parent and UNRESOLVED_OBJECT_NAME grandparent.
+    // Resolve them and replace with the resolved version.
+    for node in node.descendants_with_tokens() {
+        match node.kind() {
+            Sk::IDENT => {
+                let mut ancestors = node.ancestors();
+                let Some(obj_variant) = ancestors.next() else {
+                    continue;
+                };
+                let Some(unresolved) = ancestors.next() else {
+                    continue;
+                };
+                if unresolved.kind() != Sk::UNRESOLVED_OBJECT_NAME {
+                    continue;
+                }
+                let resolved = match obj_variant.kind() {
+                    Sk::ITEM_NAME => {
+                        let mut idents = Vec::new();
+                        for tok in obj_variant.children_with_tokens() {
+                            let NodeOrToken::Token(tok) = tok else {
+                                continue;
+                            };
+                            if !matches!(tok.kind(), Sk::IDENT) {
+                                continue;
+                            }
+                            let ident = Ident::new(tok.text())?;
+                            idents.push(ident);
+                        }
+                        let raw_name = UnresolvedItemName(idents);
+                        resolver.resolve_item_name_name(
+                            raw_name,
+                            // TODO: Figure out how to do this correctly, these configs vary based
+                            // on the fold fn.
+                            ItemResolutionConfig {
+                                functions: false,
+                                types: false,
+                                relations: true,
+                            },
+                        )
+                    }
+                    _ => continue,
+                };
+                resolved_node
+                    .resolutions
+                    .insert(unresolved.text_range().start(), resolved);
+            }
+            _ => {}
+        }
+    }
+
+    resolver.status?;
+    Ok((resolved_node, ResolvedIds(resolver.ids)))
+}
+
+/// A SyntaxTree with maps from locations of unresolved item names to the resolved version.
+#[derive(Debug)]
+pub struct ResolvedSyntaxNode {
+    pub node: SyntaxNode,
+    pub resolutions: BTreeMap<TextSize, ResolvedItemName>,
 }
 
 /// A set of IDs resolved by name resolution.
