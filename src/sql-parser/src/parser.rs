@@ -31,7 +31,7 @@ use mz_ore::option::OptionExt;
 use mz_ore::stack::{CheckedRecursion, RecursionGuard, RecursionLimitError};
 use mz_sql_lexer::keywords::*;
 use mz_sql_lexer::lexer::{self, LexerError, PosToken, Token};
-use rowan::{GreenNode, GreenNodeBuilder};
+use rowan::{Checkpoint, GreenNode, GreenNodeBuilder};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use IsLateral::*;
@@ -358,11 +358,36 @@ impl<'a> Parser<'a> {
         self.builder.start_node(kind.into());
     }
 
-    fn as_kind<F, T>(&mut self, kind: impl Into<rowan::SyntaxKind>, mut f: F) -> T
+    fn start_node_at(&mut self, checkpoint: Checkpoint, kind: impl Into<rowan::SyntaxKind>) {
+        self.builder.start_node_at(checkpoint, kind.into());
+    }
+
+    fn as_kind<F, T>(
+        &mut self,
+        kind: impl Into<rowan::SyntaxKind>,
+        mut f: F,
+    ) -> Result<T, ParserError>
     where
-        F: FnMut(&mut Self) -> T,
+        F: FnMut(&mut Self) -> Result<T, ParserError>,
     {
         self.start_node(kind);
+        let res = f(self);
+        self.bump();
+        self.builder.finish_node();
+        res
+    }
+
+    fn as_kind_at<F, T>(
+        &mut self,
+        checkpoint: Checkpoint,
+        kind: impl Into<rowan::SyntaxKind>,
+        mut f: F,
+    ) -> Result<T, ParserError>
+    where
+        F: FnMut(&mut Self) -> Result<T, ParserError>,
+    {
+        self.bump();
+        self.start_node_at(checkpoint, kind);
         let res = f(self);
         self.bump();
         self.builder.finish_node();
@@ -451,7 +476,7 @@ impl<'a> Parser<'a> {
         self.bump();
         let checkpoint = self.builder.checkpoint();
         let mut kind = None;
-        let res = match self.bump_next_token() {
+        let res = match self.next_token() {
             Some(t) => match t {
                 Token::Keyword(SELECT)
                 | Token::Keyword(WITH)
@@ -1879,14 +1904,14 @@ impl<'a> Parser<'a> {
     where
         F: FnMut(&mut Self) -> Result<T, ParserError>,
     {
-        self.as_kind(Sk::COMMA_SEPARATED, |slf| {
+        self.as_kind(Sk::COMMA_SEPARATED, |parser| {
             let mut values = vec![];
             loop {
-                values.push(f(slf)?);
-                if !slf.consume_token(&Token::Comma) {
+                values.push(f(parser)?);
+                if !parser.consume_token(&Token::Comma) {
                     break;
                 }
-                slf.bump();
+                parser.bump();
             }
             Ok(values)
         })
@@ -3763,15 +3788,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_cascade_restrict(&mut self, location: &str) -> Result<Option<Keyword>, ParserError> {
-        self.as_kind(Sk::CASCADE_OR_RESTRICT, |slf| {
-            slf.parse_at_most_one_keyword(&[CASCADE, RESTRICT], location)
+        self.as_kind(Sk::CASCADE_OR_RESTRICT, |parser| {
+            parser.parse_at_most_one_keyword(&[CASCADE, RESTRICT], location)
         })
     }
 
     fn parse_if_exists(&mut self) -> Result<bool, ParserError> {
-        self.as_kind(Sk::IF_EXISTS, |slf| {
-            if slf.parse_keyword(IF) {
-                slf.expect_keyword(EXISTS)?;
+        self.as_kind(Sk::IF_EXISTS, |parser| {
+            if parser.parse_keyword(IF) {
+                parser.expect_keyword(EXISTS)?;
                 Ok(true)
             } else {
                 Ok(false)
@@ -3983,10 +4008,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_cluster_replica_name(&mut self) -> Result<QualifiedReplica, ParserError> {
-        self.as_kind(Sk::CLUSTER_REPLICA_NAME, |slf| {
-            let cluster = slf.parse_identifier()?;
-            slf.expect_token(&Token::Dot)?;
-            let replica = slf.parse_identifier()?;
+        self.as_kind(Sk::CLUSTER_REPLICA_NAME, |parser| {
+            let cluster = parser.parse_identifier()?;
+            parser.expect_token(&Token::Dot)?;
+            let replica = parser.parse_identifier()?;
             Ok(QualifiedReplica { cluster, replica })
         })
     }
@@ -5693,24 +5718,24 @@ impl<'a> Parser<'a> {
     /// Parse a possibly quoted database identifier, e.g.
     /// `foo` or `"mydatabase"`
     fn parse_database_name(&mut self) -> Result<UnresolvedDatabaseName, ParserError> {
-        self.as_kind(Sk::DATABASE_NAME, |slf| {
-            Ok(UnresolvedDatabaseName(slf.parse_identifier()?))
+        self.as_kind(Sk::DATABASE_NAME, |parser| {
+            Ok(UnresolvedDatabaseName(parser.parse_identifier()?))
         })
     }
 
     /// Parse a possibly qualified, possibly quoted schema identifier, e.g.
     /// `foo` or `mydatabase."schema"`
     fn parse_schema_name(&mut self) -> Result<UnresolvedSchemaName, ParserError> {
-        self.as_kind(Sk::SCHEMA_NAME, |slf| {
-            Ok(UnresolvedSchemaName(slf.parse_identifiers()?))
+        self.as_kind(Sk::SCHEMA_NAME, |parser| {
+            Ok(UnresolvedSchemaName(parser.parse_identifiers()?))
         })
     }
 
     /// Parse a possibly qualified, possibly quoted object identifier, e.g.
     /// `foo` or `myschema."table"`
     fn parse_item_name(&mut self) -> Result<UnresolvedItemName, ParserError> {
-        self.as_kind(Sk::ITEM_NAME, |slf| {
-            Ok(UnresolvedItemName(slf.parse_identifiers()?))
+        self.as_kind(Sk::ITEM_NAME, |parser| {
+            Ok(UnresolvedItemName(parser.parse_identifiers()?))
         })
     }
 
@@ -5887,9 +5912,11 @@ impl<'a> Parser<'a> {
 
     /// Parses a SELECT (or WITH, VALUES, TABLE) statement with optional AS OF.
     fn parse_select_statement(&mut self) -> Result<SelectStatement<Raw>, ParserError> {
-        Ok(SelectStatement {
-            query: self.parse_query()?,
-            as_of: self.parse_optional_as_of()?,
+        self.as_kind(Sk::SELECT_STATEMENT, |parser| {
+            Ok(SelectStatement {
+                query: parser.parse_query()?,
+                as_of: parser.parse_optional_as_of()?,
+            })
         })
     }
 
@@ -5898,33 +5925,43 @@ impl<'a> Parser<'a> {
     /// by `ORDER BY`. Unlike some other parse_... methods, this one doesn't
     /// expect the initial keyword to be already consumed
     fn parse_query(&mut self) -> Result<Query<Raw>, ParserError> {
-        self.checked_recur_mut(|parser| {
-            let cte_block = if parser.parse_keyword(WITH) {
-                if parser.parse_keyword(MUTUALLY) {
-                    parser.expect_keyword(RECURSIVE)?;
-                    let options = if parser.consume_token(&Token::LParen) {
-                        let options =
-                            parser.parse_comma_separated(Self::parse_mut_rec_block_option)?;
-                        parser.expect_token(&Token::RParen)?;
-                        options
+        self.as_kind(Sk::QUERY, |parser| {
+            parser.checked_recur_mut(|parser| {
+                let checkpoint = parser.builder.checkpoint();
+                let cte_block = if parser.parse_keyword(WITH) {
+                    if parser.parse_keyword(MUTUALLY) {
+                        parser.expect_keyword(RECURSIVE)?;
+                        parser.start_node_at(checkpoint, Sk::WITH_MUTUALLY_RECURSIVE);
+                        let options = if parser.consume_token(&Token::LParen) {
+                            let options =
+                                parser.parse_comma_separated(Self::parse_mut_rec_block_option)?;
+                            parser.expect_token(&Token::RParen)?;
+                            options
+                        } else {
+                            vec![]
+                        };
+                        let res = CteBlock::MutuallyRecursive(MutRecBlock {
+                            options,
+                            ctes: parser.parse_comma_separated(Parser::parse_cte_mut_rec)?,
+                        });
+                        parser.builder.finish_node();
+                        res
                     } else {
-                        vec![]
-                    };
-                    CteBlock::MutuallyRecursive(MutRecBlock {
-                        options,
-                        ctes: parser.parse_comma_separated(Parser::parse_cte_mut_rec)?,
-                    })
+                        // TODO: optional RECURSIVE
+                        parser
+                            .as_kind_at(checkpoint, Sk::WITH, |parser| {
+                                parser.parse_comma_separated(Parser::parse_cte)
+                            })
+                            .map(CteBlock::Simple)?
+                    }
                 } else {
-                    // TODO: optional RECURSIVE
-                    CteBlock::Simple(parser.parse_comma_separated(Parser::parse_cte)?)
-                }
-            } else {
-                CteBlock::empty()
-            };
+                    CteBlock::empty()
+                };
 
-            let body = parser.parse_query_body(SetPrecedence::Zero)?;
+                let body = parser.parse_query_body(SetPrecedence::Zero)?;
 
-            parser.parse_query_tail(cte_block, body)
+                parser.parse_query_tail(cte_block, body)
+            })
         })
     }
 
@@ -6119,30 +6156,35 @@ impl<'a> Parser<'a> {
     ///   set_operation ::= query_body { 'UNION' | 'EXCEPT' | 'INTERSECT' } [ 'ALL' ] query_body
     /// ```
     fn parse_query_body(&mut self, precedence: SetPrecedence) -> Result<SetExpr<Raw>, ParserError> {
-        // We parse the expression using a Pratt parser, as in `parse_expr()`.
-        // Start by parsing a restricted SELECT or a `(subquery)`:
-        let expr = if self.parse_keyword(SELECT) {
-            SetExpr::Select(Box::new(self.parse_select()?))
-        } else if self.consume_token(&Token::LParen) {
-            // CTEs are not allowed here, but the parser currently accepts them
-            let subquery = self.parse_query()?;
-            self.expect_token(&Token::RParen)?;
-            SetExpr::Query(Box::new(subquery))
-        } else if self.parse_keyword(VALUES) {
-            SetExpr::Values(self.parse_values()?)
-        } else if self.parse_keyword(SHOW) {
-            SetExpr::Show(self.parse_show()?)
-        } else if self.parse_keyword(TABLE) {
-            SetExpr::Table(self.parse_raw_name()?)
-        } else {
-            return self.expected(
-                self.peek_pos(),
-                "SELECT, VALUES, or a subquery in the query body",
-                self.peek_token(),
-            );
-        };
+        self.as_kind(Sk::SET_EXPR, |parser| {
+            let checkpoint = parser.builder.checkpoint();
+            // We parse the expression using a Pratt parser, as in `parse_expr()`.
+            // Start by parsing a restricted SELECT or a `(subquery)`:
+            let expr = if parser.parse_keyword(SELECT) {
+                parser
+                    .as_kind_at(checkpoint, Sk::SELECT, Parser::parse_select)
+                    .map(|e| SetExpr::Select(Box::new(e)))?
+            } else if parser.consume_token(&Token::LParen) {
+                // CTEs are not allowed here, but the parser currently accepts them
+                let subquery = parser.parse_query()?;
+                parser.expect_token(&Token::RParen)?;
+                SetExpr::Query(Box::new(subquery))
+            } else if parser.parse_keyword(VALUES) {
+                SetExpr::Values(parser.parse_values()?)
+            } else if parser.parse_keyword(SHOW) {
+                SetExpr::Show(parser.parse_show()?)
+            } else if parser.parse_keyword(TABLE) {
+                SetExpr::Table(parser.parse_raw_name()?)
+            } else {
+                return parser.expected(
+                    parser.peek_pos(),
+                    "SELECT, VALUES, or a subquery in the query body",
+                    parser.peek_token(),
+                );
+            };
 
-        self.parse_query_body_seeded(precedence, expr)
+            parser.parse_query_body_seeded(precedence, expr)
+        })
     }
 
     fn parse_query_body_seeded(
@@ -6199,6 +6241,7 @@ impl<'a> Parser<'a> {
     /// Parse a restricted `SELECT` statement (no CTEs / `UNION` / `ORDER BY`),
     /// assuming the initial `SELECT` was already consumed
     fn parse_select(&mut self) -> Result<Select<Raw>, ParserError> {
+        self.bump();
         let all = self.parse_keyword(ALL);
         let distinct = self.parse_keyword(DISTINCT);
         if all && distinct {
@@ -6209,10 +6252,12 @@ impl<'a> Parser<'a> {
             );
         }
         let distinct = if distinct && self.parse_keyword(ON) {
-            self.expect_token(&Token::LParen)?;
-            let exprs = self.parse_comma_separated(Parser::parse_expr)?;
-            self.expect_token(&Token::RParen)?;
-            Some(Distinct::On(exprs))
+            self.as_kind(Sk::DISTINCT_ON, |parser| {
+                parser.expect_token(&Token::LParen)?;
+                let exprs = parser.parse_comma_separated(Parser::parse_expr)?;
+                parser.expect_token(&Token::RParen)?;
+                Ok(Some(Distinct::On(exprs)))
+            })?
         } else if distinct {
             Some(Distinct::EntireRow)
         } else {
@@ -6224,23 +6269,23 @@ impl<'a> Parser<'a> {
             // permits these for symmetry with zero column tables.
             Some(Token::Keyword(kw)) if kw.is_reserved() => vec![],
             Some(Token::Semicolon) | Some(Token::RParen) | None => vec![],
-            _ => {
+            _ => self.as_kind(Sk::PROJECTION, |parser| {
                 let mut projection = vec![];
                 loop {
-                    projection.push(self.parse_select_item()?);
-                    if !self.consume_token(&Token::Comma) {
+                    projection.push(parser.parse_select_item()?);
+                    if !parser.consume_token(&Token::Comma) {
                         break;
                     }
-                    if self.peek_keyword(FROM) {
+                    if parser.peek_keyword(FROM) {
                         return parser_err!(
-                            self,
-                            self.peek_prev_pos(),
+                            parser,
+                            parser.peek_prev_pos(),
                             "invalid trailing comma in SELECT list",
                         );
                     }
                 }
-                projection
-            }
+                Ok(projection)
+            })?,
         };
 
         // Note that for keywords to be properly handled here, they need to be
@@ -6248,35 +6293,46 @@ impl<'a> Parser<'a> {
         // otherwise they may be parsed as an alias as part of the `projection`
         // or `from`.
 
+        let checkpoint = self.builder.checkpoint();
         let from = if self.parse_keyword(FROM) {
-            self.parse_comma_separated(Parser::parse_table_and_joins)?
+            self.as_kind_at(checkpoint, Sk::FROM, |parser| {
+                parser.parse_comma_separated(Parser::parse_table_and_joins)
+            })?
         } else {
             vec![]
         };
 
+        let checkpoint = self.builder.checkpoint();
         let selection = if self.parse_keyword(WHERE) {
-            Some(self.parse_expr()?)
+            Some(self.as_kind_at(checkpoint, Sk::WHERE, Parser::parse_expr)?)
         } else {
             None
         };
 
+        let checkpoint = self.builder.checkpoint();
         let group_by = if self.parse_keywords(&[GROUP, BY]) {
-            self.parse_comma_separated(Parser::parse_expr)?
+            self.as_kind_at(checkpoint, Sk::GROUP_BY, |parser| {
+                parser.parse_comma_separated(Parser::parse_expr)
+            })?
         } else {
             vec![]
         };
 
+        let checkpoint = self.builder.checkpoint();
         let having = if self.parse_keyword(HAVING) {
-            Some(self.parse_expr()?)
+            Some(self.as_kind_at(checkpoint, Sk::HAVING, Parser::parse_expr)?)
         } else {
             None
         };
 
+        let checkpoint = self.builder.checkpoint();
         let options = if self.parse_keyword(OPTIONS) {
-            self.expect_token(&Token::LParen)?;
-            let options = self.parse_comma_separated(Self::parse_select_option)?;
-            self.expect_token(&Token::RParen)?;
-            options
+            self.as_kind_at(checkpoint, Sk::OPTIONS, |parser| {
+                parser.expect_token(&Token::LParen)?;
+                let options = parser.parse_comma_separated(Self::parse_select_option)?;
+                parser.expect_token(&Token::RParen)?;
+                Ok(options)
+            })?
         } else {
             vec![]
         };
@@ -7746,9 +7802,9 @@ impl<'a> Parser<'a> {
 
     /// Bail out if the current token is not an object type, or consume and return it if it is.
     fn expect_object_type(&mut self) -> Result<ObjectType, ParserError> {
-        self.as_kind(Sk::OBJECT_TYPE, |slf| {
+        self.as_kind(Sk::OBJECT_TYPE, |parser| {
             Ok(
-                match slf.expect_one_of_keywords(&[
+                match parser.expect_one_of_keywords(&[
                     TABLE,
                     VIEW,
                     MATERIALIZED,
@@ -7768,8 +7824,8 @@ impl<'a> Parser<'a> {
                     TABLE => ObjectType::Table,
                     VIEW => ObjectType::View,
                     MATERIALIZED => {
-                        if let Err(e) = slf.expect_keyword(VIEW) {
-                            slf.prev_token();
+                        if let Err(e) = parser.expect_keyword(VIEW) {
+                            parser.prev_token();
                             return Err(e);
                         }
                         ObjectType::MaterializedView
@@ -7780,7 +7836,7 @@ impl<'a> Parser<'a> {
                     TYPE => ObjectType::Type,
                     ROLE | USER => ObjectType::Role,
                     CLUSTER => {
-                        if slf.parse_keyword(REPLICA) {
+                        if parser.parse_keyword(REPLICA) {
                             ObjectType::ClusterReplica
                         } else {
                             ObjectType::Cluster

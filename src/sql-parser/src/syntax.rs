@@ -27,12 +27,12 @@ pub enum SyntaxKind {
 
     // Statement nodes.
     DROP_OBJECTS,
-    QUERY,
     SELECT_STATEMENT,
-    SELECT,
 
     // Inner composite nodes.
     CASCADE_OR_RESTRICT,
+    SELECT,
+    QUERY,
     UNRESOLVED_OBJECT_NAME,
     DATABASE_NAME,
     EXPR,
@@ -50,6 +50,12 @@ pub enum SyntaxKind {
     ORDER_BY,
     WHERE,
     COMMA_SEPARATED,
+    WITH_MUTUALLY_RECURSIVE,
+    WITH,
+    DISTINCT_ON,
+    PROJECTION,
+    OPTIONS,
+    SET_EXPR,
 
     // Resolved nodes.
     RESOLVED_OBJECT_NAME,
