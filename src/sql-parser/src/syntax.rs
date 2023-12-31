@@ -27,6 +27,7 @@ pub enum SyntaxKind {
 
     // Statement nodes.
     DROP_OBJECTS,
+    STATEMENT,
     SELECT_STATEMENT,
 
     // Inner composite nodes.
@@ -56,6 +57,9 @@ pub enum SyntaxKind {
     PROJECTION,
     OPTIONS,
     SET_EXPR,
+    CTE_MUT_COLUMN_DEF,
+    DATA_TYPE,
+    TYP_MOD,
 
     // Resolved nodes.
     RESOLVED_OBJECT_NAME,
@@ -68,6 +72,12 @@ pub enum SyntaxKind {
 
 use mz_sql_lexer::lexer::Token;
 use SyntaxKind::*;
+
+impl SyntaxKind {
+    pub fn is_comment(&self) -> bool {
+        matches!(self, LINECOMMENT | MULTILINECOMMENT)
+    }
+}
 
 impl From<SyntaxKind> for rowan::SyntaxKind {
     fn from(kind: SyntaxKind) -> Self {

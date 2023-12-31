@@ -59,6 +59,14 @@ macro_rules! parser_err {
     };
 }
 
+/// The result of inner statement parse with start and end SQL positions.
+#[derive(Debug, Clone)]
+pub struct InnerStatementParseResult {
+    pub ast: Statement<Raw>,
+    pub start: usize,
+    pub end: usize,
+}
+
 /// The result of successfully parsing a statement:
 /// both the AST and the SQL text that it corresponds to
 #[derive(Debug, Clone)]
@@ -347,13 +355,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Calls next_token and bump. Must not call prev_token after.
-    fn bump_next_token(&mut self) -> Option<Token> {
-        let t = self.next_token();
-        self.bump();
-        t
-    }
-
     fn start_node(&mut self, kind: impl Into<rowan::SyntaxKind>) {
         self.builder.start_node(kind.into());
     }
@@ -454,27 +455,25 @@ impl<'a> Parser<'a> {
     /// stopping before the statement separator, if any. Returns the parsed statement and the SQL
     /// fragment corresponding to it.
     fn parse_statement(&mut self) -> Result<StatementParseResult<'a>, ParserStatementError> {
-        let before = self.peek_pos();
+        self.builder = Default::default();
         self.start_node(Sk::ROOT);
         self.trivia_pos = self.index;
-        let statement = self.parse_statement_inner()?;
-        let after = self.peek_pos();
+        let res = self.parse_statement_inner();
         self.bump();
         self.builder.finish_node();
+        let res = res?;
         let builder = std::mem::take(&mut self.builder);
         let green_node = builder.finish();
-        Ok(StatementParseResult::new(
-            statement,
-            self.sql[before..after].trim(),
-            green_node,
-        ))
+        let sql = self.sql[res.start..res.end].trim();
+        Ok(StatementParseResult::new(res.ast, sql, green_node))
     }
 
     /// Parse a single top-level statement (such as SELECT, INSERT, CREATE, etc.),
     /// stopping before the statement separator, if any.
-    fn parse_statement_inner(&mut self) -> Result<Statement<Raw>, ParserStatementError> {
-        self.bump();
+    fn parse_statement_inner(&mut self) -> Result<InnerStatementParseResult, ParserStatementError> {
         let checkpoint = self.builder.checkpoint();
+        let before = self.peek_pos();
+        self.bump();
         let mut kind = None;
         let res = match self.next_token() {
             Some(t) => match t {
@@ -595,9 +594,15 @@ impl<'a> Parser<'a> {
         };
         if let Some(kind) = kind {
             self.builder.start_node_at(checkpoint, kind.into());
+            self.bump();
             self.builder.finish_node();
         }
-        res
+        let after = self.peek_pos();
+        res.map(|ast| InnerStatementParseResult {
+            ast,
+            start: before,
+            end: after,
+        })
     }
 
     /// Parse a new expression
@@ -1756,6 +1761,7 @@ impl<'a> Parser<'a> {
     fn parse_keyword(&mut self, kw: Keyword) -> bool {
         if self.peek_keyword(kw) {
             self.next_token();
+            self.bump();
             true
         } else {
             false
@@ -1767,6 +1773,7 @@ impl<'a> Parser<'a> {
     fn parse_keywords(&mut self, keywords: &[Keyword]) -> bool {
         if self.peek_keywords(keywords) {
             self.index += keywords.len();
+            self.bump();
             true
         } else {
             false
@@ -1809,6 +1816,7 @@ impl<'a> Parser<'a> {
         match self.peek_token() {
             Some(Token::Keyword(k)) => kws.iter().find(|kw| **kw == k).map(|kw| {
                 self.next_token();
+                self.bump();
                 *kw
             }),
             _ => None,
@@ -1852,6 +1860,7 @@ impl<'a> Parser<'a> {
         match &self.peek_token() {
             Some(t) if *t == *expected => {
                 self.next_token();
+                self.bump();
                 true
             }
             _ => false,
@@ -1861,6 +1870,7 @@ impl<'a> Parser<'a> {
     /// Bail out if the current token is not an expected token, or consume it if it is
     fn expect_token(&mut self, expected: &Token) -> Result<(), ParserError> {
         if self.consume_token(expected) {
+            self.bump();
             Ok(())
         } else {
             self.expected(self.peek_pos(), expected, self.peek_token())
@@ -1872,6 +1882,7 @@ impl<'a> Parser<'a> {
         match self.peek_token() {
             Some(t) if tokens.iter().find(|token| t == **token).is_some() => {
                 let _ = self.next_token();
+                self.bump();
                 Ok(t)
             }
             _ => self.expected(
@@ -1889,6 +1900,7 @@ impl<'a> Parser<'a> {
         expected_token: &Token,
     ) -> Result<(), ParserError> {
         if self.parse_keyword(expected_keyword) || self.consume_token(expected_token) {
+            self.bump();
             Ok(())
         } else {
             self.expected(
@@ -3886,13 +3898,13 @@ impl<'a> Parser<'a> {
     fn parse_drop_objects(&mut self) -> Result<Statement<Raw>, ParserError> {
         let object_type = self.expect_object_type()?;
         let if_exists = self.parse_if_exists()?;
-        self.start_node(Sk::OBJECT_NAMES);
         match object_type {
             ObjectType::Database => {
                 let name = self
-                    .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_database_name)
+                    .as_kind(Sk::OBJECT_NAMES, |parser| {
+                        parser.as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_database_name)
+                    })
                     .map(UnresolvedObjectName::Database)?;
-                self.builder.finish_node();
                 let restrict = matches!(self.parse_cascade_restrict("DROP")?, Some(RESTRICT));
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type: ObjectType::Database,
@@ -3902,12 +3914,13 @@ impl<'a> Parser<'a> {
                 }))
             }
             ObjectType::Schema => {
-                let names = self.parse_comma_separated(|parser| {
-                    parser
-                        .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_schema_name)
-                        .map(UnresolvedObjectName::Schema)
+                let names = self.as_kind(Sk::OBJECT_NAMES, |parser| {
+                    parser.parse_comma_separated(|parser| {
+                        parser
+                            .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_schema_name)
+                            .map(UnresolvedObjectName::Schema)
+                    })
                 })?;
-                self.builder.finish_node();
                 let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type: ObjectType::Schema,
@@ -3917,12 +3930,13 @@ impl<'a> Parser<'a> {
                 }))
             }
             ObjectType::Role => {
-                let names = self.parse_comma_separated(|parser| {
-                    parser
-                        .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_identifier)
-                        .map(UnresolvedObjectName::Role)
+                let names = self.as_kind(Sk::OBJECT_NAMES, |parser| {
+                    parser.parse_comma_separated(|parser| {
+                        parser
+                            .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_identifier)
+                            .map(UnresolvedObjectName::Role)
+                    })
                 })?;
-                self.builder.finish_node();
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type: ObjectType::Role,
                     if_exists,
@@ -3941,12 +3955,13 @@ impl<'a> Parser<'a> {
             | ObjectType::Type
             | ObjectType::Secret
             | ObjectType::Connection => {
-                let names = self.parse_comma_separated(|parser| {
-                    parser
-                        .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_item_name)
-                        .map(UnresolvedObjectName::Item)
+                let names = self.as_kind(Sk::OBJECT_NAMES, |parser| {
+                    parser.parse_comma_separated(|parser| {
+                        parser
+                            .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_item_name)
+                            .map(UnresolvedObjectName::Item)
+                    })
                 })?;
-                self.builder.finish_node();
                 let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
                 Ok(Statement::DropObjects(DropObjectsStatement {
                     object_type,
@@ -3964,12 +3979,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_drop_clusters(&mut self, if_exists: bool) -> Result<Statement<Raw>, ParserError> {
-        let names = self.parse_comma_separated(|parser| {
-            parser
-                .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_identifier)
-                .map(UnresolvedObjectName::Cluster)
+        let names = self.as_kind(Sk::OBJECT_NAMES, |parser| {
+            parser.parse_comma_separated(|parser| {
+                parser
+                    .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_identifier)
+                    .map(UnresolvedObjectName::Cluster)
+            })
         })?;
-        self.builder.finish_node();
         let cascade = matches!(self.parse_cascade_restrict("DROP")?, Some(CASCADE));
         Ok(Statement::DropObjects(DropObjectsStatement {
             object_type: ObjectType::Cluster,
@@ -3983,12 +3999,13 @@ impl<'a> Parser<'a> {
         &mut self,
         if_exists: bool,
     ) -> Result<Statement<Raw>, ParserError> {
-        let names = self.parse_comma_separated(|parser| {
-            parser
-                .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_cluster_replica_name)
-                .map(UnresolvedObjectName::ClusterReplica)
+        let names = self.as_kind(Sk::OBJECT_NAMES, |parser| {
+            parser.parse_comma_separated(|parser| {
+                parser
+                    .as_kind(Sk::UNRESOLVED_OBJECT_NAME, Self::parse_cluster_replica_name)
+                    .map(UnresolvedObjectName::ClusterReplica)
+            })
         })?;
-        self.builder.finish_node();
         Ok(Statement::DropObjects(DropObjectsStatement {
             object_type: ObjectType::ClusterReplica,
             if_exists,
@@ -5212,7 +5229,7 @@ impl<'a> Parser<'a> {
     /// Parse a copy statement
     fn parse_copy(&mut self) -> Result<Statement<Raw>, ParserStatementError> {
         let relation = if self.consume_token(&Token::LParen) {
-            let query = self.parse_statement()?.ast;
+            let query = self.parse_statement_inner()?.ast;
             self.expect_token(&Token::RParen)
                 .map_parser_err(StatementKind::Copy)?;
             match query {
@@ -5443,155 +5460,159 @@ impl<'a> Parser<'a> {
             typ_mod: vec![],
         };
 
-        let mut data_type = match self.next_token() {
-            Some(Token::Keyword(kw)) => match kw {
-                // Text-like types
-                CHAR | CHARACTER => {
-                    let name = if self.parse_keyword(VARYING) {
-                        ident!("varchar")
-                    } else {
-                        ident!("bpchar")
-                    };
-                    RawDataType::Other {
-                        name: RawItemName::Name(UnresolvedItemName::unqualified(name)),
-                        typ_mod: self.parse_typ_mod()?,
-                    }
-                }
-                BPCHAR => RawDataType::Other {
-                    name: RawItemName::Name(UnresolvedItemName::unqualified(ident!("bpchar"))),
-                    typ_mod: self.parse_typ_mod()?,
-                },
-                VARCHAR => RawDataType::Other {
-                    name: RawItemName::Name(UnresolvedItemName::unqualified(ident!("varchar"))),
-                    typ_mod: self.parse_typ_mod()?,
-                },
-                STRING => other(ident!("text")),
-
-                // Number-like types
-                BIGINT => other(ident!("int8")),
-                SMALLINT => other(ident!("int2")),
-                DEC | DECIMAL => RawDataType::Other {
-                    name: RawItemName::Name(UnresolvedItemName::unqualified(ident!("numeric"))),
-                    typ_mod: self.parse_typ_mod()?,
-                },
-                DOUBLE => {
-                    let _ = self.parse_keyword(PRECISION);
-                    other(ident!("float8"))
-                }
-                FLOAT => match self.parse_optional_precision()?.unwrap_or(53) {
-                    v if v == 0 || v > 53 => {
-                        return Err(self.error(
-                            self.peek_prev_pos(),
-                            "precision for type float must be within ([1-53])".into(),
-                        ))
-                    }
-                    v if v < 25 => other(ident!("float4")),
-                    _ => other(ident!("float8")),
-                },
-                INT | INTEGER => other(ident!("int4")),
-                REAL => other(ident!("float4")),
-
-                // Time-like types
-                TIME => {
-                    if self.parse_keyword(WITH) {
-                        self.expect_keywords(&[TIME, ZONE])?;
-                        other(ident!("timetz"))
-                    } else {
-                        if self.parse_keyword(WITHOUT) {
-                            self.expect_keywords(&[TIME, ZONE])?;
+        self.as_kind(Sk::DATA_TYPE, |parser| {
+            let mut data_type = match parser.next_token() {
+                Some(Token::Keyword(kw)) => match kw {
+                    // Text-like types
+                    CHAR | CHARACTER => {
+                        let name = if parser.parse_keyword(VARYING) {
+                            ident!("varchar")
+                        } else {
+                            ident!("bpchar")
+                        };
+                        RawDataType::Other {
+                            name: RawItemName::Name(UnresolvedItemName::unqualified(name)),
+                            typ_mod: parser.parse_typ_mod()?,
                         }
-                        other(ident!("time"))
                     }
-                }
-                TIMESTAMP => {
-                    let typ_mod = self.parse_timestamp_precision()?;
-                    if self.parse_keyword(WITH) {
-                        self.expect_keywords(&[TIME, ZONE])?;
+                    BPCHAR => RawDataType::Other {
+                        name: RawItemName::Name(UnresolvedItemName::unqualified(ident!("bpchar"))),
+                        typ_mod: parser.parse_typ_mod()?,
+                    },
+                    VARCHAR => RawDataType::Other {
+                        name: RawItemName::Name(UnresolvedItemName::unqualified(ident!("varchar"))),
+                        typ_mod: parser.parse_typ_mod()?,
+                    },
+                    STRING => other(ident!("text")),
+
+                    // Number-like types
+                    BIGINT => other(ident!("int8")),
+                    SMALLINT => other(ident!("int2")),
+                    DEC | DECIMAL => RawDataType::Other {
+                        name: RawItemName::Name(UnresolvedItemName::unqualified(ident!("numeric"))),
+                        typ_mod: parser.parse_typ_mod()?,
+                    },
+                    DOUBLE => {
+                        let _ = parser.parse_keyword(PRECISION);
+                        other(ident!("float8"))
+                    }
+                    FLOAT => match parser.parse_optional_precision()?.unwrap_or(53) {
+                        v if v == 0 || v > 53 => {
+                            return Err(parser.error(
+                                parser.peek_prev_pos(),
+                                "precision for type float must be within ([1-53])".into(),
+                            ))
+                        }
+                        v if v < 25 => other(ident!("float4")),
+                        _ => other(ident!("float8")),
+                    },
+                    INT | INTEGER => other(ident!("int4")),
+                    REAL => other(ident!("float4")),
+
+                    // Time-like types
+                    TIME => {
+                        if parser.parse_keyword(WITH) {
+                            parser.expect_keywords(&[TIME, ZONE])?;
+                            other(ident!("timetz"))
+                        } else {
+                            if parser.parse_keyword(WITHOUT) {
+                                parser.expect_keywords(&[TIME, ZONE])?;
+                            }
+                            other(ident!("time"))
+                        }
+                    }
+                    TIMESTAMP => {
+                        let typ_mod = parser.parse_timestamp_precision()?;
+                        if parser.parse_keyword(WITH) {
+                            parser.expect_keywords(&[TIME, ZONE])?;
+                            RawDataType::Other {
+                                name: RawItemName::Name(UnresolvedItemName::unqualified(ident!(
+                                    "timestamptz"
+                                ))),
+                                typ_mod,
+                            }
+                        } else {
+                            if parser.parse_keyword(WITHOUT) {
+                                parser.expect_keywords(&[TIME, ZONE])?;
+                            }
+                            RawDataType::Other {
+                                name: RawItemName::Name(UnresolvedItemName::unqualified(ident!(
+                                    "timestamp"
+                                ))),
+                                typ_mod,
+                            }
+                        }
+                    }
+                    TIMESTAMPTZ => {
+                        let typ_mod = parser.parse_timestamp_precision()?;
                         RawDataType::Other {
                             name: RawItemName::Name(UnresolvedItemName::unqualified(ident!(
                                 "timestamptz"
                             ))),
                             typ_mod,
                         }
-                    } else {
-                        if self.parse_keyword(WITHOUT) {
-                            self.expect_keywords(&[TIME, ZONE])?;
-                        }
+                    }
+
+                    // MZ "proprietary" types
+                    MAP => {
+                        return parser.parse_map();
+                    }
+
+                    // Misc.
+                    BOOLEAN => other(ident!("bool")),
+                    BYTES => other(ident!("bytea")),
+                    JSON => other(ident!("jsonb")),
+                    _ => {
+                        parser.prev_token();
                         RawDataType::Other {
-                            name: RawItemName::Name(UnresolvedItemName::unqualified(ident!(
-                                "timestamp"
-                            ))),
-                            typ_mod,
+                            name: RawItemName::Name(parser.parse_item_name()?),
+                            typ_mod: parser.parse_typ_mod()?,
                         }
                     }
-                }
-                TIMESTAMPTZ => {
-                    let typ_mod = self.parse_timestamp_precision()?;
+                },
+                Some(Token::Ident(_) | Token::LBracket) => {
+                    parser.prev_token();
                     RawDataType::Other {
-                        name: RawItemName::Name(UnresolvedItemName::unqualified(ident!(
-                            "timestamptz"
-                        ))),
-                        typ_mod,
+                        name: parser.parse_raw_name()?,
+                        typ_mod: parser.parse_typ_mod()?,
                     }
                 }
+                other => parser.expected(parser.peek_prev_pos(), "a data type name", other)?,
+            };
 
-                // MZ "proprietary" types
-                MAP => {
-                    return self.parse_map();
-                }
-
-                // Misc.
-                BOOLEAN => other(ident!("bool")),
-                BYTES => other(ident!("bytea")),
-                JSON => other(ident!("jsonb")),
-                _ => {
-                    self.prev_token();
-                    RawDataType::Other {
-                        name: RawItemName::Name(self.parse_item_name()?),
-                        typ_mod: self.parse_typ_mod()?,
+            loop {
+                match parser.peek_token() {
+                    Some(Token::Keyword(LIST)) => {
+                        parser.next_token();
+                        data_type = RawDataType::List(Box::new(data_type));
                     }
-                }
-            },
-            Some(Token::Ident(_) | Token::LBracket) => {
-                self.prev_token();
-                RawDataType::Other {
-                    name: self.parse_raw_name()?,
-                    typ_mod: self.parse_typ_mod()?,
+                    Some(Token::LBracket) => {
+                        // Handle array suffixes. Note that `int[]`, `int[][][]`,
+                        // and `int[2][2]` all parse to the same "int array" type.
+                        parser.next_token();
+                        let _ = parser.maybe_parse(|parser| parser.parse_number_value());
+                        parser.expect_token(&Token::RBracket)?;
+                        if !matches!(data_type, RawDataType::Array(_)) {
+                            data_type = RawDataType::Array(Box::new(data_type));
+                        }
+                    }
+                    _ => break,
                 }
             }
-            other => self.expected(self.peek_prev_pos(), "a data type name", other)?,
-        };
-
-        loop {
-            match self.peek_token() {
-                Some(Token::Keyword(LIST)) => {
-                    self.next_token();
-                    data_type = RawDataType::List(Box::new(data_type));
-                }
-                Some(Token::LBracket) => {
-                    // Handle array suffixes. Note that `int[]`, `int[][][]`,
-                    // and `int[2][2]` all parse to the same "int array" type.
-                    self.next_token();
-                    let _ = self.maybe_parse(|parser| parser.parse_number_value());
-                    self.expect_token(&Token::RBracket)?;
-                    if !matches!(data_type, RawDataType::Array(_)) {
-                        data_type = RawDataType::Array(Box::new(data_type));
-                    }
-                }
-                _ => break,
-            }
-        }
-        Ok(data_type)
+            Ok(data_type)
+        })
     }
 
     fn parse_typ_mod(&mut self) -> Result<Vec<i64>, ParserError> {
-        if self.consume_token(&Token::LParen) {
-            let typ_mod = self.parse_comma_separated(Parser::parse_literal_int)?;
-            self.expect_token(&Token::RParen)?;
-            Ok(typ_mod)
-        } else {
-            Ok(vec![])
-        }
+        self.as_kind(Sk::TYP_MOD, |parser| {
+            if parser.consume_token(&Token::LParen) {
+                let typ_mod = parser.parse_comma_separated(Parser::parse_literal_int)?;
+                parser.expect_token(&Token::RParen)?;
+                Ok(typ_mod)
+            } else {
+                Ok(vec![])
+            }
+        })
     }
 
     // parses the precision in timestamp(<precision>) and timestamptz(<precision>)
@@ -5931,21 +5952,20 @@ impl<'a> Parser<'a> {
                 let cte_block = if parser.parse_keyword(WITH) {
                     if parser.parse_keyword(MUTUALLY) {
                         parser.expect_keyword(RECURSIVE)?;
-                        parser.start_node_at(checkpoint, Sk::WITH_MUTUALLY_RECURSIVE);
-                        let options = if parser.consume_token(&Token::LParen) {
-                            let options =
-                                parser.parse_comma_separated(Self::parse_mut_rec_block_option)?;
-                            parser.expect_token(&Token::RParen)?;
-                            options
-                        } else {
-                            vec![]
-                        };
-                        let res = CteBlock::MutuallyRecursive(MutRecBlock {
-                            options,
-                            ctes: parser.parse_comma_separated(Parser::parse_cte_mut_rec)?,
-                        });
-                        parser.builder.finish_node();
-                        res
+                        parser.as_kind_at(checkpoint, Sk::WITH_MUTUALLY_RECURSIVE, |parser| {
+                            let options = if parser.consume_token(&Token::LParen) {
+                                let options = parser
+                                    .parse_comma_separated(Self::parse_mut_rec_block_option)?;
+                                parser.expect_token(&Token::RParen)?;
+                                options
+                            } else {
+                                vec![]
+                            };
+                            Ok(CteBlock::MutuallyRecursive(MutRecBlock {
+                                options,
+                                ctes: parser.parse_comma_separated(Parser::parse_cte_mut_rec)?,
+                            }))
+                        })?
                     } else {
                         // TODO: optional RECURSIVE
                         parser
@@ -6129,9 +6149,11 @@ impl<'a> Parser<'a> {
         let name = self.parse_identifier()?;
         self.expect_token(&Token::LParen)?;
         let columns = self.parse_comma_separated(|parser| {
-            Ok(CteMutRecColumnDef {
-                name: parser.parse_identifier()?,
-                data_type: parser.parse_data_type()?,
+            parser.as_kind(Sk::CTE_MUT_COLUMN_DEF, |parser| {
+                Ok(CteMutRecColumnDef {
+                    name: parser.parse_identifier()?,
+                    data_type: parser.parse_data_type()?,
+                })
             })
         })?;
         self.expect_token(&Token::RParen)?;
@@ -7466,15 +7488,11 @@ impl<'a> Parser<'a> {
         let _ = self.parse_keywords(&[WITHOUT, HOLD]);
         self.expect_keyword(FOR)
             .map_parser_err(StatementKind::Declare)?;
-        let StatementParseResult {
-            ast,
-            sql,
-            green_node: _,
-        } = self.parse_statement()?;
+        let InnerStatementParseResult { ast, start, end } = self.parse_statement_inner()?;
         Ok(Statement::Declare(DeclareStatement {
             name,
             stmt: Box::new(ast),
-            sql: sql.to_string(),
+            sql: self.sql[start..end].trim().to_string(),
         }))
     }
 
@@ -7495,12 +7513,7 @@ impl<'a> Parser<'a> {
             .map_parser_err(StatementKind::Prepare)?;
         let pos = self.peek_pos();
         //
-        let StatementParseResult {
-            ast,
-            sql,
-            // TODO: Use this. Currently hard due to walkabout.
-            green_node: _,
-        } = self.parse_statement()?;
+        let InnerStatementParseResult { ast, start, end } = self.parse_statement_inner()?;
         if !matches!(
             ast,
             Statement::Select(_)
@@ -7513,7 +7526,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::Prepare(PrepareStatement {
             name,
             stmt: Box::new(ast),
-            sql: sql.to_string(),
+            sql: self.sql[start..end].trim().to_string(),
         }))
     }
 

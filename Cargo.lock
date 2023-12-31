@@ -5466,6 +5466,7 @@ dependencies = [
  "mz-ore",
  "mz-sql-parser",
  "pretty",
+ "rowan",
  "thiserror",
  "workspace-hack",
 ]
