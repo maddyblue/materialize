@@ -623,14 +623,14 @@ impl Coordinator {
         let catalog = self.catalog();
         let catalog = catalog.for_session(ctx.session());
         let original_stmt = Arc::clone(&stmt);
+        let _syntax_node_resolved =
+            mz_sql::names::resolve_syntax(&catalog, SyntaxNode::new_root(green_node.clone()));
         // `resolved_ids` should be derivable from `stmt`. If `stmt` is transformed to remove/add
         // IDs, then `resolved_ids` should be updated to also remove/add those IDs.
         let (stmt, resolved_ids) = match mz_sql::names::resolve(&catalog, (*stmt).clone()) {
             Ok(resolved) => resolved,
             Err(e) => return ctx.retire(Err(e.into())),
         };
-        let _syntax_node_resolved =
-            mz_sql::names::resolve_syntax(&catalog, SyntaxNode::new_root(green_node.clone()));
         //   .expect("must succeed because above succeeded");
         // N.B. The catalog can change during purification so we must validate that the dependencies still exist after
         // purification.  This should be done back on the main thread.

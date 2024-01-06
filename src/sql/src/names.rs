@@ -2023,14 +2023,11 @@ pub fn resolve_syntax(
                 let Some(obj_variant) = ancestors.next() else {
                     continue;
                 };
-                let Some(unresolved) = ancestors.next() else {
+                let Some(kind) = ancestors.next() else {
                     continue;
                 };
-                if unresolved.kind() != Sk::UNRESOLVED_OBJECT_NAME {
-                    continue;
-                }
-                let resolved = match obj_variant.kind() {
-                    Sk::ITEM_NAME => {
+                let resolved = match (kind.kind(), obj_variant.kind()) {
+                    (Sk::UNRESOLVED_OBJECT_NAME | Sk::RAW_NAME, Sk::ITEM_NAME) => {
                         let mut idents = Vec::new();
                         for tok in obj_variant.children_with_tokens() {
                             let NodeOrToken::Token(tok) = tok else {
@@ -2047,6 +2044,9 @@ pub fn resolve_syntax(
                             raw_name,
                             // TODO: Figure out how to do this correctly, these configs vary based
                             // on the fold fn.
+                            //
+                            // TODO: Make sure this is correct for all of the match cases (things
+                            // OR'd with "|").
                             ItemResolutionConfig {
                                 functions: false,
                                 types: false,
@@ -2058,7 +2058,23 @@ pub fn resolve_syntax(
                 };
                 resolved_node
                     .resolutions
-                    .insert(unresolved.text_range().start(), resolved);
+                    .insert(kind.text_range().start(), resolved);
+                if let Err(e) = resolver.status {
+                    // Move forward to the first non-trivia token.
+                    let mut pos: usize = kind.text_range().start().into();
+                    for node in kind.descendants_with_tokens() {
+                        if let NodeOrToken::Token(t) = node {
+                            if !t.kind().is_trivia() {
+                                pos = t.text_range().start().into();
+                                break;
+                            }
+                        }
+                    }
+                    return Err(PlanError::WithPosition {
+                        err: Box::new(e),
+                        pos: pos + 1,
+                    });
+                }
             }
             _ => {}
         }

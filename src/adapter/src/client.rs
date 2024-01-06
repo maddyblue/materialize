@@ -476,7 +476,13 @@ impl SessionClient {
             tokio::time::sleep(Duration::from_secs(1)).await;
         };
 
-        let desc = Coordinator::describe(&catalog, self.session(), stmt.clone(), param_types)?;
+        let desc = Coordinator::describe(
+            &catalog,
+            self.session(),
+            stmt.clone(),
+            green_node.clone(),
+            param_types,
+        )?;
         let now = self.now();
         self.session().set_prepared_statement(
             name,
@@ -501,8 +507,13 @@ impl SessionClient {
     ) -> Result<(), AdapterError> {
         let catalog = self.catalog_snapshot().await;
         let param_types = vec![];
-        let desc =
-            Coordinator::describe(&catalog, self.session(), Some(stmt.clone()), param_types)?;
+        let desc = Coordinator::describe(
+            &catalog,
+            self.session(),
+            Some(stmt.clone()),
+            green_node.clone(),
+            param_types,
+        )?;
         let params = vec![];
         let result_formats = vec![mz_pgwire_common::Format::Text; desc.arity()];
         let now = self.now();

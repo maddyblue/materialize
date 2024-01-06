@@ -5689,26 +5689,28 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_raw_name(&mut self) -> Result<RawItemName, ParserError> {
-        if self.consume_token(&Token::LBracket) {
-            let id = match self.next_token() {
-                Some(Token::Ident(id)) => id.into_inner(),
-                _ => return parser_err!(self, self.peek_prev_pos(), "expected id"),
-            };
-            self.expect_keyword(AS)?;
-            let name = self.parse_item_name()?;
-            // TODO(justin): is there a more idiomatic way to detect a fully-qualified name?
-            if name.0.len() < 2 {
-                return parser_err!(
-                    self,
-                    self.peek_prev_pos(),
-                    "table name in square brackets must be fully qualified"
-                );
+        self.as_kind(Sk::RAW_NAME, |parser| {
+            if parser.consume_token(&Token::LBracket) {
+                let id = match parser.next_token() {
+                    Some(Token::Ident(id)) => id.into_inner(),
+                    _ => return parser_err!(parser, parser.peek_prev_pos(), "expected id"),
+                };
+                parser.expect_keyword(AS)?;
+                let name = parser.parse_item_name()?;
+                // TODO(justin): is there a more idiomatic way to detect a fully-qualified name?
+                if name.0.len() < 2 {
+                    return parser_err!(
+                        parser,
+                        parser.peek_prev_pos(),
+                        "table name in square brackets must be fully qualified"
+                    );
+                }
+                parser.expect_token(&Token::RBracket)?;
+                Ok(RawItemName::Id(id, name))
+            } else {
+                Ok(RawItemName::Name(parser.parse_item_name()?))
             }
-            self.expect_token(&Token::RBracket)?;
-            Ok(RawItemName::Id(id, name))
-        } else {
-            Ok(RawItemName::Name(self.parse_item_name()?))
-        }
+        })
     }
 
     fn parse_column_name(&mut self) -> Result<RawColumnName, ParserError> {
@@ -6807,108 +6809,114 @@ impl<'a> Parser<'a> {
 
     /// A table name or a parenthesized subquery, followed by optional `[AS] alias`
     fn parse_table_factor(&mut self) -> Result<TableFactor<Raw>, ParserError> {
-        if self.parse_keyword(LATERAL) {
-            // LATERAL must always be followed by a subquery or table function.
-            if self.consume_token(&Token::LParen) {
-                return self.parse_derived_table_factor(Lateral);
-            } else if self.parse_keywords(&[ROWS, FROM]) {
-                return self.parse_rows_from();
-            } else {
-                let name = self.parse_raw_name()?;
-                self.expect_token(&Token::LParen)?;
-                let args = self.parse_optional_args(false)?;
-                let alias = self.parse_optional_table_alias()?;
-                let with_ordinality = self.parse_keywords(&[WITH, ORDINALITY]);
-                return Ok(TableFactor::Function {
-                    function: Function {
-                        name,
-                        args,
-                        filter: None,
-                        over: None,
-                        distinct: false,
-                    },
-                    alias,
-                    with_ordinality,
-                });
-            }
-        }
-
-        if self.consume_token(&Token::LParen) {
-            // A left paren introduces either a derived table (i.e., a subquery)
-            // or a nested join. It's nearly impossible to determine ahead of
-            // time which it is... so we just try to parse both.
-            //
-            // Here's an example that demonstrates the complexity:
-            //                     /-------------------------------------------------------\
-            //                     | /-----------------------------------\                 |
-            //     SELECT * FROM ( ( ( (SELECT 1) UNION (SELECT 2) ) AS t1 NATURAL JOIN t2 ) )
-            //                   ^ ^ ^ ^
-            //                   | | | |
-            //                   | | | |
-            //                   | | | (4) belongs to a SetExpr::Query inside the subquery
-            //                   | | (3) starts a derived table (subquery)
-            //                   | (2) starts a nested join
-            //                   (1) an additional set of parens around a nested join
-            //
-
-            // Check if the recently consumed '(' started a derived table, in
-            // which case we've parsed the subquery, followed by the closing
-            // ')', and the alias of the derived table. In the example above
-            // this is case (3), and the next token would be `NATURAL`.
-            maybe!(self.maybe_parse(|parser| parser.parse_derived_table_factor(NotLateral)));
-
-            // The '(' we've recently consumed does not start a derived table.
-            // For valid input this can happen either when the token following
-            // the paren can't start a query (e.g. `foo` in `FROM (foo NATURAL
-            // JOIN bar)`, or when the '(' we've consumed is followed by another
-            // '(' that starts a derived table, like (3), or another nested join
-            // (2).
-            //
-            // Ignore the error and back up to where we were before. Either
-            // we'll be able to parse a valid nested join, or we won't, and
-            // we'll return that error instead.
-            let table_and_joins = self.parse_table_and_joins()?;
-            match table_and_joins.relation {
-                TableFactor::NestedJoin { .. } => (),
-                _ => {
-                    if table_and_joins.joins.is_empty() {
-                        // The SQL spec prohibits derived tables and bare
-                        // tables from appearing alone in parentheses.
-                        self.expected(self.peek_pos(), "joined table", self.peek_token())?
-                    }
+        self.as_kind(Sk::TABLE_FACTOR, |parser| {
+            if parser.parse_keyword(LATERAL) {
+                // LATERAL must always be followed by a subquery or table function.
+                if parser.consume_token(&Token::LParen) {
+                    return parser.parse_derived_table_factor(Lateral);
+                } else if parser.parse_keywords(&[ROWS, FROM]) {
+                    return parser.parse_rows_from();
+                } else {
+                    let name = parser.parse_raw_name()?;
+                    parser.expect_token(&Token::LParen)?;
+                    let args = parser.parse_optional_args(false)?;
+                    let alias = parser.parse_optional_table_alias()?;
+                    let with_ordinality = parser.parse_keywords(&[WITH, ORDINALITY]);
+                    return Ok(TableFactor::Function {
+                        function: Function {
+                            name,
+                            args,
+                            filter: None,
+                            over: None,
+                            distinct: false,
+                        },
+                        alias,
+                        with_ordinality,
+                    });
                 }
             }
-            self.expect_token(&Token::RParen)?;
-            Ok(TableFactor::NestedJoin {
-                join: Box::new(table_and_joins),
-                alias: self.parse_optional_table_alias()?,
-            })
-        } else if self.parse_keywords(&[ROWS, FROM]) {
-            Ok(self.parse_rows_from()?)
-        } else {
-            let name = self.parse_raw_name()?;
-            if self.consume_token(&Token::LParen) {
-                let args = self.parse_optional_args(false)?;
-                let alias = self.parse_optional_table_alias()?;
-                let with_ordinality = self.parse_keywords(&[WITH, ORDINALITY]);
-                Ok(TableFactor::Function {
-                    function: Function {
-                        name,
-                        args,
-                        filter: None,
-                        over: None,
-                        distinct: false,
-                    },
-                    alias,
-                    with_ordinality,
+
+            if parser.consume_token(&Token::LParen) {
+                // A left paren introduces either a derived table (i.e., a subquery)
+                // or a nested join. It's nearly impossible to determine ahead of
+                // time which it is... so we just try to parse both.
+                //
+                // Here's an example that demonstrates the complexity:
+                //                     /-------------------------------------------------------\
+                //                     | /-----------------------------------\                 |
+                //     SELECT * FROM ( ( ( (SELECT 1) UNION (SELECT 2) ) AS t1 NATURAL JOIN t2 ) )
+                //                   ^ ^ ^ ^
+                //                   | | | |
+                //                   | | | |
+                //                   | | | (4) belongs to a SetExpr::Query inside the subquery
+                //                   | | (3) starts a derived table (subquery)
+                //                   | (2) starts a nested join
+                //                   (1) an additional set of parens around a nested join
+                //
+
+                // Check if the recently consumed '(' started a derived table, in
+                // which case we've parsed the subquery, followed by the closing
+                // ')', and the alias of the derived table. In the example above
+                // this is case (3), and the next token would be `NATURAL`.
+                maybe!(parser.maybe_parse(|parser| parser.parse_derived_table_factor(NotLateral)));
+
+                // The '(' we've recently consumed does not start a derived table.
+                // For valid input this can happen either when the token following
+                // the paren can't start a query (e.g. `foo` in `FROM (foo NATURAL
+                // JOIN bar)`, or when the '(' we've consumed is followed by another
+                // '(' that starts a derived table, like (3), or another nested join
+                // (2).
+                //
+                // Ignore the error and back up to where we were before. Either
+                // we'll be able to parse a valid nested join, or we won't, and
+                // we'll return that error instead.
+                let table_and_joins = parser.parse_table_and_joins()?;
+                match table_and_joins.relation {
+                    TableFactor::NestedJoin { .. } => (),
+                    _ => {
+                        if table_and_joins.joins.is_empty() {
+                            // The SQL spec prohibits derived tables and bare
+                            // tables from appearing alone in parentheses.
+                            parser.expected(
+                                parser.peek_pos(),
+                                "joined table",
+                                parser.peek_token(),
+                            )?
+                        }
+                    }
+                }
+                parser.expect_token(&Token::RParen)?;
+                Ok(TableFactor::NestedJoin {
+                    join: Box::new(table_and_joins),
+                    alias: parser.parse_optional_table_alias()?,
                 })
+            } else if parser.parse_keywords(&[ROWS, FROM]) {
+                Ok(parser.parse_rows_from()?)
             } else {
-                Ok(TableFactor::Table {
-                    name,
-                    alias: self.parse_optional_table_alias()?,
-                })
+                let name = parser.parse_raw_name()?;
+                if parser.consume_token(&Token::LParen) {
+                    let args = parser.parse_optional_args(false)?;
+                    let alias = parser.parse_optional_table_alias()?;
+                    let with_ordinality = parser.parse_keywords(&[WITH, ORDINALITY]);
+                    Ok(TableFactor::Function {
+                        function: Function {
+                            name,
+                            args,
+                            filter: None,
+                            over: None,
+                            distinct: false,
+                        },
+                        alias,
+                        with_ordinality,
+                    })
+                } else {
+                    Ok(TableFactor::Table {
+                        name,
+                        alias: parser.parse_optional_table_alias()?,
+                    })
+                }
             }
-        }
+        })
     }
 
     fn parse_rows_from(&mut self) -> Result<TableFactor<Raw>, ParserError> {

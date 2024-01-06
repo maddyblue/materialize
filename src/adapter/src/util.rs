@@ -23,8 +23,10 @@ use mz_sql_parser::ast::display::AstDisplay;
 use mz_sql_parser::ast::{
     CreateIndexStatement, FetchStatement, Ident, Raw, RawClusterName, RawItemName, Statement,
 };
+use mz_sql_parser::syntax::SyntaxNode;
 use mz_storage_types::controller::StorageError;
 use mz_transform::TransformError;
+use rowan::GreenNode;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
@@ -223,6 +225,7 @@ pub fn index_sql(
 pub fn describe(
     catalog: &Catalog,
     stmt: Statement<Raw>,
+    green_node: GreenNode,
     param_types: &[Option<ScalarType>],
     session: &Session,
 ) -> Result<StatementDesc, AdapterError> {
@@ -247,6 +250,9 @@ pub fn describe(
         }
         _ => {
             let catalog = &catalog.for_session(session);
+            let _syntax_node_resolved =
+                mz_sql::names::resolve_syntax(catalog, SyntaxNode::new_root(green_node.clone()));
+            _syntax_node_resolved?;
             let (stmt, _) = mz_sql::names::resolve(catalog, stmt)?;
             Ok(mz_sql::plan::describe(
                 session.pcx(),

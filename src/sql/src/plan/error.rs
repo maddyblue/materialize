@@ -45,6 +45,10 @@ use crate::session::vars::VarError;
 
 #[derive(Clone, Debug)]
 pub enum PlanError {
+    WithPosition {
+        err: Box<PlanError>,
+        pos: usize,
+    },
     /// This feature is not yet supported, but may be supported at some point in the future.
     Unsupported {
         feature: String,
@@ -240,8 +244,16 @@ impl PlanError {
         }
     }
 
+    pub fn pos(&self) -> Option<usize> {
+        match self {
+            Self::WithPosition { pos, .. } => Some(*pos),
+            _ => None,
+        }
+    }
+
     pub fn detail(&self) -> Option<String> {
         match self {
+            Self::WithPosition { err, .. } => err.detail(),
             Self::NeverSupported { details, .. } => details.clone(),
             Self::FetchingCsrSchemaFailed { cause, .. } => Some(cause.to_string_with_causes()),
             Self::PostgresConnectionErr { cause } => Some(cause.to_string_with_causes()),
@@ -286,6 +298,7 @@ impl PlanError {
 
     pub fn hint(&self) -> Option<String> {
         match self {
+            Self::WithPosition { err, .. } => err.hint(),
             Self::DropViewOnMaterializedView(_) => {
                 Some("Use DROP MATERIALIZED VIEW to remove a materialized view.".into())
             }
@@ -379,6 +392,7 @@ impl PlanError {
 impl fmt::Display for PlanError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::WithPosition{ err, .. }=> err.fmt(f),
             Self::Unsupported { feature, issue_no } => {
                 write!(f, "{} not yet supported", feature)?;
                 if let Some(issue_no) = issue_no {

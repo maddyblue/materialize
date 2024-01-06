@@ -32,8 +32,10 @@ pub enum SyntaxKind {
 
     // Inner composite nodes.
     CASCADE_OR_RESTRICT,
+    TABLE_FACTOR,
     SELECT,
     QUERY,
+    RAW_NAME,
     UNRESOLVED_OBJECT_NAME,
     DATABASE_NAME,
     EXPR,
@@ -74,8 +76,14 @@ use mz_sql_lexer::lexer::Token;
 use SyntaxKind::*;
 
 impl SyntaxKind {
+    /// Whether this is a comment (single or multi line).
     pub fn is_comment(&self) -> bool {
         matches!(self, LINECOMMENT | MULTILINECOMMENT)
+    }
+
+    /// Whether this is whitespace or a comment.
+    pub fn is_trivia(&self) -> bool {
+        matches!(self, WHITESPACE) || self.is_comment()
     }
 }
 

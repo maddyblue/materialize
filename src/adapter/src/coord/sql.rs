@@ -83,7 +83,13 @@ impl Coordinator {
             .iter()
             .map(|ty| Some(ty.clone()))
             .collect::<Vec<_>>();
-        let desc = describe(catalog, stmt.clone(), &param_types, session)?;
+        let desc = describe(
+            catalog,
+            stmt.clone(),
+            green_node.clone(),
+            &param_types,
+            session,
+        )?;
         let params = params.datums.into_iter().zip(params.types).collect();
         let result_formats = vec![mz_pgwire_common::Format::Text; desc.arity()];
         let redacted_sql = stmt.to_ast_string_redacted();
@@ -107,10 +113,11 @@ impl Coordinator {
         catalog: &Catalog,
         session: &Session,
         stmt: Option<Statement<Raw>>,
+        green_node: GreenNode,
         param_types: Vec<Option<ScalarType>>,
     ) -> Result<StatementDesc, AdapterError> {
         if let Some(stmt) = stmt {
-            describe(catalog, stmt, &param_types, session)
+            describe(catalog, stmt, green_node, &param_types, session)
         } else {
             Ok(StatementDesc::new(None))
         }
@@ -132,6 +139,7 @@ impl Coordinator {
             catalog,
             session,
             ps.stmt(),
+            ps.green_node(),
             ps.desc(),
             ps.catalog_revision,
         )? {
@@ -158,6 +166,7 @@ impl Coordinator {
             self.catalog(),
             session,
             portal.stmt.as_deref(),
+            &portal.green_node,
             &portal.desc,
             portal.catalog_revision,
         )? {
@@ -177,6 +186,7 @@ impl Coordinator {
         catalog: &Catalog,
         session: &Session,
         stmt: Option<&Statement<Raw>>,
+        green_node: &GreenNode,
         desc: &StatementDesc,
         catalog_revision: u64,
     ) -> Result<Option<u64>, AdapterError> {
@@ -186,6 +196,7 @@ impl Coordinator {
                 catalog,
                 session,
                 stmt.cloned(),
+                green_node.clone(),
                 desc.param_types.iter().map(|ty| Some(ty.clone())).collect(),
             )?;
             if &current_desc != desc {

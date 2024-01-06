@@ -232,6 +232,7 @@ impl AdapterError {
     pub fn position(&self) -> Option<usize> {
         match self {
             AdapterError::ParseError(err) => Some(err.error.pos),
+            AdapterError::PlanError(err) => err.pos(),
             _ => None,
         }
     }
