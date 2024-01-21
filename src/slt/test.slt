@@ -1,0 +1,21 @@
+# Copyright Materialize, Inc. and contributors. All rights reserved.
+#
+# Use of this software is governed by the Business Source License
+# included in the LICENSE file at the root of this repository.
+
+#mode cockroach
+
+reset-server
+
+statement error blah onetuh
+CREATE VIEW objects AS
+  SELECT
+
+query ITT rowsort,blah
+SELECT position
+----
+1  id
+2  element_id
+
+statement ok
+select 1

@@ -74,6 +74,7 @@ members = [
     "src/segment",
     "src/server-core",
     "src/service",
+    "src/slt",
     "src/ssh-util",
     "src/sql",
     "src/sql-lexer",
@@ -106,7 +107,7 @@ members = [
 exclude = [
     # All WASM crates are split into their own workspace to avoid needles cache
     #  invalidations for the core Mz crates.
-    "misc/wasm/*"
+    "misc/wasm/*",
 ]
 
 # Use Cargo's new feature resolver, which can handle target-specific features.
