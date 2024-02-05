@@ -35,6 +35,21 @@ determine
 ----
 10
 
+determine
+{
+  "id_bundle": {
+    "compute_ids": {
+      "s1": [
+        "s10"
+      ]
+    }
+  },
+  "when": "AtTimestamp:-3ms",
+  "instance": "s1"
+}
+----
+10
+
 set-isolation
 serializable
 ----

@@ -1488,6 +1488,15 @@ impl QueryWhen {
             QueryWhen::AtLeastTimestamp(_) | QueryWhen::AtTimestamp(_) => false,
         }
     }
+    /// Whether the timestamp is relative to the oracle read ts.
+    pub fn oracle_relative(&self) -> bool {
+        // `AS OF <interval>` needs the oracle timestamp
+        if let QueryWhen::AtLeastTimestamp(expr) | QueryWhen::AtTimestamp(expr) = self {
+            let typ = expr.typ(&[]);
+            return typ.scalar_type == ScalarType::Interval;
+        }
+        false
+    }
 }
 
 #[derive(Debug, Copy, Clone)]

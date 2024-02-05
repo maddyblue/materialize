@@ -69,7 +69,7 @@ impl Coordinator {
                     (ctx, SubscribeStage::OptimizeMir(next))
                 }
                 OptimizeMir(stage) => {
-                    self.subscribe_optimize_mir(ctx, stage, otel_ctx);
+                    self.subscribe_optimize_mir(ctx, stage, otel_ctx).await;
                     return;
                 }
                 Timestamp(stage) => {
@@ -160,7 +160,7 @@ impl Coordinator {
         })
     }
 
-    fn subscribe_optimize_mir(
+    async fn subscribe_optimize_mir(
         &mut self,
         mut ctx: ExecuteContext,
         SubscribeOptimizeMir {
@@ -173,6 +173,7 @@ impl Coordinator {
         let plan::SubscribePlan {
             with_snapshot,
             up_to,
+            when,
             ..
         } = &plan;
 
@@ -186,13 +187,15 @@ impl Coordinator {
             .expect("compute instance does not exist");
         let id = return_if_err!(self.allocate_transient_id(), ctx);
         let conn_id = ctx.session().conn_id().clone();
+        let oracle_read_ts = self.oracle_read_ts(&ctx.session, &timeline, when).await;
         let up_to = return_if_err!(
             up_to
                 .as_ref()
                 .map(|expr| Coordinator::evaluate_when(
                     self.catalog().state(),
                     expr.clone(),
-                    ctx.session_mut()
+                    ctx.session_mut(),
+                    &oracle_read_ts,
                 ))
                 .transpose(),
             ctx
@@ -225,6 +228,7 @@ impl Coordinator {
                     validity,
                     plan,
                     timeline,
+                    oracle_read_ts,
                     optimizer,
                     global_mir_plan,
                 });
@@ -245,6 +249,7 @@ impl Coordinator {
             validity,
             plan,
             timeline,
+            oracle_read_ts,
             optimizer,
             global_mir_plan,
         }: SubscribeTimestamp,
@@ -252,7 +257,6 @@ impl Coordinator {
         let plan::SubscribePlan { when, .. } = &plan;
 
         // Timestamp selection
-        let oracle_read_ts = self.oracle_read_ts(&ctx.session, &timeline, when).await;
         let as_of = match self
             .determine_timestamp(
                 ctx.session(),

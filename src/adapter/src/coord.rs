@@ -735,6 +735,7 @@ pub struct SubscribeTimestamp {
     validity: PlanValidity,
     plan: plan::SubscribePlan,
     timeline: TimelineContext,
+    oracle_read_ts: Option<Timestamp>,
     optimizer: optimize::subscribe::Optimizer,
     global_mir_plan: optimize::subscribe::GlobalMirPlan<optimize::subscribe::Unresolved>,
 }

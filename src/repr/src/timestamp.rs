@@ -404,6 +404,16 @@ impl TryFrom<i64> for Timestamp {
     }
 }
 
+impl TryFrom<i128> for Timestamp {
+    type Error = TryFromIntError;
+
+    fn try_from(value: i128) -> Result<Self, Self::Error> {
+        Ok(Self {
+            internal: value.try_into()?,
+        })
+    }
+}
+
 impl TryFrom<Numeric> for Timestamp {
     type Error = TryFromDecimalError;
 

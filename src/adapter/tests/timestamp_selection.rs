@@ -18,6 +18,7 @@ use mz_adapter::session::Session;
 use mz_adapter::{CollectionIdBundle, TimelineContext, TimestampProvider};
 use mz_compute_types::ComputeInstanceId;
 use mz_expr::MirScalarExpr;
+use mz_repr::strconv::parse_interval;
 use mz_repr::{Datum, GlobalId, ScalarType, Timestamp};
 use mz_sql::plan::QueryWhen;
 use mz_sql::session::vars::IsolationLevel;
@@ -158,8 +159,13 @@ fn parse_query_when(s: &str) -> QueryWhen {
     let s = s.to_lowercase();
     match s.split_once(':') {
         Some((when, ts)) => {
-            let ts: i64 = ts.parse().unwrap();
-            let expr = MirScalarExpr::literal_ok(Datum::Int64(ts), ScalarType::Int64);
+            let expr = if let Ok(ts) = ts.parse() {
+                MirScalarExpr::literal_ok(Datum::Int64(ts), ScalarType::Int64)
+            } else if let Ok(interval) = parse_interval(ts) {
+                MirScalarExpr::literal(Ok(Datum::Interval(interval)), ScalarType::Interval)
+            } else {
+                panic!("bad expr {ts}");
+            };
             match when {
                 "attimestamp" => QueryWhen::AtTimestamp(expr),
                 "atleasttimestamp" => QueryWhen::AtLeastTimestamp(expr),
@@ -200,6 +206,7 @@ fn test_timestamp_selection() {
         let catalog = CatalogState::empty();
         let mut isolation = TransactionIsolationLevel::StrictSerializable;
         tf.run(move |tc| -> String {
+            dbg!(&tc);
             match tc.directive.as_str() {
                 "set-compute" => {
                     let set: Set = serde_json::from_str(&tc.input).unwrap();
@@ -262,7 +269,7 @@ fn test_timestamp_selection() {
                         None
                     };
 
-                    let ts = block_on(f.determine_timestamp_for(
+                    let ts = dbg!(block_on(f.determine_timestamp_for(
                         &catalog,
                         &session,
                         &det.id_bundle.into(),
@@ -272,7 +279,7 @@ fn test_timestamp_selection() {
                         oracle_read_ts,
                         None, /* real_time_recency_ts */
                         &IsolationLevel::from(isolation),
-                    ))
+                    )))
                     .unwrap();
 
                     if tc.args.contains_key("full") {

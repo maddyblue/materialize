@@ -251,6 +251,7 @@ pub trait TimestampProvider {
         // - The isolation level is Strict Serializable and the `when` allows us to use the
         //   the timestamp oracle (ex: queries with no AS OF).
         // - The `when` requires us to use the timestamp oracle (ex: read-then-write queries).
+        // - The `when` requires the oracle to evaluate (ex: `AS OF <interval>`).
         let linearized_timeline = match &timeline {
             Some(timeline)
                 if when.must_advance_to_timeline_ts()
@@ -259,7 +260,8 @@ pub trait TimestampProvider {
                             isolation_level,
                             IsolationLevel::StrictSerializable
                                 | IsolationLevel::StrongSessionSerializable
-                        )) =>
+                        ))
+                    || when.oracle_relative() =>
             {
                 Some(timeline.clone())
             }
@@ -328,7 +330,7 @@ pub trait TimestampProvider {
         let mut candidate = Timestamp::minimum();
 
         if let Some(timestamp) = when.advance_to_timestamp() {
-            let ts = Coordinator::evaluate_when(catalog, timestamp, session)?;
+            let ts = Coordinator::evaluate_when(catalog, timestamp, session, &oracle_read_ts)?;
             candidate.join_assign(&ts);
         }
 
@@ -634,6 +636,7 @@ impl Coordinator {
         catalog: &CatalogState,
         mut timestamp: MirScalarExpr,
         session: &Session,
+        oracle_read_ts: &Option<Timestamp>,
     ) -> Result<mz_repr::Timestamp, AdapterError> {
         let temp_storage = RowArena::new();
         prep_scalar_expr(&mut timestamp, ExprPrepStyle::AsOfUpTo)?;
@@ -659,6 +662,21 @@ impl Coordinator {
             }
             ScalarType::Timestamp { .. } => {
                 evaled.unwrap_timestamp().timestamp_millis().try_into()?
+            }
+            ScalarType::Interval => {
+                // See get_linearized_timeline for when this is None.
+                let Some(oracle_read_ts) = oracle_read_ts else {
+                    coord_bail!("can't use interval in AS OF or UP TO in this context");
+                };
+                let interval = evaled.unwrap_interval().as_milliseconds();
+                if interval < 0 {
+                    let Some(interval) = interval.checked_abs() else {
+                        coord_bail!("incompatible interval in AS OF or UP TO");
+                    };
+                    oracle_read_ts.saturating_sub(Timestamp::try_from(interval)?)
+                } else {
+                    oracle_read_ts.saturating_add(Timestamp::try_from(interval)?)
+                }
             }
             _ => coord_bail!(
                 "can't use {} as a mz_timestamp for AS OF or UP TO",
