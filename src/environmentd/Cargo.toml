@@ -12,7 +12,7 @@ publish = false
 workspace = true
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.79"
 askama = { version = "0.11.1", default-features = false, features = [
   "config",
   "serde-json",
@@ -152,7 +152,7 @@ timely = { version = "0.12.0", default-features = false, features = [
 tokio-postgres = { version = "0.7.8", features = ["with-chrono-0_4"] }
 
 [build-dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.79"
 cc = "1.0.78"
 mz-npm = { path = "../npm" }
 
