@@ -27,7 +27,7 @@ proptest = { version = "1.0.0", default-features = false, features = [
     "std",
 ], optional = true }
 proptest-derive = { version = "0.3.0", features = ["boxed_union"]}
-prost = { version = "0.11.3", features = [
+prost = { version = "0.12.3", features = [
     "no-recursion-limit",
 ], optional = true }
 serde = { version = "1.0.152", features = ["derive"], optional = true }
