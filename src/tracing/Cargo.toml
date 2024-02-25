@@ -10,7 +10,7 @@ publish = false
 workspace = true
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.80"
 mz-ore = { path = "../ore" }
 mz-proto = { path = "../proto" }
 prost = { version = "0.11.3", features = ["no-recursion-limit"] }

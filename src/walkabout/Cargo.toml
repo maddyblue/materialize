@@ -10,7 +10,7 @@ publish = false
 workspace = true
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.80"
 itertools = "0.10.5"
 mz-ore = { path = "../ore", default-features = false }
 quote = "1.0.23"

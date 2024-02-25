@@ -10,7 +10,7 @@ publish = false
 workspace = true
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.80"
 async-compression = { version = "0.4.5", features = ["tokio", "gzip"] }
 async-trait = "0.1.68"
 atty = "0.2.0"
