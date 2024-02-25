@@ -13,7 +13,7 @@ workspace = true
 anyhow = "1.0.66"
 mz-ore = { path = "../ore", features = ["metrics", "network", "async", "test"] }
 mz-proto = { path = "../proto" }
-paste = "1.0.11"
+paste = "1.0.14"
 prometheus = { version = "0.13.3", default-features = false }
 prost = { version = "0.11.9", features = ["no-recursion-limit"] }
 serde = "1.0.152"
