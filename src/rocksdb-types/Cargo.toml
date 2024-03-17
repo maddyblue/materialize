@@ -10,7 +10,7 @@ publish = false
 workspace = true
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.81"
 mz-ore = { path = "../ore", features = ["async", "metrics", "test"] }
 mz-proto = { path = "../proto" }
 num_cpus = "1.14.0"

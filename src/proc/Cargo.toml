@@ -15,7 +15,7 @@ repository = "https://github.com/MaterializeInc/materialize"
 workspace = true
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.81"
 libc = "0.2.138"
 mz-ore = { path = "../ore", features = ["async"], default-features = false }
 workspace-hack = { version = "0.0.0", path = "../workspace-hack", optional = true }

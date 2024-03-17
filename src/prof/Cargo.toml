@@ -11,7 +11,7 @@ license = "Apache-2.0"
 workspace = true
 
 [dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.81"
 backtrace = "0.3.66"
 flate2 = "1.0.24"
 libc = "0.2.138"
@@ -27,7 +27,7 @@ tokio = { version = "1.32.0", features = ["time"] }
 workspace-hack = { version = "0.0.0", path = "../workspace-hack", optional = true }
 
 [build-dependencies]
-anyhow = "1.0.66"
+anyhow = "1.0.81"
 prost-build = "0.11.2"
 protobuf-src = "1.1.0"
 
