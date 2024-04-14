@@ -83,7 +83,7 @@ postgres = { git = "https://github.com/MaterializeInc/rust-postgres", default-fe
 postgres-types = { git = "https://github.com/MaterializeInc/rust-postgres", default-features = false, features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
 predicates = { version = "2.1.4" }
 proc-macro2 = { version = "1.0.69", features = ["span-locations"] }
-prost = { version = "0.11.9", features = ["no-recursion-limit"] }
+prost = { version = "0.12.4", features = ["no-recursion-limit"] }
 prost-reflect = { version = "0.11.4", default-features = false, features = ["serde"] }
 prost-types = { version = "0.11.9" }
 quote = { version = "1.0.28" }
@@ -198,7 +198,7 @@ postgres = { git = "https://github.com/MaterializeInc/rust-postgres", default-fe
 postgres-types = { git = "https://github.com/MaterializeInc/rust-postgres", default-features = false, features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
 predicates = { version = "2.1.4" }
 proc-macro2 = { version = "1.0.69", features = ["span-locations"] }
-prost = { version = "0.11.9", features = ["no-recursion-limit"] }
+prost = { version = "0.12.4", features = ["no-recursion-limit"] }
 prost-reflect = { version = "0.11.4", default-features = false, features = ["serde"] }
 prost-types = { version = "0.11.9" }
 quote = { version = "1.0.28" }
