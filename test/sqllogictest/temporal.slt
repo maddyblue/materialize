@@ -16,6 +16,20 @@ mode cockroach
 statement ok
 CREATE VIEW intervals (a, b) AS VALUES (1, 10), (1, 2), (2, 13), (3, 1), (0, 10), (5, 18446744073709551614)
 
+statement ok
+CREATE MATERIALIZED VIEW mznow_exprs AS
+SELECT *
+FROM intervals
+WHERE mz_now() + '1h'::interval < b
+
+query II rowsort
+select * from mznow_exprs AS OF 2
+----
+0  10
+1  10
+1  2
+2  13
+
 # Select out rows when each are valid.
 statement ok
 CREATE MATERIALIZED VIEW valid AS

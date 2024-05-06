@@ -1851,16 +1851,23 @@ impl MirScalarExpr {
         }
     }
 
-    /// True iff the expression contains
-    /// `UnmaterializableFunc::MzNow`.
+    /// Whether the expression contains `UnmaterializableFunc::MzNow`.
     pub fn contains_temporal(&self) -> bool {
         let mut contains = false;
         self.visit_pre(|e| {
-            if let MirScalarExpr::CallUnmaterializable(UnmaterializableFunc::MzNow) = e {
+            if e.is_temporal() {
                 contains = true;
             }
         });
         contains
+    }
+
+    /// Whether the expression is `UnmaterializableFunc::MzNow`.
+    pub fn is_temporal(&self) -> bool {
+        matches!(
+            self,
+            MirScalarExpr::CallUnmaterializable(UnmaterializableFunc::MzNow)
+        )
     }
 
     /// True iff the expression contains an `UnmaterializableFunc`.
@@ -2377,6 +2384,7 @@ pub enum EvalError {
     UInt64OutOfRange(String),
     MzTimestampOutOfRange(String),
     MzTimestampStepOverflow,
+    MzTimestampOverflow,
     OidOutOfRange(String),
     IntervalOutOfRange(String),
     TimestampCannotBeNan,
@@ -2504,6 +2512,7 @@ impl fmt::Display for EvalError {
                 write!(f, "{} mz_timestamp out of range", val.quoted())
             }
             EvalError::MzTimestampStepOverflow => f.write_str("step mz_timestamp overflow"),
+            EvalError::MzTimestampOverflow => f.write_str("mz_timestamp overflow"),
             EvalError::OidOutOfRange(val) => write!(f, "{} OID out of range", val.quoted()),
             EvalError::IntervalOutOfRange(val) => {
                 write!(f, "{} interval out of range", val.quoted())
@@ -2807,6 +2816,7 @@ impl RustType<ProtoEvalError> for EvalError {
                 value: val.to_string(),
             }),
             EvalError::MzTimestampStepOverflow => MzTimestampStepOverflow(()),
+            EvalError::MzTimestampOverflow => MzTimestampOverflow(()),
             EvalError::OidOutOfRange(val) => OidOutOfRange(ProtoValueOutOfRange {
                 value: val.to_string(),
             }),
@@ -2950,6 +2960,7 @@ impl RustType<ProtoEvalError> for EvalError {
                 Uint64OutOfRange(val) => Ok(EvalError::UInt64OutOfRange(val.value)),
                 MzTimestampOutOfRange(val) => Ok(EvalError::MzTimestampOutOfRange(val.value)),
                 MzTimestampStepOverflow(()) => Ok(EvalError::MzTimestampStepOverflow),
+                MzTimestampOverflow(()) => Ok(EvalError::MzTimestampOverflow),
                 OidOutOfRange(val) => Ok(EvalError::OidOutOfRange(val.value)),
                 IntervalOutOfRange(val) => Ok(EvalError::IntervalOutOfRange(val.value)),
                 TimestampCannotBeNan(()) => Ok(EvalError::TimestampCannotBeNan),
