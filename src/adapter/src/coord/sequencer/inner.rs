@@ -156,20 +156,32 @@ impl Coordinator {
             .await;
         let stage = return_if_err!(next, ctx);
         let internal_cmd_tx = self.internal_cmd_tx.clone();
+        let (tx, rx) = oneshot::channel();
+        // This is removed at transaction/connection close. There may be one that is overwritten
+        // here from a previous statement in this transaction, and that is safe because it has no
+        // listener and its rx was dropped.
+        self.active_staged.insert(ctx.session.conn_id().clone(), tx);
         match stage {
             StageResult::Handle(handle) => {
                 spawn(|| "sequence_staged", async move {
-                    let next = match handle.await {
-                        Ok(next) => return_if_err!(next, ctx),
-                        Err(err) => {
-                            tracing::error!("sequence_staged join error {err}");
-                            ctx.retire(Err(AdapterError::Internal(
-                                "sequence_staged join error".into(),
-                            )));
-                            return;
+                    tokio::select! {
+                        res = handle => {
+                            let next = match res {
+                                Ok(next) => return_if_err!(next, ctx),
+                                Err(err) => {
+                                    tracing::error!("sequence_staged join error {err}");
+                                    ctx.retire(Err(AdapterError::Internal(
+                                        "sequence_staged join error".into(),
+                                    )));
+                                    return;
+                                }
+                            };
+                            let _ = internal_cmd_tx.send(next.message(ctx, parent_span));
                         }
-                    };
-                    let _ = internal_cmd_tx.send(next.message(ctx, parent_span));
+                        _ = rx => {
+                            ctx.retire(Err(AdapterError::Canceled));
+                        }
+                    }
                 });
             }
             StageResult::Response(resp) => {

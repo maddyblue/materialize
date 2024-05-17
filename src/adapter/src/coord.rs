@@ -1352,6 +1352,8 @@ pub struct Coordinator {
     active_compute_sinks: BTreeMap<GlobalId, ActiveComputeSink>,
     /// A map from active webhooks to their invalidation handle.
     active_webhooks: BTreeMap<GlobalId, WebhookAppenderInvalidator>,
+    /// A map from connection ids to a cancel handle.
+    active_staged: BTreeMap<ConnectionId, oneshot::Sender<()>>,
 
     /// Serializes accesses to write critical sections.
     write_lock: Arc<tokio::sync::Mutex<()>>,
@@ -3082,6 +3084,7 @@ pub fn serve(
                     pending_linearize_read_txns: BTreeMap::new(),
                     active_compute_sinks: BTreeMap::new(),
                     active_webhooks: BTreeMap::new(),
+                    active_staged: BTreeMap::new(),
                     write_lock: Arc::new(tokio::sync::Mutex::new(())),
                     write_lock_wait_group: VecDeque::new(),
                     pending_writes: Vec::new(),
