@@ -23,7 +23,7 @@ use mz_cloud_resources::VpcEndpointConfig;
 use mz_controller_types::{ClusterId, ReplicaId};
 use mz_expr::{CollectionPlan, MirScalarExpr, OptimizedMirRelationExpr, RowSetFinishing};
 use mz_ore::collections::{CollectionExt, HashSet};
-use mz_ore::task::{self, spawn};
+use mz_ore::task::{self, spawn, JoinHandle};
 use mz_ore::tracing::OpenTelemetryContext;
 use mz_ore::vec::VecExt;
 use mz_proto::RustType;
@@ -90,8 +90,8 @@ use crate::coord::id_bundle::CollectionIdBundle;
 use crate::coord::timestamp_selection::{TimestampDetermination, TimestampSource};
 use crate::coord::{
     AlterConnectionValidationReady, Coordinator, CreateConnectionValidationReady, ExecuteContext,
-    ExplainContext, Message, PeekStage, PeekStageValidate, PendingRead, PendingReadTxn, PendingTxn,
-    PendingTxnResponse, PlanValidity, RealTimeRecencyContext, StageResult, Staged, TargetCluster,
+    ExplainContext, Message, PendingRead, PendingReadTxn, PendingTxn, PendingTxnResponse,
+    PlanValidity, RealTimeRecencyContext, StageResult, Staged, TargetCluster,
 };
 use crate::error::AdapterError;
 use crate::notice::{AdapterNotice, DroppedInUseIndex};
@@ -150,44 +150,69 @@ impl Coordinator {
         mut stage: S,
     ) {
         return_if_err!(stage.validity().check(self.catalog()), ctx);
-        let next = stage
-            .stage(self, &mut ctx)
-            .instrument(parent_span.clone())
-            .await;
-        let stage = return_if_err!(next, ctx);
-        let internal_cmd_tx = self.internal_cmd_tx.clone();
-        let (tx, rx) = oneshot::channel();
-        // This is removed at transaction/connection close. There may be one that is overwritten
-        // here from a previous statement in this transaction, and that is safe because it has no
-        // listener and its rx was dropped.
-        self.active_staged.insert(ctx.session.conn_id().clone(), tx);
-        match stage {
-            StageResult::Handle(handle) => {
-                spawn(|| "sequence_staged", async move {
-                    tokio::select! {
-                        res = handle => {
-                            let next = match res {
-                                Ok(next) => return_if_err!(next, ctx),
-                                Err(err) => {
-                                    tracing::error!("sequence_staged join error {err}");
-                                    ctx.retire(Err(AdapterError::Internal(
-                                        "sequence_staged join error".into(),
-                                    )));
-                                    return;
-                                }
-                            };
-                            let _ = internal_cmd_tx.send(next.message(ctx, parent_span));
-                        }
-                        _ = rx => {
-                            ctx.retire(Err(AdapterError::Canceled));
-                        }
-                    }
-                });
-            }
-            StageResult::Response(resp) => {
-                ctx.retire(Ok(resp));
+        loop {
+            let next = stage
+                .stage(self, &mut ctx)
+                .instrument(parent_span.clone())
+                .await;
+            let res = return_if_err!(next, ctx);
+            stage = match res {
+                StageResult::Handle(handle) => {
+                    let internal_cmd_tx = self.internal_cmd_tx.clone();
+                    self.handle_spawn(ctx, handle, move |ctx, next| {
+                        let _ = internal_cmd_tx.send(next.message(ctx, parent_span));
+                    });
+                    return;
+                }
+                StageResult::HandleRetire(handle) => {
+                    self.handle_spawn(ctx, handle, move |ctx, resp| {
+                        ctx.retire(Ok(resp));
+                    });
+                    return;
+                }
+                StageResult::Immediate(stage) => *stage,
+                StageResult::Response(resp) => {
+                    ctx.retire(Ok(resp));
+                    return;
+                }
             }
         }
+    }
+
+    fn handle_spawn<T, F>(
+        &mut self,
+        ctx: ExecuteContext,
+        handle: JoinHandle<Result<T, AdapterError>>,
+        f: F,
+    ) where
+        T: Send + 'static,
+        F: FnOnce(ExecuteContext, T) + Send + 'static,
+    {
+        let (tx, rx) = oneshot::channel();
+        // This is removed at transaction/connection close. There may be one that is
+        // overwritten here from a previous statement in this transaction, and that is safe
+        // because it has no listener and its rx was dropped.
+        self.active_staged.insert(ctx.session.conn_id().clone(), tx);
+        spawn(|| "sequence_staged", async move {
+            tokio::select! {
+                res = handle => {
+                    let next = match res {
+                        Ok(next) => return_if_err!(next, ctx),
+                        Err(err) => {
+                            tracing::error!("sequence_staged join error {err}");
+                            ctx.retire(Err(AdapterError::Internal(
+                                "sequence_staged join error".into(),
+                            )));
+                            return;
+                        }
+                    };
+                    f(ctx, next);
+                }
+                _ = rx => {
+                    ctx.retire(Err(AdapterError::Canceled));
+                }
+            }
+        });
     }
 
     async fn create_source_inner(
@@ -2083,17 +2108,17 @@ impl Coordinator {
                 plan,
                 desc: _,
             }) => {
-                self.execute_peek_stage(
-                    ctx,
-                    OpenTelemetryContext::obtain(),
-                    PeekStage::Validate(PeekStageValidate {
+                let stage = return_if_err!(
+                    self.peek_validate(
+                        ctx.session(),
                         plan,
                         target_cluster,
-                        copy_to_ctx: None,
-                        explain_ctx: ExplainContext::Pushdown,
-                    }),
-                )
-                .await;
+                        None,
+                        ExplainContext::Pushdown
+                    ),
+                    ctx
+                );
+                self.sequence_staged(ctx, Span::current(), stage).await;
             }
             _ => {
                 ctx.retire(Err(AdapterError::Unsupported(

@@ -165,11 +165,10 @@ impl Coordinator {
                 }
                 Message::PeekStageReady {
                     ctx,
-                    otel_ctx,
+                    span,
                     stage,
                 } => {
-                    otel_ctx.attach_as_parent();
-                    self.execute_peek_stage(ctx, otel_ctx, stage).await;
+                    self.sequence_staged(ctx, span, stage).await;
                 }
                 Message::CreateIndexStageReady {
                     ctx,
@@ -880,7 +879,7 @@ impl Coordinator {
                 optimizer,
                 explain_ctx,
             } => {
-                self.execute_peek_stage(
+                self.sequence_staged(
                     ctx,
                     root_otel_ctx,
                     PeekStage::TimestampReadHold(PeekStageTimestampReadHold {

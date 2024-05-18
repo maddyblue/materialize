@@ -247,7 +247,7 @@ pub enum Message<T = mz_repr::Timestamp> {
     },
     PeekStageReady {
         ctx: ExecuteContext,
-        otel_ctx: OpenTelemetryContext,
+        span: Span,
         stage: PeekStage,
     },
     CreateIndexStageReady {
@@ -398,7 +398,6 @@ impl RealTimeRecencyContext {
 #[derive(Debug)]
 pub enum PeekStage {
     /// Common stages across SELECT, EXPLAIN and COPY TO queries.
-    Validate(PeekStageValidate),
     LinearizeTimestamp(PeekStageLinearizeTimestamp),
     RealTimeRecency(PeekStageRealTimeRecency),
     TimestampReadHold(PeekStageTimestampReadHold),
@@ -410,24 +409,6 @@ pub enum PeekStage {
     ExplainPushdown(PeekStageExplainPushdown),
     /// Final stage for a copy to.
     CopyTo(PeekStageCopyTo),
-}
-
-impl PeekStage {
-    fn validity(&mut self) -> Option<&mut PlanValidity> {
-        match self {
-            PeekStage::Validate(_) => None,
-            PeekStage::LinearizeTimestamp(PeekStageLinearizeTimestamp { validity, .. })
-            | PeekStage::RealTimeRecency(PeekStageRealTimeRecency { validity, .. })
-            | PeekStage::TimestampReadHold(PeekStageTimestampReadHold { validity, .. })
-            | PeekStage::Optimize(PeekStageOptimize { validity, .. })
-            | PeekStage::Finish(PeekStageFinish { validity, .. })
-            | PeekStage::CopyTo(PeekStageCopyTo { validity, .. })
-            | PeekStage::ExplainPlan(PeekStageExplainPlan { validity, .. })
-            | PeekStage::ExplainPushdown(PeekStageExplainPushdown { validity, .. }) => {
-                Some(validity)
-            }
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -449,21 +430,6 @@ pub struct CopyToContext {
     /// This is only an option since it's not set when CopyToContext is instantiated
     /// but immediately after in the PeekStageValidate stage.
     pub output_batch_count: Option<u64>,
-}
-
-#[derive(Debug)]
-pub struct PeekStageValidate {
-    plan: mz_sql::plan::SelectPlan,
-    target_cluster: TargetCluster,
-    /// An optional context set iff the state machine is initiated from
-    /// sequencing a COPY TO statement.
-    ///
-    /// Will result in creating and using [`optimize::copy_to::Optimizer`] in
-    /// the `optimizer` field of all subsequent stages.
-    copy_to_ctx: Option<CopyToContext>,
-    /// An optional context set iff the state machine is initiated from
-    /// sequencing an EXPLAIN for this statement.
-    explain_ctx: ExplainContext,
 }
 
 #[derive(Debug)]
@@ -843,6 +809,10 @@ impl PlanValidity {
 pub(crate) enum StageResult<T> {
     /// A task was spawned that will return the next stage.
     Handle(JoinHandle<Result<T, AdapterError>>),
+    /// A task was spawned that will return a response for the client.
+    HandleRetire(JoinHandle<Result<ExecuteResponse, AdapterError>>),
+    /// The next stage is immediately ready and will execute.
+    Immediate(T),
     /// The finaly stage was executed and is ready to respond to the client.
     Response(ExecuteResponse),
 }
