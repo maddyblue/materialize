@@ -10,6 +10,7 @@
 use crate::coord::{Coordinator, Message};
 use differential_dataflow::lattice::Lattice;
 use itertools::Itertools;
+use mz_adapter_types::connection::ConnectionId;
 use mz_catalog::memory::objects::{CatalogItem, ClusterVariant, ClusterVariantManaged};
 use mz_controller_types::ClusterId;
 use mz_ore::soft_panic_or_log;
@@ -252,5 +253,35 @@ impl Coordinator {
         } else {
             None
         }
+    }
+
+    pub(crate) async fn handle_cluster_reconfiguration(&mut self, connid: ConnectionId) {
+        let Some(reconfig) = self.pending_cluster_reconfigurations.get(&connid) else {
+            // Was canceled.
+            return;
+        };
+        let internal_cmd_tx = self.internal_cmd_tx.clone();
+
+        // does logic to determine if done or not done.
+        let done = reconfig.started_at.elapsed() > wait_for_time;
+        // if done, finalize:
+        {
+            // do finalize logic
+            // blah
+            // return success to user
+            reconfig.ctx.retire(Ok(todo!()));
+            return;
+        }
+        // if not done, wait again:
+        let wait_duration = if is_wait_for_stmt {
+            wait_for_time
+        } else {
+            std::time::Duration::from_secs(10)
+        };
+        mz_ore::task::spawn(|| "", async move {
+            // some wait condition
+            tokio::time::sleep(wait_duration).wait;
+            let _ = internal_cmd_tx.send(Message::ClusterReconfigurationReady(connid));
+        });
     }
 }

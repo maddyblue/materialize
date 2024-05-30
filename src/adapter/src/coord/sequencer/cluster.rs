@@ -33,7 +33,7 @@ use mz_sql::session::metadata::SessionMetadata;
 use mz_sql::session::vars::{SystemVars, Var, MAX_REPLICAS_PER_CLUSTER};
 
 use crate::catalog::Op;
-use crate::coord::Coordinator;
+use crate::coord::{Coordinator, PendingClusterReconfiguration};
 use crate::session::Session;
 use crate::{catalog, AdapterError, ExecuteResponse};
 
@@ -695,6 +695,19 @@ impl Coordinator {
         let name = cluster.name().to_string();
         let owner_id = cluster.owner_id();
         let mut ops = vec![];
+
+        /// this needs to go into its own function
+        let whatever = PendingClusterReconfiguration {};
+        // do start logic like make replicas, update tables
+        self.pending_cluster_reconfigurations
+            .insert(session.unwrap().conn_id().clone(), whatever);
+        let _ = self
+            .internal_cmd_tx
+            .send(crate::coord::Message::ClusterReconfigurationReady(
+                session.unwrap().conn_id().clone(),
+            ));
+        return;
+        /////
 
         let (
             ClusterVariantManaged {

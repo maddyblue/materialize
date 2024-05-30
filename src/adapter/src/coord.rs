@@ -223,6 +223,8 @@ pub enum Message<T = mz_repr::Timestamp> {
         conn_id: ConnectionId,
     },
     LinearizeReads,
+    // TODO: Add some idempotency token.
+    ClusterReconfigurationReady(ConnectionId),
     StorageUsageSchedule,
     StorageUsageFetch,
     StorageUsageUpdate(ShardsUsageReferenced),
@@ -1010,6 +1012,13 @@ impl From<PendingTxnResponse> for ExecuteResponse {
 }
 
 #[derive(Debug)]
+pub struct PendingClusterReconfiguration {
+    ctx: ExecuteContext,
+    whatever: bool,
+    started_at: Instant,
+}
+
+#[derive(Debug)]
 /// A pending read transaction waiting to be linearized along with metadata about it's state
 pub struct PendingReadTxn {
     /// The transaction type
@@ -1347,6 +1356,8 @@ pub struct Coordinator {
 
     /// A map from client connection ids to pending linearize read transaction.
     pending_linearize_read_txns: BTreeMap<ConnectionId, PendingReadTxn>,
+
+    pending_cluster_reconfigurations: BTreeMap<ConnectionId, PendingClusterReconfiguration>,
 
     /// A map from the compute sink ID to it's state description.
     active_compute_sinks: BTreeMap<GlobalId, ActiveComputeSink>,

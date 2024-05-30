@@ -221,6 +221,9 @@ impl Coordinator {
                 Message::SchedulingDecisions(decisions) => {
                     self.handle_scheduling_decisions(decisions).await;
                 }
+                Message::ClusterReconfigurationReady(connid) => {
+                    self.handle_cluster_reconfiguration(connid).await;
+                }
             }
         }
         .instrument(span)
